@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm ci && npm run build -w apps/api
+    buildCommand: npm ci --include=dev && npm run build -w apps/api
     startCommand: npm start -w apps/api
     healthCheckPath: /health
     autoDeploy: true
@@ -25,7 +25,7 @@ services:
   - type: web
     name: soulmate-web
     runtime: static
-    buildCommand: npm ci && npm run build -w apps/web
+    buildCommand: npm ci --include=dev && npm run build -w apps/web
     staticPublishPath: apps/web/dist
     autoDeploy: true
     envVars:
