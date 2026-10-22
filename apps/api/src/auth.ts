@@ -11,6 +11,8 @@ export type TokenVerifier = (token: string) => Promise<AuthUser | null>;
 declare module "express-serve-static-core" {
   interface Request {
     user?: AuthUser;
+    /** The caller's JWT, used to query Supabase under their own RLS permissions. */
+    accessToken?: string;
   }
 }
 
@@ -44,6 +46,7 @@ export function requireAuth(verify: TokenVerifier | null) {
         return;
       }
       req.user = user;
+      req.accessToken = match[1];
       next();
     } catch {
       res.status(401).json({ error: "Invalid or expired token" });

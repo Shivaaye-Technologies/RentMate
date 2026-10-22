@@ -4,23 +4,25 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
-import { rankMatches, type MatchProfile } from "./matching.js";
+import { displayDistanceKm, isOnline, rankMatches, type MatchProfile } from "./matching.js";
 import { MessageInput, ProfileInput } from "./validation.js";
 
-/** Data access the routes depend on. Swap in a Supabase-backed store in production. */
+/** Data access the routes depend on. */
 export interface ProfileStore {
   upsertProfile(userId: string, profile: ProfileInput): Promise<void>;
   getProfile(userId: string): Promise<MatchProfile | null>;
+  /** Other users' profiles, excluding anyone the user already liked or passed on. */
   listCandidates(userId: string): Promise<MatchProfile[]>;
 }
 
 export interface AppDeps {
   config: AppConfig;
   verifyToken: TokenVerifier | null;
-  store: ProfileStore;
+  /** Returns the store for an authenticated request (Supabase uses the caller's token). */
+  storeFor: (req: Request) => ProfileStore;
 }
 
-export function createApp({ config, verifyToken, store }: AppDeps) {
+export function createApp({ config, verifyToken, storeFor }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.use(helmet());
@@ -42,7 +44,7 @@ export function createApp({ config, verifyToken, store }: AppDeps) {
         res.status(400).json({ error: "Invalid profile", issues: parsed.error.issues });
         return;
       }
-      await store.upsertProfile(req.user!.id, parsed.data);
+      await storeFor(req).upsertProfile(req.user!.id, parsed.data);
       res.status(204).end();
     } catch (err) {
       next(err);
@@ -51,13 +53,31 @@ export function createApp({ config, verifyToken, store }: AppDeps) {
 
   api.get("/matches", async (req, res, next) => {
     try {
+      const store = storeFor(req);
       const me = await store.getProfile(req.user!.id);
       if (!me) {
         res.status(404).json({ error: "Create your profile first" });
         return;
       }
       const candidates = await store.listCandidates(req.user!.id);
-      res.json({ matches: rankMatches(me, candidates) });
+      const byId = new Map(candidates.map((c) => [c.id, c]));
+      const matches = rankMatches(me, candidates).map((m) => {
+        const c = byId.get(m.id)!;
+        return {
+          ...m,
+          displayName: c.displayName ?? "",
+          age: c.age,
+          bio: c.bio ?? "",
+          interests: c.interests,
+          lookingFor: c.lookingFor,
+          photoPath: c.photoPath ?? null,
+          verified: c.verified ?? false,
+          online: isOnline(c.lastSeenAt),
+          distanceKm: displayDistanceKm(me, c),
+          joinedAt: c.joinedAt ?? null,
+        };
+      });
+      res.json({ matches });
     } catch (err) {
       next(err);
     }

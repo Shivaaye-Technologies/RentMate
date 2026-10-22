@@ -50,3 +50,27 @@ describe("rankMatches", () => {
     expect(rankMatches(me, [base({ id: "x" }), base({ id: "y" })], 1)).toHaveLength(1);
   });
 });
+
+describe("distance and online status", () => {
+  it("computes distance between two cities", async () => {
+    const { distanceKm } = await import("../src/matching.js");
+    // Bengaluru to Mumbai is about 840 km.
+    const d = distanceKm({ lat: 12.97, lng: 77.59 }, { lat: 19.08, lng: 72.88 })!;
+    expect(d).toBeGreaterThan(820);
+    expect(d).toBeLessThan(860);
+  });
+
+  it("shows at least 1 km and null when a location is missing", async () => {
+    const { displayDistanceKm } = await import("../src/matching.js");
+    expect(displayDistanceKm({ lat: 12.97, lng: 77.59 }, { lat: 12.97, lng: 77.59 })).toBe(1);
+    expect(displayDistanceKm({ lat: 12.97, lng: 77.59 }, { lat: null, lng: 77.59 })).toBeNull();
+  });
+
+  it("treats people seen in the last 10 minutes as online", async () => {
+    const { isOnline } = await import("../src/matching.js");
+    const now = Date.parse("2026-10-23T12:00:00Z");
+    expect(isOnline("2026-10-23T11:55:00Z", now)).toBe(true);
+    expect(isOnline("2026-10-23T11:40:00Z", now)).toBe(false);
+    expect(isOnline(undefined, now)).toBe(false);
+  });
+});

@@ -1,3 +1,5 @@
+import { distanceKm, isNew, isOnline, type LookingFor, type ProfileRow } from "./profile";
+
 export type HealthState = "checking" | "online" | "offline";
 
 /** Base URL of the API. Set VITE_API_URL at build time; defaults to local dev. */
@@ -15,4 +17,70 @@ export async function checkHealth(fetchFn: typeof fetch = fetch, base = apiBaseU
   } catch {
     return "offline";
   }
+}
+
+/** A person shown in the app (from the API's ranking, or built from a profile row). */
+export interface Person {
+  id: string;
+  score: number;
+  sharedInterests: string[];
+  displayName: string;
+  age: number;
+  bio: string;
+  interests: string[];
+  lookingFor: LookingFor;
+  photoPath: string | null;
+  verified: boolean;
+  online: boolean;
+  distanceKm: number | null;
+  joinedAt: string | null;
+}
+
+/** Ranked people to discover, from the API's matching engine. */
+export async function fetchRanked(
+  token: string,
+  fetchFn: typeof fetch = fetch,
+  base = apiBaseUrl(),
+): Promise<Person[]> {
+  const res = await fetchFn(`${base}/api/v1/matches`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await res.json().catch(() => ({}))) as { matches?: Person[]; error?: string };
+  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+  return body.matches ?? [];
+}
+
+/** Builds a Person from a profile row (used for Likes and chat headers). */
+export function personFromRow(
+  row: ProfileRow,
+  me: { lat?: ProfileRow["lat"]; lng?: ProfileRow["lng"] },
+): Person {
+  return {
+    id: row.id,
+    score: 0,
+    sharedInterests: [],
+    displayName: row.display_name,
+    age: row.age,
+    bio: row.bio,
+    interests: row.interests ?? [],
+    lookingFor: row.looking_for,
+    photoPath: row.photo_path ?? null,
+    verified: row.verified ?? false,
+    online: isOnline(row.last_seen_at),
+    distanceKm: distanceKm(me, row),
+    joinedAt: row.created_at ?? null,
+  };
+}
+
+export type Filter = "all" | "new" | "verified" | "online";
+
+/** Discover filters: quick filter plus "I'm here for" mood. */
+export function filterPeople(people: Person[], filter: Filter, mood: LookingFor | "any", now = Date.now()) {
+  return people.filter((p) => {
+    if (mood !== "any" && p.lookingFor !== mood) return false;
+    if (filter === "new") return isNew(p.joinedAt, now);
+    if (filter === "verified") return p.verified;
+    if (filter === "online") return p.online;
+    return true;
+  });
 }

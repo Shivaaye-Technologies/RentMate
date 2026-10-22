@@ -1,5 +1,13 @@
 export interface MatchProfile {
   id: string;
+  displayName?: string;
+  bio?: string;
+  photoPath?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  lastSeenAt?: string;
+  joinedAt?: string;
+  verified?: boolean;
   age: number;
   interests: string[];
   lookingFor: "relationship" | "friendship" | "casual";
@@ -41,6 +49,38 @@ export function compatibility(a: MatchProfile, b: MatchProfile): ScoredMatch {
     score: Math.round(interestScore + goalScore),
     sharedInterests: shared.sort(),
   };
+}
+
+type Point = { lat?: number | null; lng?: number | null };
+
+/** Great-circle distance in km, or null when either location is unknown. */
+export function distanceKm(a: Point, b: Point): number | null {
+  if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+/** Distance shown to users: whole km, never below 1 (locations are only ~1 km precise). */
+export function displayDistanceKm(a: Point, b: Point): number | null {
+  const d = distanceKm(a, b);
+  return d == null ? null : Math.max(1, Math.round(d));
+}
+
+export const ONLINE_WINDOW_MS = 10 * 60 * 1000;
+
+export function isOnline(lastSeenAt: string | undefined, now = Date.now()): boolean {
+  if (!lastSeenAt) return false;
+  const t = Date.parse(lastSeenAt);
+  return Number.isFinite(t) && now - t <= ONLINE_WINDOW_MS;
+}
+
+/** Removes candidates the user already liked or passed on. */
+export function excludeSeen<T extends { id: string }>(candidates: T[], seenIds: Iterable<string>): T[] {
+  const seen = new Set(seenIds);
+  return candidates.filter((c) => !seen.has(c.id));
 }
 
 /** Ranks candidates for a user, dropping zero scores, highest first. */
