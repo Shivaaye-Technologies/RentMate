@@ -1,0 +1,49 @@
+:root {
+  --bg: #fff7f8;
+  --text: #2a1a22;
+  --accent: #d6336c;
+  --muted: #7a6670;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1116;
+    --text: #f5e9ee;
+    --muted: #b49aa6;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 64px 16px;
+}
+
+h1 {
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.tagline {
+  color: var(--muted);
+}
+
+.status {
+  font-weight: 600;
+}
+
+.status-online {
+  color: #2f9e44;
+}
+
+.status-offline {
+  color: #e03131;
+}
