@@ -198,7 +198,7 @@ const MIDDLES = [
   "I'm happiest with {a}, good company and a bit of {b}.",
   "Looking for someone who'd join me for {a} or show me more {b}.",
   "Two things I'd never give up: {a} and {b}.",
-  "If there's {a} involved, count me in. {b} too.",
+  "If there's {a} involved, count me in, and {b} too.",
 ];
 const CLOSERS = [
   "Let's swap recommendations.",
