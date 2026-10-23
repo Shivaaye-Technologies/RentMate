@@ -34,7 +34,8 @@ apps/api/src
   config.ts      zod-validated environment config
   matching.ts    pure compatibility scoring and ranking
   store.ts       in-memory ProfileStore (tests only)
-  supabaseStore.ts  Supabase ProfileStore (production; queries with the caller's JWT)
+  supabaseStore.ts  Supabase ProfileStore (production; calls get_my_profile / discover_profiles
+                    with the caller's JWT)
   validation.ts  zod request schemas
 apps/web/src     React app and API client
 supabase/migrations  SQL schema with RLS
@@ -42,12 +43,11 @@ supabase/migrations  SQL schema with RLS
 
 ## API
 
-| Method | Path               | Auth | Description                     |
-| ------ | ------------------ | ---- | ------------------------------- |
-| GET    | `/health`          | No   | Liveness and auth config status |
-| PUT    | `/api/v1/profile`  | Yes  | Create or update your profile   |
-| GET    | `/api/v1/matches`  | Yes  | Ranked matches for you          |
-| POST   | `/api/v1/messages` | Yes  | Validate a message payload      |
+| Method | Path              | Auth | Description                     |
+| ------ | ----------------- | ---- | ------------------------------- |
+| GET    | `/health`         | No   | Liveness and auth config status |
+| PUT    | `/api/v1/profile` | Yes  | Create or update your profile   |
+| GET    | `/api/v1/matches` | Yes  | Ranked matches for you          |
 
 ## Adding a feature
 
@@ -64,12 +64,20 @@ filters and mood chips, Likes received, It's a Match, chats with realtime messag
 The web app talks to Supabase directly for likes, passes, matches, chat and photos (all protected by
 RLS) and to the API for ranked discovery.
 
+Safety: report (6 reasons), block (both people disappear for each other everywhere, chats included),
+unmatch, and account deletion from the Profile tab. Static pages `apps/web/public/privacy.html`,
+`terms.html`, `safety.html` and `delete-account.html` are served at the site root.
+
+Privacy: other people's coordinates and last-seen times are never sent to the browser. The database
+functions `discover_profiles` and `profiles_by_ids` return a coarse distance bucket (1 km, whole km
+under 10, then 5 km and 10 km steps) and an online flag. Photos are in a private bucket and load
+through one-hour signed links.
+
 Not built on purpose: a live map of other users' positions (stalking risk). Only distances are shown,
 from locations rounded to about 1 km on the device and stored at that precision.
 
 ## Next steps for the app
 
-- Report and block flows in the UI (the `blocks` table exists).
-- Photo moderation and an admin flow to grant `verified`.
+- Photo moderation and an in-app admin flow to review reports and grant `verified`.
 - Multiple photos per profile.
 - Android build (wrap the web app or React Native).

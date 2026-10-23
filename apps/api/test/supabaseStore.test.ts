@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { excludeSeen } from "../src/matching.js";
-import { toMatchProfile, toProfileRow, type ProfileRow } from "../src/supabaseStore.js";
+import { personToMatchProfile, toMatchProfile, toProfileRow, type ProfileRow } from "../src/supabaseStore.js";
 
 const row: ProfileRow = {
   id: "u1",
@@ -74,5 +74,34 @@ describe("excludeSeen", () => {
     const list = [{ id: "a" }, { id: "b" }, { id: "c" }];
     expect(excludeSeen(list, ["b"])).toEqual([{ id: "a" }, { id: "c" }]);
     expect(excludeSeen(list, [])).toEqual(list);
+  });
+});
+
+describe("people from the database", () => {
+  it("keeps the precomputed distance and online flag and has no coordinates", () => {
+    const p = personToMatchProfile({
+      id: "u2",
+      display_name: "Ravi",
+      age: 30,
+      bio: "",
+      interests: null,
+      looking_for: "friendship",
+      age_min: 25,
+      age_max: 35,
+      photo_path: null,
+      verified: false,
+      created_at: "2026-10-01T00:00:00Z",
+      distance_km: 15,
+      online: true,
+    });
+    expect(p).toMatchObject({
+      id: "u2",
+      interests: [],
+      distanceKm: 15,
+      online: true,
+      joinedAt: "2026-10-01T00:00:00Z",
+    });
+    expect(p.lat).toBeUndefined();
+    expect(p.lastSeenAt).toBeUndefined();
   });
 });

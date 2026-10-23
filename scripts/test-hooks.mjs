@@ -42,7 +42,7 @@ const cases = [
   ["guard-files.mjs", file("Write", "supabase/migrations/29990101000000_new.sql"), 0],
   ["guard-files.mjs", file("Read", ".env"), 2],
   ["guard-files.mjs", file("Write", "apps/api/.env.production"), 2],
-  ["guard-files.mjs", file("Edit", "supabase/migrations/20261023000000_init.sql"), 2],
+  ["guard-files.mjs", file("Edit", "supabase/migrations/20261022210236_init.sql"), 2],
 ];
 
 let failed = 0;

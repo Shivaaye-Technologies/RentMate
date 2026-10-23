@@ -120,3 +120,36 @@ describe("loadConfig", () => {
     ]);
   });
 });
+
+describe("precomputed fields from the database", () => {
+  it("uses distance and online status supplied by the store", async () => {
+    const store = new MemoryProfileStore();
+    const base = {
+      age: 28,
+      interests: ["hiking"],
+      lookingFor: "relationship" as const,
+      ageMin: 20,
+      ageMax: 40,
+    };
+    const app = createApp({
+      config,
+      verifyToken: verifier,
+      storeFor: () => ({
+        upsertProfile: async () => undefined,
+        getProfile: async () => ({ id: "alice", ...base }),
+        listCandidates: async () => [
+          { id: "bob", displayName: "Bob", ...base, distanceKm: 15, online: true },
+        ],
+      }),
+    });
+    void store;
+    const res = await request(app).get("/api/v1/matches").set("Authorization", "Bearer token-alice");
+    expect(res.status).toBe(200);
+    expect(res.body.matches[0]).toMatchObject({ id: "bob", distanceKm: 15, online: true });
+  });
+
+  it("no longer exposes the unused messages endpoint", async () => {
+    const res = await request(makeApp()).post("/api/v1/messages").set("Authorization", "Bearer token-alice");
+    expect(res.status).toBe(404);
+  });
+});

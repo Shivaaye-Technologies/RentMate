@@ -54,5 +54,5 @@ Ask for a subagent by name: "use the database-engineer to add a photos table".
 ## Known limitations
 
 - Hooks catch common destructive commands by pattern. They are a safety net, not a sandbox; permissions and human review remain the main control.
-- The API uses an in-memory profile store. Data is lost on restart until a Supabase-backed store is added.
+- The API reads and writes profiles in Supabase with each user's own token (RLS applies). The in-memory store in `apps/api/src/store.ts` is used only by tests.
 - The Supabase MCP server is read-only by design. Apply migrations yourself (see the deployment guide).

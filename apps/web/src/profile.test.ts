@@ -160,24 +160,35 @@ describe("discover filters", () => {
     expect(ids(filterPeople(people, "online", "casual", now))).toEqual([]);
   });
 
-  it("builds a person from a profile row with distance from me", () => {
-    const p = personFromRow(
-      {
-        id: "r",
-        display_name: "Ravi",
-        age: 30,
-        bio: "",
-        interests: ["cricket"],
-        looking_for: "relationship",
-        age_min: 25,
-        age_max: 35,
-        lat: "12.98",
-        lng: "77.60",
-        verified: true,
-      },
-      { lat: 12.97, lng: 77.59 },
-    );
-    // 0.01° lat + 0.01° lng near Bengaluru ≈ 1.5 km → rounds to 2.
-    expect(p).toMatchObject({ displayName: "Ravi", verified: true, distanceKm: 2, photoPath: null });
+  it("builds a person from a database row without any coordinates", () => {
+    const p = personFromRow({
+      id: "r",
+      display_name: "Ravi",
+      age: 30,
+      bio: "",
+      interests: null,
+      looking_for: "relationship",
+      photo_path: "r/a.jpg",
+      verified: true,
+      created_at: "2026-10-01T00:00:00Z",
+      distance_km: 5,
+      online: true,
+    });
+    expect(p).toEqual({
+      id: "r",
+      score: 0,
+      sharedInterests: [],
+      displayName: "Ravi",
+      age: 30,
+      bio: "",
+      interests: [],
+      lookingFor: "relationship",
+      photoPath: "r/a.jpg",
+      verified: true,
+      online: true,
+      distanceKm: 5,
+      joinedAt: "2026-10-01T00:00:00Z",
+    });
+    expect(p).not.toHaveProperty("lat");
   });
 });

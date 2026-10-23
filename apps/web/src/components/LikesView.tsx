@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { personFromRow, type Person } from "../api";
-import { PROFILE_COLUMNS, type ProfileRow } from "../profile";
+import type { PersonRow } from "../profile";
 import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
@@ -16,7 +16,7 @@ export interface ReceivedLike {
  * People who liked you and you haven't answered yet (no like or pass from you).
  * RLS lets you read likes you received; nothing else about other users' likes.
  */
-export async function loadReceivedLikes(me: string, myProfile: ProfileRow): Promise<ReceivedLike[]> {
+export async function loadReceivedLikes(me: string): Promise<ReceivedLike[]> {
   const [received, mine, passed] = await Promise.all([
     supabase
       .from("likes")
@@ -36,22 +36,18 @@ export async function loadReceivedLikes(me: string, myProfile: ProfileRow): Prom
   const pending = (received.data ?? []).filter((l) => !answered.has(l.liker_id as string));
   if (pending.length === 0) return [];
 
-  const { data: rows, error } = await supabase
-    .from("profiles")
-    .select(PROFILE_COLUMNS)
-    .in(
-      "id",
-      pending.map((l) => l.liker_id as string),
-    );
+  const { data: rows, error } = await supabase.rpc("profiles_by_ids", {
+    p_ids: pending.map((l) => l.liker_id as string),
+  });
   if (error) throw new Error(error.message);
-  const byId = new Map((rows as ProfileRow[]).map((r) => [r.id, r]));
+  const byId = new Map(((rows ?? []) as PersonRow[]).map((r) => [r.id, r]));
 
   return pending.flatMap((l) => {
     const row = byId.get(l.liker_id as string);
     if (!row) return [];
     return [
       {
-        person: personFromRow(row, myProfile),
+        person: personFromRow(row),
         isSuper: Boolean(l.is_super),
         message: (l.message as string | null) ?? null,
         at: l.created_at as string,
@@ -62,13 +58,11 @@ export async function loadReceivedLikes(me: string, myProfile: ProfileRow): Prom
 
 export function LikesView({
   me,
-  myProfile,
   refreshKey,
   onOpen,
   onCount,
 }: {
   me: string;
-  myProfile: ProfileRow;
   refreshKey: number;
   onOpen: (like: ReceivedLike) => void;
   onCount: (n: number) => void;
@@ -78,7 +72,7 @@ export function LikesView({
 
   useEffect(() => {
     let cancelled = false;
-    loadReceivedLikes(me, myProfile)
+    loadReceivedLikes(me)
       .then((l) => {
         if (cancelled) return;
         setLikes(l);
@@ -88,7 +82,7 @@ export function LikesView({
     return () => {
       cancelled = true;
     };
-  }, [me, myProfile, refreshKey, onCount]);
+  }, [me, refreshKey, onCount]);
 
   if (error) return <p className="alert error">{error}</p>;
   if (!likes) {

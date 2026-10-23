@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ProfileStore } from "./app.js";
-import { excludeSeen, type MatchProfile } from "./matching.js";
+import type { MatchProfile } from "./matching.js";
 import type { ProfileInput } from "./validation.js";
 
+/** Row from public.get_my_profile() (your own profile, all columns). */
 export interface ProfileRow {
   id: string;
   display_name: string;
@@ -20,8 +21,26 @@ export interface ProfileRow {
   verified?: boolean;
 }
 
-const COLUMNS =
-  "id, display_name, age, bio, interests, looking_for, age_min, age_max, photo_path, lat, lng, last_seen_at, created_at, verified";
+/**
+ * Row from public.discover_profiles() / profiles_by_ids(). Other people never
+ * come with coordinates or last-seen times: the database returns a coarse
+ * distance bucket and an online flag instead.
+ */
+export interface PersonRow {
+  id: string;
+  display_name: string;
+  age: number;
+  bio: string;
+  interests: string[] | null;
+  looking_for: MatchProfile["lookingFor"];
+  age_min: number;
+  age_max: number;
+  photo_path: string | null;
+  verified: boolean;
+  created_at: string;
+  distance_km: number | null;
+  online: boolean;
+}
 
 const num = (v: number | string | null | undefined) => (v == null ? null : Number(v));
 const CANDIDATE_LIMIT = 500;
@@ -45,6 +64,24 @@ export function toMatchProfile(r: ProfileRow): MatchProfile {
   };
 }
 
+export function personToMatchProfile(r: PersonRow): MatchProfile {
+  return {
+    id: r.id,
+    displayName: r.display_name,
+    bio: r.bio,
+    age: r.age,
+    interests: r.interests ?? [],
+    lookingFor: r.looking_for,
+    ageMin: r.age_min,
+    ageMax: r.age_max,
+    photoPath: r.photo_path ?? null,
+    joinedAt: r.created_at,
+    verified: r.verified ?? false,
+    distanceKm: r.distance_km,
+    online: r.online,
+  };
+}
+
 export function toProfileRow(userId: string, p: ProfileInput): ProfileRow {
   return {
     id: userId,
@@ -60,8 +97,8 @@ export function toProfileRow(userId: string, p: ProfileInput): ProfileRow {
 
 /**
  * Profile store backed by Supabase. It queries with the caller's own JWT, so
- * every read and write is checked by the database's RLS policies; the API never
- * uses a privileged key.
+ * every read and write is checked by the database's RLS policies and functions;
+ * the API never uses a privileged key.
  */
 export class SupabaseProfileStore implements ProfileStore {
   private db: SupabaseClient;
@@ -78,25 +115,16 @@ export class SupabaseProfileStore implements ProfileStore {
     if (error) throw new Error(`Saving profile failed: ${error.message}`);
   }
 
-  async getProfile(userId: string): Promise<MatchProfile | null> {
-    const { data, error } = await this.db.from("profiles").select(COLUMNS).eq("id", userId).maybeSingle();
+  async getProfile(): Promise<MatchProfile | null> {
+    const { data, error } = await this.db.rpc("get_my_profile").maybeSingle();
     if (error) throw new Error(`Loading profile failed: ${error.message}`);
     return data ? toMatchProfile(data as ProfileRow) : null;
   }
 
-  async listCandidates(userId: string): Promise<MatchProfile[]> {
-    const [profiles, likes, passes] = await Promise.all([
-      this.db.from("profiles").select(COLUMNS).neq("id", userId).limit(CANDIDATE_LIMIT),
-      this.db.from("likes").select("liked_id").eq("liker_id", userId),
-      this.db.from("passes").select("passed_id").eq("passer_id", userId),
-    ]);
-    const failed = profiles.error ?? likes.error ?? passes.error;
-    if (failed) throw new Error(`Loading candidates failed: ${failed.message}`);
-
-    const seen = [
-      ...(likes.data ?? []).map((l: { liked_id: string }) => l.liked_id),
-      ...(passes.data ?? []).map((p: { passed_id: string }) => p.passed_id),
-    ];
-    return excludeSeen(((profiles.data ?? []) as ProfileRow[]).map(toMatchProfile), seen);
+  /** The database already excludes you, people you liked or passed, and blocks. */
+  async listCandidates(): Promise<MatchProfile[]> {
+    const { data, error } = await this.db.rpc("discover_profiles", { p_limit: CANDIDATE_LIMIT });
+    if (error) throw new Error(`Loading candidates failed: ${error.message}`);
+    return ((data ?? []) as PersonRow[]).map(personToMatchProfile);
   }
 }

@@ -16,8 +16,3 @@ export const ProfileInput = z
   });
 
 export type ProfileInput = z.infer<typeof ProfileInput>;
-
-export const MessageInput = z.object({
-  matchId: z.string().uuid(),
-  body: z.string().trim().min(1).max(2000),
-});

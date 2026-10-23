@@ -1,4 +1,4 @@
-import { distanceKm, isNew, isOnline, type LookingFor, type ProfileRow } from "./profile";
+import { isNew, type LookingFor, type PersonRow } from "./profile";
 
 export type HealthState = "checking" | "online" | "offline";
 
@@ -50,11 +50,8 @@ export async function fetchRanked(
   return body.matches ?? [];
 }
 
-/** Builds a Person from a profile row (used for Likes and chat headers). */
-export function personFromRow(
-  row: ProfileRow,
-  me: { lat?: ProfileRow["lat"]; lng?: ProfileRow["lng"] },
-): Person {
+/** Builds a Person from a database row (used for Likes and Chats). */
+export function personFromRow(row: PersonRow): Person {
   return {
     id: row.id,
     score: 0,
@@ -66,8 +63,8 @@ export function personFromRow(
     lookingFor: row.looking_for,
     photoPath: row.photo_path ?? null,
     verified: row.verified ?? false,
-    online: isOnline(row.last_seen_at),
-    distanceKm: distanceKm(me, row),
+    online: row.online ?? false,
+    distanceKm: row.distance_km ?? null,
     joinedAt: row.created_at ?? null,
   };
 }

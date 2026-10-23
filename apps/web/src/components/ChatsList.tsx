@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { personFromRow, type Person } from "../api";
-import { otherUserId, PROFILE_COLUMNS, type ProfileRow } from "../profile";
+import { otherUserId, type PersonRow } from "../profile";
 import { supabase } from "../supabase";
 import { Icon } from "./Icon";
 import { Photo } from "./Photo";
@@ -14,15 +14,7 @@ export interface MatchSummary {
   lastFromMe: boolean;
 }
 
-export function ChatsList({
-  me,
-  myProfile,
-  onOpen,
-}: {
-  me: string;
-  myProfile: ProfileRow;
-  onOpen: (m: MatchSummary) => void;
-}) {
+export function ChatsList({ me, onOpen }: { me: string; onOpen: (m: MatchSummary) => void }) {
   const [items, setItems] = useState<MatchSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,9 +34,7 @@ export function ChatsList({
       const ids = matches.map((m) => otherUserId(m, me));
       const matchIds = matches.map((m) => m.id as string);
       const [people, msgs] = await Promise.all([
-        ids.length
-          ? supabase.from("profiles").select(PROFILE_COLUMNS).in("id", ids)
-          : { data: [], error: null },
+        ids.length ? supabase.rpc("profiles_by_ids", { p_ids: ids }) : { data: [], error: null },
         matchIds.length
           ? supabase
               .from("messages")
@@ -55,7 +45,7 @@ export function ChatsList({
           : { data: [], error: null },
       ]);
       if (cancelled) return;
-      const byId = new Map(((people.data ?? []) as ProfileRow[]).map((p) => [p.id, p]));
+      const byId = new Map(((people.data ?? []) as PersonRow[]).map((p) => [p.id, p]));
       const last = new Map<string, { body: string; created_at: string; sender_id: string }>();
       for (const m of (msgs.data ?? []) as {
         match_id: string;
@@ -73,7 +63,7 @@ export function ChatsList({
         return [
           {
             matchId: m.id as string,
-            person: personFromRow(row, myProfile),
+            person: personFromRow(row),
             since: m.created_at as string,
             lastMessage: lm?.body ?? null,
             lastAt: lm?.created_at ?? null,
@@ -95,7 +85,7 @@ export function ChatsList({
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [me, myProfile]);
+  }, [me]);
 
   if (error) return <p className="alert error">{error}</p>;
   if (!items) {

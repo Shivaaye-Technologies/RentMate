@@ -19,12 +19,15 @@ export function ProfileSheet({
   onLike,
   onPass,
   onSuper,
+  onSafety,
 }: {
   person: Person;
   onClose: () => void;
   onLike?: () => void;
   onPass?: () => void;
   onSuper?: () => void;
+  /** Opens report / block options. */
+  onSafety?: () => void;
 }) {
   useEscape(onClose);
   return (
@@ -50,6 +53,11 @@ export function ProfileSheet({
           )}
         </div>
         <PersonDetails person={person} />
+        {onSafety && (
+          <button className="btn link block muted-link" onClick={onSafety}>
+            Report or block {person.displayName}
+          </button>
+        )}
         {(onLike || onPass || onSuper) && (
           <div className="action-bar in-sheet">
             {onPass && (

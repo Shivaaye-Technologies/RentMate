@@ -28,6 +28,8 @@ interface Props {
   person: Person;
   onBack: () => void;
   onProfile: () => void;
+  /** Opens report / block / unmatch options. */
+  onSafety: () => void;
 }
 
 function addUnique(list: Message[], m: Message): Message[] {
@@ -43,7 +45,7 @@ const dayLabel = (iso: string) =>
     minute: "2-digit",
   });
 
-export function Chat({ me, myProfile, matchId, person, onBack, onProfile }: Props) {
+export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafety }: Props) {
   const [match, setMatch] = useState<MatchRow | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -151,6 +153,13 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile }: Prop
             </strong>
             <small>{person.online ? "Online" : "See profile"}</small>
           </span>
+        </button>
+        <button
+          className="icon-btn more"
+          aria-label={`Safety options for ${person.displayName}`}
+          onClick={onSafety}
+        >
+          <Icon name="more" />
         </button>
       </header>
 

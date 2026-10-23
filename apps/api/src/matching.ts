@@ -8,6 +8,10 @@ export interface MatchProfile {
   lastSeenAt?: string;
   joinedAt?: string;
   verified?: boolean;
+  /** Precomputed by the database for other people (coarse bucket). */
+  distanceKm?: number | null;
+  /** Precomputed by the database for other people. */
+  online?: boolean;
   age: number;
   interests: string[];
   lookingFor: "relationship" | "friendship" | "casual";

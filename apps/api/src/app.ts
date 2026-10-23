@@ -5,7 +5,7 @@ import helmet from "helmet";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, type MatchProfile } from "./matching.js";
-import { MessageInput, ProfileInput } from "./validation.js";
+import { ProfileInput } from "./validation.js";
 
 /** Data access the routes depend on. */
 export interface ProfileStore {
@@ -72,8 +72,9 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
           lookingFor: c.lookingFor,
           photoPath: c.photoPath ?? null,
           verified: c.verified ?? false,
-          online: isOnline(c.lastSeenAt),
-          distanceKm: displayDistanceKm(me, c),
+          // Supabase returns these precomputed; the in-memory test store does not.
+          online: c.online ?? isOnline(c.lastSeenAt),
+          distanceKm: c.distanceKm !== undefined ? c.distanceKm : displayDistanceKm(me, c),
           joinedAt: c.joinedAt ?? null,
         };
       });
@@ -81,17 +82,6 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
     } catch (err) {
       next(err);
     }
-  });
-
-  api.post("/messages", (req, res) => {
-    const parsed = MessageInput.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid message", issues: parsed.error.issues });
-      return;
-    }
-    // Messages are written directly to Supabase by the client under RLS.
-    // This endpoint validates payloads for clients that route through the API.
-    res.status(202).json({ accepted: true });
   });
 
   app.use("/api/v1", api);

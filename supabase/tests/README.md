@@ -1,7 +1,8 @@
 # Database security tests
 
-`rls_flow.sql` simulates five users (profiles, likes, Super Likes, matches, chat,
-ready-to-meet, rewind, photo storage, anonymous access) and checks every
+`rls_flow.sql` simulates five users (profiles, location privacy, discovery, likes, Super Likes,
+matches, chat, rate limits, ready-to-meet, rewind, photos, reports, blocks, unmatch, account
+deletion and anonymous access) and checks every
 permission rule. It runs inside one `DO` block that always ends by raising
 `ROLLED BACK. RESULTS: ...`, so nothing is saved, even on production.
 

@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
 import { fetchRanked, type Person } from "./api";
+import { AccountPanel } from "./components/AccountPanel";
 import { AuthScreen } from "./components/AuthScreen";
 import { Chat } from "./components/Chat";
 import { ChatsList } from "./components/ChatsList";
@@ -11,9 +12,11 @@ import { LikesView, loadReceivedLikes } from "./components/LikesView";
 import { Photo } from "./components/Photo";
 import { ProfileExtras } from "./components/ProfileExtras";
 import { ProfileForm } from "./components/ProfileForm";
+import { SafetySheet } from "./components/SafetySheet";
 import { MatchOverlay, ProfileSheet, SuperLikeSheet } from "./components/Sheets";
-import { orderedPair, PROFILE_COLUMNS, type ProfileRow } from "./profile";
-import { supabase, supabaseConfigured } from "./supabase";
+import { orderedPair, type ProfileRow } from "./profile";
+import { friendlyError, type ReportReason } from "./safety";
+import { clearPhotoCache, supabase, supabaseConfigured } from "./supabase";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -80,13 +83,13 @@ function Home({ session }: { session: Session }) {
   const [superFor, setSuperFor] = useState<Person | null>(null);
   const [matched, setMatched] = useState<{ matchId: string; person: Person } | null>(null);
   const [chat, setChat] = useState<{ matchId: string; person: Person } | null>(null);
+  const [safety, setSafety] = useState<{ person: Person; matchId: string | null } | null>(null);
+  const [safetyBusy, setSafetyBusy] = useState(false);
 
   // Own profile.
   useEffect(() => {
     void supabase
-      .from("profiles")
-      .select(PROFILE_COLUMNS)
-      .eq("id", me)
+      .rpc("get_my_profile")
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) setLoadError(error.message);
@@ -130,7 +133,7 @@ function Home({ session }: { session: Session }) {
   // Likes badge count.
   useEffect(() => {
     if (!profile) return;
-    loadReceivedLikes(me, profile)
+    loadReceivedLikes(me)
       .then((l) => setLikesCount(l.length))
       .catch(() => undefined);
     // Only on first load and when likes are refreshed.
@@ -196,7 +199,81 @@ function Home({ session }: { session: Session }) {
     setTab("crush");
   }
 
-  const signOut = () => void supabase.auth.signOut();
+  /** Drops someone from every list after a block or unmatch. */
+  function forget(personId: string) {
+    setPeople((list) => list.filter((p) => p.id !== personId));
+    setPassed((h) => h.filter((p) => p.id !== personId));
+    setSheet(null);
+    setMatched(null);
+    setChat((c) => (c && c.person.id === personId ? null : c));
+    setLikesKey((k) => k + 1);
+  }
+
+  async function block(person: Person) {
+    const { error } = await supabase.from("blocks").insert({ blocker_id: me, blocked_id: person.id });
+    // 23505 = already blocked.
+    if (error && error.code !== "23505") throw new Error(friendlyError(error.message));
+  }
+
+  async function runSafety(action: () => Promise<string>) {
+    if (!safety || safetyBusy) return;
+    setSafetyBusy(true);
+    try {
+      flash(await action());
+      setSafety(null);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setSafetyBusy(false);
+    }
+  }
+
+  const report = (reason: ReportReason, details: string, alsoBlock: boolean) =>
+    runSafety(async () => {
+      const person = safety!.person;
+      const { error } = await supabase
+        .from("reports")
+        .insert({ reporter_id: me, reported_id: person.id, reason, details });
+      if (error) throw new Error(friendlyError(error.message));
+      if (!alsoBlock) return "Thanks for reporting. We'll review it.";
+      await block(person);
+      forget(person.id);
+      return `Thanks. ${person.displayName} is reported and blocked.`;
+    });
+
+  const blockOnly = () =>
+    runSafety(async () => {
+      const person = safety!.person;
+      await block(person);
+      forget(person.id);
+      return `${person.displayName} is blocked.`;
+    });
+
+  const unmatch = () =>
+    runSafety(async () => {
+      const { person, matchId } = safety!;
+      const { error } = await supabase.from("matches").delete().eq("id", matchId!);
+      if (error) throw new Error(friendlyError(error.message));
+      forget(person.id);
+      return `You unmatched ${person.displayName}.`;
+    });
+
+  const signOut = () => {
+    clearPhotoCache();
+    void supabase.auth.signOut();
+  };
+
+  const safetySheet = safety && (
+    <SafetySheet
+      person={safety.person}
+      canUnmatch={safety.matchId !== null}
+      busy={safetyBusy}
+      onReport={(r, d, b) => void report(r, d, b)}
+      onBlock={() => void blockOnly()}
+      onUnmatch={() => void unmatch()}
+      onClose={() => setSafety(null)}
+    />
+  );
 
   if (!loaded) {
     return (
@@ -249,8 +326,21 @@ function Home({ session }: { session: Session }) {
           person={chat.person}
           onBack={() => setChat(null)}
           onProfile={() => setSheet({ person: chat.person, actions: false })}
+          onSafety={() => setSafety({ person: chat.person, matchId: chat.matchId })}
         />
-        {sheet && <ProfileSheet person={sheet.person} onClose={() => setSheet(null)} />}
+        {sheet && (
+          <ProfileSheet
+            person={sheet.person}
+            onClose={() => setSheet(null)}
+            onSafety={() => setSafety({ person: sheet.person, matchId: chat.matchId })}
+          />
+        )}
+        {toast && (
+          <div className="toast" role="status">
+            {toast}
+          </div>
+        )}
+        {safetySheet}
       </main>
     );
   }
@@ -337,7 +427,6 @@ function Home({ session }: { session: Session }) {
         {tab === "likes" && (
           <LikesView
             me={me}
-            myProfile={profile}
             refreshKey={likesKey}
             onCount={setLikesCount}
             onOpen={(l) => setSheet({ person: l.person, actions: true })}
@@ -345,11 +434,7 @@ function Home({ session }: { session: Session }) {
         )}
 
         {tab === "chats" && (
-          <ChatsList
-            me={me}
-            myProfile={profile}
-            onOpen={(m) => setChat({ matchId: m.matchId, person: m.person })}
-          />
+          <ChatsList me={me} onOpen={(m) => setChat({ matchId: m.matchId, person: m.person })} />
         )}
 
         {tab === "profile" && (
@@ -365,10 +450,7 @@ function Home({ session }: { session: Session }) {
                 void loadPeople();
               }}
             />
-            <p className="muted center small">Signed in as {session.user.email}</p>
-            <button className="btn link block" onClick={signOut}>
-              Sign out
-            </button>
+            <AccountPanel email={session.user.email} photoPath={profile.photo_path} onSignOut={signOut} />
           </>
         )}
       </main>
@@ -399,6 +481,7 @@ function Home({ session }: { session: Session }) {
         <ProfileSheet
           person={sheet.person}
           onClose={() => setSheet(null)}
+          onSafety={() => setSafety({ person: sheet.person, matchId: null })}
           onPass={sheet.actions ? () => void decide(sheet.person, "pass") : undefined}
           onLike={sheet.actions ? () => void decide(sheet.person, "like") : undefined}
           onSuper={
@@ -420,6 +503,8 @@ function Home({ session }: { session: Session }) {
           onSend={(msg) => void decide(superFor, "super", msg)}
         />
       )}
+
+      {safetySheet}
 
       {matched && (
         <MatchOverlay

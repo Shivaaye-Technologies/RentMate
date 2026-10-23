@@ -25,8 +25,24 @@ export interface ProfileRow {
   verified?: boolean;
 }
 
-export const PROFILE_COLUMNS =
-  "id, display_name, age, bio, interests, looking_for, age_min, age_max, photo_path, lat, lng, last_seen_at, created_at, verified";
+/**
+ * Another person, from public.discover_profiles() / public.profiles_by_ids().
+ * The database never returns other people's coordinates or last-seen times,
+ * only a coarse distance bucket and an online flag.
+ */
+export interface PersonRow {
+  id: string;
+  display_name: string;
+  age: number;
+  bio: string;
+  interests: string[] | null;
+  looking_for: LookingFor;
+  photo_path: string | null;
+  verified: boolean;
+  created_at: string;
+  distance_km: number | null;
+  online: boolean;
+}
 
 /** The columns a user is allowed to write (matches the database column grants). */
 export type EditableProfile = Pick<
