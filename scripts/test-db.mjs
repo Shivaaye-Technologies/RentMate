@@ -29,7 +29,7 @@ const { rows } = await db.query("select count(*)::int as n from public.profiles 
 console.log(`Demo seed applied twice: ${rows[0].n} demo profiles.`);
 if (rows[0].n !== DEFAULTS.count) failed = true;
 
-for (const test of ["rls_flow.sql", "demo_isolation.sql", "demo_mode.sql"]) {
+for (const test of ["rls_flow.sql", "demo_isolation.sql", "demo_mode.sql", "discover_activity.sql"]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
     console.error(`${test}: did not report results`);

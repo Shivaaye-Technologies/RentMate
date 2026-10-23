@@ -98,30 +98,63 @@ export interface EmptyState {
   body: string;
   /** Offer a shortcut to the profile (age range) settings. */
   editProfile: boolean;
+  /** People you passed who can be brought back (0 = don't offer). */
+  reviewPasses: number;
 }
 
-/** Explains an empty Discover using the real reason. */
-export function discoverEmptyState(summary: DiscoverSummary | null): EmptyState {
+/** Your own activity, used to explain an empty Discover honestly. */
+export interface EmptyActivity {
+  awaitingReply: number;
+  passed: number;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Explains an empty Discover using the real reason and your real activity. */
+export function discoverEmptyState(
+  summary: DiscoverSummary | null,
+  activity: EmptyActivity | null = null,
+): EmptyState {
   const outside = summary?.outsideAgeRange ?? 0;
   const eligible = (summary?.candidates ?? 0) - outside;
+  const waiting = activity?.awaitingReply ?? 0;
+  const passed = activity?.passed ?? 0;
+  const waitingLine =
+    waiting > 0
+      ? ` You liked ${plural(waiting, "person who hasn't", "people who haven't")} replied yet. When they like you back, you'll match and can chat.`
+      : "";
+  const passedLine =
+    passed > 0 ? ` You passed ${plural(passed, "person", "people")}; you can bring them back.` : "";
+
   if (eligible > 0) {
     return {
       title: "You're all caught up",
-      body: "You've seen everyone who fits your preferences for now. New people appear here as they join.",
+      body: `You've seen everyone who fits your preferences for now.${waitingLine}${passedLine} New members appear here as they join.`,
       editProfile: false,
+      reviewPasses: passed,
     };
   }
   if (outside > 0) {
     return {
       title: "No one in your age range yet",
-      body: `${outside} ${outside === 1 ? "person is" : "people are"} outside your age range, or you're outside theirs. Widen your age range to see more people.`,
+      body: `${plural(outside, "person is", "people are")} outside your age range, or you're outside theirs. Widen your age range to see more people.${waitingLine}`,
       editProfile: true,
+      reviewPasses: passed,
+    };
+  }
+  if (waiting > 0 || passed > 0) {
+    return {
+      title: "You're all caught up",
+      body: `You've seen everyone here so far.${waitingLine}${passedLine} New members appear here as they join.`,
+      editProfile: false,
+      reviewPasses: passed,
     };
   }
   return {
     title: "No new people yet",
-    body: "SOULMATE.AI is just getting started near you. New members appear here as they join, so check back soon.",
+    body: "SOULMATE.AI is just getting started near you. New members appear here as they join, so check back soon, or invite friends to join.",
     editProfile: false,
+    reviewPasses: 0,
   };
 }
 
