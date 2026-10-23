@@ -14,6 +14,12 @@ const EnvSchema = z.object({
     ),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  /**
+   * Proxy hops in front of the API (Render adds one). Lets rate limiting see each
+   * visitor's own address instead of putting everyone in one shared bucket.
+   * Defaults to 1 in production and 0 elsewhere.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;

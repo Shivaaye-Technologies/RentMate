@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
-import { fetchRanked, type Person } from "./api";
+import { DiscoverError, fetchDiscover, type DiscoverSummary, type Person } from "./api";
 import { AccountPanel } from "./components/AccountPanel";
 import { AuthScreen } from "./components/AuthScreen";
 import { Chat } from "./components/Chat";
@@ -18,6 +18,7 @@ import { orderedPair, type ProfileRow } from "./profile";
 import { friendlyError, type ReportReason } from "./safety";
 import { clearPhotoCache, supabase, supabaseConfigured } from "./supabase";
 import { loadDemoIds, setDemoIds } from "./demo";
+import { touchLastSeen } from "./presence";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -74,6 +75,8 @@ function Home({ session }: { session: Session }) {
   const [status, setStatus] = useState<Status>("loading");
   const [slow, setSlow] = useState(false);
   const [peopleError, setPeopleError] = useState<string | null>(null);
+  const [peopleErrorStatus, setPeopleErrorStatus] = useState<number | null>(null);
+  const [summary, setSummary] = useState<DiscoverSummary | null>(null);
   const [passed, setPassed] = useState<Person[]>([]);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -103,8 +106,7 @@ function Home({ session }: { session: Session }) {
   const hasProfile = profile !== null;
   useEffect(() => {
     if (!hasProfile) return;
-    const beat = () =>
-      void supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", me);
+    const beat = () => void touchLastSeen(supabase, me);
     beat();
     const t = setInterval(beat, 2 * 60 * 1000);
     return () => clearInterval(t);
@@ -113,14 +115,19 @@ function Home({ session }: { session: Session }) {
   const loadPeople = useCallback(async () => {
     setStatus("loading");
     setPeopleError(null);
+    setPeopleErrorStatus(null);
     setSlow(false);
     // Free hosting sleeps when idle; explain if waking takes a while.
     const timer = setTimeout(() => setSlow(true), 4000);
     try {
-      setPeople(await fetchRanked(session.access_token));
+      const result = await fetchDiscover(session.access_token);
+      setPeople(result.people);
+      setSummary(result.summary);
       setStatus("ready");
     } catch (e) {
+      console.error("Discover failed", e);
       setPeopleError(e instanceof Error ? e.message : "Could not load people.");
+      setPeopleErrorStatus(e instanceof DiscoverError ? e.status : null);
       setStatus("error");
     } finally {
       clearTimeout(timer);
@@ -141,7 +148,8 @@ function Home({ session }: { session: Session }) {
     if (!profile) return;
     loadReceivedLikes(me)
       .then((l) => setLikesCount(l.length))
-      .catch(() => undefined);
+      // The Likes tab shows this error itself; the badge just stays unchanged.
+      .catch((e: unknown) => console.error("Could not count likes", e));
     // Only on first load and when likes are refreshed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasProfile, me, likesKey]);
@@ -365,10 +373,18 @@ function Home({ session }: { session: Session }) {
     if (status === "error") {
       return (
         <div className="empty">
-          <p className="alert error">{peopleError}</p>
-          <button className="btn dark" onClick={() => void loadPeople()}>
-            Try again
-          </button>
+          <p className="alert error" role="alert">
+            {peopleError}
+          </p>
+          {peopleErrorStatus === 401 ? (
+            <button className="btn dark" onClick={signOut}>
+              Sign in again
+            </button>
+          ) : (
+            <button className="btn dark" onClick={() => void loadPeople()}>
+              Try again
+            </button>
+          )}
         </div>
       );
     }
@@ -410,6 +426,8 @@ function Home({ session }: { session: Session }) {
               )}
               <CrushStack
                 people={people}
+                summary={summary}
+                onEditProfile={() => setTab("profile")}
                 busy={busy}
                 canRewind={passed.length > 0}
                 onPass={(p) => void decide(p, "pass")}
@@ -425,6 +443,8 @@ function Home({ session }: { session: Session }) {
           peopleBody(
             <DiscoverHub
               people={people}
+              summary={summary}
+              onEditProfile={() => setTab("profile")}
               likesCount={likesCount}
               onOpenLikes={() => setTab("likes")}
               onOpen={(p) => setSheet({ person: p, actions: true })}

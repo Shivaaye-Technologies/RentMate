@@ -61,7 +61,11 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
       .select("id, user_a, user_b, created_at, ready_a, ready_b")
       .eq("id", matchId)
       .maybeSingle()
-      .then(({ data }) => !cancelled && data && setMatch(data as MatchRow));
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) setError(`Could not load this match: ${error.message}`);
+        else if (data) setMatch(data as MatchRow);
+      });
     void supabase
       .from("messages")
       .select("id, sender_id, body, created_at")

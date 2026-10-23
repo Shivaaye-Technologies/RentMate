@@ -1338,6 +1338,7 @@ textarea {
 /* ---------- Auth ---------- */
 .auth {
   min-height: 100dvh;
+  overflow-x: clip;
   background: var(--ink);
   color: var(--cream);
   padding: 32px 16px 40px;
@@ -1606,4 +1607,26 @@ textarea {
   border-color: var(--danger);
   background: var(--danger);
   color: #fff;
+}
+
+/* ---------- Public links on the landing page ---------- */
+.public-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+  padding: 8px 16px 24px;
+  font-size: 14px;
+}
+
+.public-links a {
+  color: var(--cream);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fine a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

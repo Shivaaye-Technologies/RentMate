@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- Landing page links to Privacy, Terms, Dating safety and Delete your account, and states the terms at sign-up; tests for the public landing and public pages.
 - Demo profiles for testing: 100 fictional profiles (50/50, ages 18–45, illustrated portraits, unique bios) visible only to tester accounts, with like-back and auto-reply so matching and chat can be tested; repeatable seed, tester grant and cleanup scripts; "Demo" label in the app (`docs/DEMO_PROFILES.md`).
 - `npm run test:db`: applies all migrations to a throwaway local Postgres (PGlite) and runs the SQL permission tests, the demo isolation test and the cleanup check; part of `npm test` and CI.
 - API: `GET /` returns service name, version and the documented routes (no configuration values); `GET /health` sends `Cache-Control: no-store`; tests for both, for `HEAD /health`, documented routes and `PORT` handling.
@@ -21,6 +22,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Fixed
 
+- **Discover was empty for some members.** The ranking hid anyone with a compatibility score of 0 (no shared interests and a different goal), so in a small community people who fit each other's age ranges never appeared. Everyone who fits both age ranges is now shown; the score only orders them. Empty Discover now explains why (nobody new, everyone outside your age range with a shortcut to change it, or all caught up), and errors say what happened with a retry (or "Sign in again" when the session expired).
+- **"Online" never worked:** the heartbeat used `void supabase.from(...).update(...)`, which never sends a request; it is now awaited and failures are logged.
+- **Rate limiting shared one bucket for everyone** behind Render's proxy (`trust proxy` was off); now per visitor (`TRUST_PROXY`, default 1 in production).
+- A failed match lookup in chat and network failures during sign-in are shown instead of ignored.
 - `rls_flow.sql` expected 20 chat messages where the rate-limit block's rollback leaves 1; the expectation is corrected (the check itself is unchanged).
 - Write-limit trigger made likes and reports fail for about 25 minutes after it was applied; fixed by checking each table in its own branch (`20261023103442_fix_write_limits_per_table`).
 - Blocks are now enforced in both directions; the previous profile policy could not see blocks made by other people.
