@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- Demo profiles for testing: 100 fictional profiles (50/50, ages 18–45, illustrated portraits, unique bios) visible only to tester accounts, with like-back and auto-reply so matching and chat can be tested; repeatable seed, tester grant and cleanup scripts; "Demo" label in the app (`docs/DEMO_PROFILES.md`).
+- `npm run test:db`: applies all migrations to a throwaway local Postgres (PGlite) and runs the SQL permission tests, the demo isolation test and the cleanup check; part of `npm test` and CI.
 - API: `GET /` returns service name, version and the documented routes (no configuration values); `GET /health` sends `Cache-Control: no-store`; tests for both, for `HEAD /health`, documented routes and `PORT` handling.
 - Safety: report (6 reasons, optional block), block, unmatch and delete account in the app; `reports` table; per-user write limits (messages 20/min, likes 300/day, reports 20/day).
 - Privacy: other people's coordinates and last-seen times are no longer readable; `discover_profiles` / `profiles_by_ids` return a coarse distance bucket and an online flag; photos bucket made private with signed links.
@@ -19,6 +21,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Fixed
 
+- `rls_flow.sql` expected 20 chat messages where the rate-limit block's rollback leaves 1; the expectation is corrected (the check itself is unchanged).
 - Write-limit trigger made likes and reports fail for about 25 minutes after it was applied; fixed by checking each table in its own branch (`20261023103442_fix_write_limits_per_table`).
 - Blocks are now enforced in both directions; the previous profile policy could not see blocks made by other people.
 - Migration files renamed to the versions recorded in the database, so the Supabase CLI and production agree.

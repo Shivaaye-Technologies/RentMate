@@ -2,6 +2,7 @@ import type { Person } from "../api";
 import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
 import { Photo } from "./Photo";
+import { DemoBadge } from "./DemoBadge";
 
 interface Props {
   people: Person[];
@@ -48,6 +49,7 @@ export function CrushStack({ people, busy, canRewind, onPass, onLike, onSuper, o
             {p.displayName}, {p.age}
           </h2>
           {p.verified && <VerifiedBadge size={22} />}
+          <DemoBadge id={p.id} />
           {p.online && <span className="dot-online" title="Online now" />}
         </div>
 

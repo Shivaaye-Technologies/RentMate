@@ -4,6 +4,7 @@ import type { PersonRow } from "../profile";
 import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
+import { DemoBadge } from "./DemoBadge";
 
 export interface ReceivedLike {
   person: Person;
@@ -113,7 +114,8 @@ export function LikesView({
                 </span>
               )}
               <span className="tile-name">
-                {l.person.displayName}, {l.person.age} {l.person.verified && <VerifiedBadge size={15} />}
+                {l.person.displayName}, {l.person.age} {l.person.verified && <VerifiedBadge size={15} />}{" "}
+                <DemoBadge id={l.person.id} />
               </span>
               {l.message && <span className="tile-msg">“{l.message}”</span>}
             </button>

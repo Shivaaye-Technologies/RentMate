@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { demoPhotoUrl } from "./profile";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -27,6 +28,8 @@ export async function signedPhotoUrl(
   now = Date.now,
 ): Promise<string | null> {
   if (!path) return null;
+  const demo = demoPhotoUrl(path, import.meta.env.BASE_URL);
+  if (demo) return demo;
   const hit = cache.get(path);
   if (hit instanceof Promise) return hit;
   if (hit && hit.expiresAt - REFRESH_MARGIN_MS > now()) return hit.url;

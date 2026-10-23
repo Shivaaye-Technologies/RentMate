@@ -537,6 +537,21 @@ textarea {
   flex: none;
 }
 
+.demo-badge {
+  display: inline-block;
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 /* ---------- Crush card ---------- */
 .crush {
   display: flex;

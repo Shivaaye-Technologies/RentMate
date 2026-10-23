@@ -3,6 +3,7 @@ import { filterPeople, type Filter, type Person } from "../api";
 import { isNew, type LookingFor } from "../profile";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
+import { DemoBadge } from "./DemoBadge";
 
 interface Props {
   people: Person[];
@@ -107,7 +108,7 @@ export function DiscoverHub({ people, likesCount, onOpenLikes, onOpen }: Props) 
                   </span>
                 )}
                 <span className="tile-name">
-                  {p.displayName}, {p.age} {p.verified && <VerifiedBadge size={15} />}
+                  {p.displayName}, {p.age} {p.verified && <VerifiedBadge size={15} />} <DemoBadge id={p.id} />
                   {p.online && <i className="dot-online small" />}
                 </span>
                 {p.distanceKm != null && <span className="tile-dist">{p.distanceKm} km</span>}

@@ -3,6 +3,7 @@ import type { Person } from "../api";
 import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
 import { Photo } from "./Photo";
+import { DemoBadge } from "./DemoBadge";
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -41,6 +42,7 @@ export function ProfileSheet({
             {person.displayName}, {person.age}
           </h2>
           {person.verified && <VerifiedBadge size={22} />}
+          <DemoBadge id={person.id} />
         </div>
         <div className="crush-photo">
           <Photo id={person.id} name={person.displayName} path={person.photoPath} textSize={72} />
@@ -106,7 +108,8 @@ export function MatchOverlay({
         <div className="celebrate-photo">
           <Photo id={person.id} name={person.displayName} path={person.photoPath} textSize={64} />
           <span className="photo-name">
-            {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={18} />}
+            {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={18} />}{" "}
+            <DemoBadge id={person.id} />
           </span>
         </div>
         <p className="display-xl">Match!</p>
