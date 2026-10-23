@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- **Honest empty Discover/Crush:** when you've seen everyone, it says how many of your likes are still waiting for a reply and how many people you passed (from your own rows only), with **Review passed profiles** (deletes only your own passes), **Invite friends**, and **Explore Demo Mode (fictional profiles)**.
+- **Step-by-step onboarding** for new members (name and age with the 18+ rule, what you're looking for and age range, tap-to-pick interests, bio with prompts, optional photo and distance) and a **Profile strength** card and Crush nudge for existing members.
+- **Standard interests:** tap-to-pick list and common spellings ("hike" = Hiking, "traveling" = Travel) saved in a standard form and treated as the same when ranking. Ranking only; who is eligible is unchanged.
+- **Invite friends:** the phone's share sheet or copying the plain site link (no referral code or tracking).
+- `supabase/tests/discover_activity.sql`: proves the counts and "Review passed profiles" only see or change the caller's own rows.
 - **Demo Mode** (`/#demo`): anyone can try SOULMATE.AI with the fictional demo profiles from the landing page or the profile tab. Simulated likes (arriving over time), matches and scripted chats run only in the browser, are labelled as simulated on every screen, and never touch real likes, matches or messages. Cards show a "Fictional" label.
 - `public.demo_mode_profiles()`: read-only list of released demo profiles for Demo Mode (visitors still cannot read real profiles).
 - Demo profiles released over time: the generator appends profiles after the original 100 (which never change) with `demo_visible_from` dates, `--count` (max 500), `--per-day`, `--start`, `--female-share`, and writes `demo_trim.sql` to remove profiles above the count. 160 profiles by default.
