@@ -39,12 +39,12 @@ begin
   begin perform lat from public.profiles where id = b; r := r||'FAIL others coordinates readable; '; exception when insufficient_privilege then r := r||'ok others coordinates hidden; '; end;
   begin perform last_seen_at from public.profiles where id = b; r := r||'FAIL last_seen readable; '; exception when insufficient_privilege then r := r||'ok others last-seen hidden; '; end;
 
-  -- B shares a location ~5 km away; A sees only a bucket.
+  -- B shares a location ~5.5 km away; A sees only a bucket (rounds to 6).
   perform set_config('request.jwt.claims', json_build_object('sub',b,'role','authenticated')::text, true);
   update public.profiles set lat = 13.01, lng = 77.62 where id = b;
   perform set_config('request.jwt.claims', json_build_object('sub',a,'role','authenticated')::text, true);
   select distance_km, online into n, ok from public.discover_profiles() where id = b;
-  r := r || case when n = 5 and ok then 'ok distance bucket + online flag; ' else format('FAIL distance %s online %s; ', n, ok) end;
+  r := r || case when n = 6 and ok then 'ok distance bucket + online flag; ' else format('FAIL distance %s online %s; ', n, ok) end;
   select count(*) into n from public.discover_profiles() where id in (b, c, d, e); r := r || case when n = 4 then 'ok discover lists the other 4 test users; ' else format('FAIL discover count %s; ', n) end;
   select count(*) into n from public.profiles_by_ids(array[b, c]); r := r || case when n = 0 then 'ok profiles_by_ids needs a relationship; ' else 'FAIL by_ids leak; ' end;
 

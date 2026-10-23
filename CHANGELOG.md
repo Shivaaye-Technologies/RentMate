@@ -18,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Fixed
 
+- Write-limit trigger made likes and reports fail for about 25 minutes after it was applied; fixed by checking each table in its own branch (`20261023103442_fix_write_limits_per_table`).
 - Blocks are now enforced in both directions; the previous profile policy could not see blocks made by other people.
 - Migration files renamed to the versions recorded in the database, so the Supabase CLI and production agree.
 - Removed the unused `POST /api/v1/messages` placeholder.
