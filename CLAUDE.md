@@ -20,6 +20,7 @@ Dating app: users create a profile, get ranked matches, like each other, and cha
 | Typecheck         | `npm run typecheck`                   |
 | Unit tests        | `npm test`                            |
 | Hook guard tests  | `npm run test:hooks`                  |
+| DB tests (local)  | `npm run test:db`                     |
 | Build             | `npm run build`                       |
 | Everything (= CI) | `npm run check && npm run test:hooks` |
 

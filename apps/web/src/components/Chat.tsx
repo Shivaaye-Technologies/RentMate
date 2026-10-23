@@ -4,6 +4,7 @@ import { storyDate } from "../profile";
 import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
+import { DemoBadge } from "./DemoBadge";
 
 interface Message {
   id: string;
@@ -149,7 +150,8 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
           />
           <span>
             <strong>
-              {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={15} />}
+              {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={15} />}{" "}
+              <DemoBadge id={person.id} />
             </strong>
             <small>{person.online ? "Online" : "See profile"}</small>
           </span>

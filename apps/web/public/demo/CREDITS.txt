@@ -1,0 +1,5 @@
+Demo profile portraits in avatars/ are generated with DiceBear from
+"Personas" by Draftbit (https://personas.draftbit.com/), licensed under
+CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: colours,
+hair and expression chosen per profile. They are illustrations, not photos
+of real people, and are shown only to tester accounts.

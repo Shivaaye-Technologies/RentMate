@@ -203,3 +203,12 @@ export function isNew(joinedAt: string | undefined | null, now = Date.now()): bo
 export function storyDate(iso: string, locale?: string): string {
   return new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "long" });
 }
+
+/** Demo profile portraits ship with the website (public/demo/avatars). */
+const DEMO_PHOTO = /^demo\/avatars\/\d{3}\.svg$/;
+
+/** Site URL for a demo portrait path, or null for any other path (normal photos are private). */
+export function demoPhotoUrl(path: string | null | undefined, base = "/"): string | null {
+  if (!path || !DEMO_PHOTO.test(path)) return null;
+  return `${base.endsWith("/") ? base : `${base}/`}${path}`;
+}

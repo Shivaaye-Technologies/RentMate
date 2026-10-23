@@ -17,6 +17,7 @@ import { MatchOverlay, ProfileSheet, SuperLikeSheet } from "./components/Sheets"
 import { orderedPair, type ProfileRow } from "./profile";
 import { friendlyError, type ReportReason } from "./safety";
 import { clearPhotoCache, supabase, supabaseConfigured } from "./supabase";
+import { loadDemoIds, setDemoIds } from "./demo";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -129,6 +130,11 @@ function Home({ session }: { session: Session }) {
   useEffect(() => {
     if (hasProfile) void loadPeople();
   }, [hasProfile, loadPeople]);
+
+  // Testers see a "Demo" label on fictional demo profiles.
+  useEffect(() => {
+    if (hasProfile) void loadDemoIds();
+  }, [hasProfile, me]);
 
   // Likes badge count.
   useEffect(() => {
@@ -260,6 +266,7 @@ function Home({ session }: { session: Session }) {
 
   const signOut = () => {
     clearPhotoCache();
+    setDemoIds([]);
     void supabase.auth.signOut();
   };
 

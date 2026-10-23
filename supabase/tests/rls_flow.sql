@@ -83,7 +83,8 @@ begin
 
   -- ===== Ready to meet =====
   perform set_config('request.jwt.claims', json_build_object('sub',a,'role','authenticated')::text, true);
-  select count(*) into n from public.messages where match_id = mid; r := r || case when n = 20 then 'ok participant reads chat; ' else format('FAIL chat read %s; ', n) end;
+  -- 1, not 20: the rate-limit block above rolls back its own 19 inserts when the 21st fails.
+  select count(*) into n from public.messages where match_id = mid; r := r || case when n = 1 then 'ok participant reads chat; ' else format('FAIL chat read %s; ', n) end;
   perform public.set_ready_to_meet(mid, true);
   begin
     if a = least(a,b) then update public.matches set ready_b = true where id = mid; else update public.matches set ready_a = true where id = mid; end if;
