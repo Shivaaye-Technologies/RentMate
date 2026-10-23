@@ -11,6 +11,9 @@ import {
   orderedPair,
   otherUserId,
   parseInterests,
+  profileStrength,
+  STEP_FIELDS,
+  stepErrors,
   validateProfile,
   type ProfileDraft,
   type ProfileRow,
@@ -35,7 +38,8 @@ describe("profile validation", () => {
         display_name: "Asha",
         age: 27,
         bio: "Chai and long walks",
-        interests: ["travel", "Books"],
+        // Standard spellings: "travel" is saved as "Travel" so interests line up.
+        interests: ["Travel", "Books"],
         looking_for: "friendship",
         age_min: 24,
         age_max: 34,
@@ -190,5 +194,60 @@ describe("discover filters", () => {
       joinedAt: "2026-10-01T00:00:00Z",
     });
     expect(p).not.toHaveProperty("lat");
+  });
+});
+
+describe("standard interests on save", () => {
+  it("saves standard spellings and drops duplicates by alias", () => {
+    const r = validateProfile({ ...draft, interests: "hike, Hiking, traveling, Chess" });
+    expect(r.ok && r.row.interests).toEqual(["Hiking", "Travel", "Chess"]);
+  });
+});
+
+describe("onboarding steps", () => {
+  const empty = { ...draft, displayName: "", age: "", bio: "" };
+
+  it("only reports errors for the fields on the current step", () => {
+    expect(Object.keys(stepErrors(empty, STEP_FIELDS.basics)).sort()).toEqual(["age", "displayName"]);
+    expect(stepErrors(empty, STEP_FIELDS.goals)).toEqual({});
+  });
+
+  it("keeps the 18+ rule", () => {
+    expect(stepErrors({ ...draft, age: "17" }, STEP_FIELDS.basics).age).toMatch(/18 or older/);
+    expect(stepErrors({ ...draft, ageMin: "16" }, STEP_FIELDS.goals).ageMin).toBeDefined();
+  });
+});
+
+describe("profileStrength", () => {
+  const p = {
+    display_name: "Asha",
+    age: 27,
+    bio: "",
+    interests: ["hike"],
+    photo_path: null,
+    lat: null,
+    lng: null,
+  };
+
+  it("counts only fields the member fills in", () => {
+    expect(profileStrength(p)).toMatchObject({ score: 1, total: 5 });
+    const full = {
+      ...p,
+      bio: "I love long walks, chai at sunrise and finding new street food.",
+      interests: ["Hiking", "Travel", "Books"],
+      photo_path: "u/a.jpg",
+      lat: 28.6,
+      lng: 77.2,
+    };
+    expect(profileStrength(full)).toMatchObject({ score: 5, total: 5 });
+    expect(profileStrength(full).items.every((i) => i.done)).toBe(true);
+  });
+
+  it("names what is missing", () => {
+    expect(
+      profileStrength(p)
+        .items.filter((i) => !i.done)
+        .map((i) => i.key),
+    ).toEqual(["photo", "bio", "interests", "location"]);
   });
 });

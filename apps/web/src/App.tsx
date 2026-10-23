@@ -19,6 +19,10 @@ import { friendlyError, type ReportReason } from "./safety";
 import { clearPhotoCache, supabase, supabaseConfigured } from "./supabase";
 import { loadDemoIds, setDemoIds } from "./demo";
 import { touchLastSeen } from "./presence";
+import { clearMyPasses, loadActivity, type Activity } from "./activity";
+import { Onboarding } from "./components/Onboarding";
+import { ProfileStrength, StrengthNudge } from "./components/ProfileStrength";
+import { InviteButton } from "./components/InviteButton";
 import { DemoMode } from "./demoMode/DemoMode";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
@@ -159,6 +163,39 @@ function Home({ session }: { session: Session }) {
   useEffect(() => {
     if (hasProfile) void loadPeople();
   }, [hasProfile, loadPeople]);
+
+  // Honest empty states: your own likes awaiting a reply and your passes.
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const caughtUp = status === "ready" && people.length === 0;
+  useEffect(() => {
+    if (!hasProfile || !caughtUp) return;
+    let cancelled = false;
+    loadActivity(supabase, me)
+      .then((a) => !cancelled && setActivity(a))
+      // The empty state still explains itself without these counts.
+      .catch((e: unknown) => console.error("Could not load your activity", e));
+    return () => {
+      cancelled = true;
+    };
+  }, [hasProfile, caughtUp, me, likesKey]);
+
+  async function reviewPasses() {
+    if (reviewing) return;
+    setReviewing(true);
+    try {
+      const n = await clearMyPasses(supabase, me);
+      setPassed([]);
+      setActivity((a) => (a ? { ...a, passed: 0 } : a));
+      await loadPeople();
+      flash(n === 1 ? "1 passed profile is back in Discover." : `${n} passed profiles are back in Discover.`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Could not bring back passed profiles.");
+    } finally {
+      setReviewing(false);
+    }
+  }
+  const emptyExtras = { activity, onReviewPasses: () => void reviewPasses(), reviewing };
 
   // Testers see a "Demo" label on fictional demo profiles.
   useEffect(() => {
@@ -332,24 +369,15 @@ function Home({ session }: { session: Session }) {
 
   if (!profile) {
     return (
-      <main className="shell onboarding">
-        <p className="display-lg center">Let's make it happen</p>
-        <ProfileForm
-          userId={me}
-          initial={null}
-          title="Create your profile"
-          subtitle="Tell people about you. Shared interests power your matches. You can add a photo next."
-          submitLabel="Start meeting people"
-          onSaved={(row) => {
-            setProfile({ ...row });
-            setTab("profile");
-            flash("Welcome! Add a photo to get noticed.");
-          }}
-        />
-        <button className="btn link block" onClick={signOut}>
-          Sign out
-        </button>
-      </main>
+      <Onboarding
+        userId={me}
+        onSignOut={signOut}
+        onDone={(row) => {
+          setProfile(row);
+          setTab("crush");
+          flash(`Welcome to SOULMATE.AI, ${row.display_name}!`);
+        }}
+      />
     );
   }
 
@@ -441,14 +469,11 @@ function Home({ session }: { session: Session }) {
         {tab === "crush" &&
           peopleBody(
             <>
-              {!profile.photo_path && (
-                <button className="nudge" onClick={() => setTab("profile")}>
-                  <Icon name="camera" size={18} /> Add a photo — profiles with photos get far more matches
-                </button>
-              )}
+              <StrengthNudge profile={profile} onOpen={() => setTab("profile")} />
               <CrushStack
                 people={people}
                 summary={summary}
+                emptyExtras={emptyExtras}
                 onEditProfile={() => setTab("profile")}
                 busy={busy}
                 canRewind={passed.length > 0}
@@ -466,6 +491,7 @@ function Home({ session }: { session: Session }) {
             <DiscoverHub
               people={people}
               summary={summary}
+              emptyExtras={emptyExtras}
               onEditProfile={() => setTab("profile")}
               likesCount={likesCount}
               onOpenLikes={() => setTab("likes")}
@@ -488,6 +514,7 @@ function Home({ session }: { session: Session }) {
 
         {tab === "profile" && (
           <>
+            <ProfileStrength profile={profile} />
             <ProfileExtras profile={profile} onChange={(patch) => setProfile({ ...profile, ...patch })} />
             <ProfileForm
               userId={me}
@@ -506,6 +533,14 @@ function Home({ session }: { session: Session }) {
                 <small>Try likes, matches and chat with 100+ fictional profiles. Nothing is shared.</small>
               </span>
             </a>
+            <div className="panel invite-panel">
+              <h2 className="display-sm">Bring your friends</h2>
+              <p className="muted">
+                SOULMATE.AI grows one real person at a time. Share the link; there is no tracking or referral
+                code.
+              </p>
+              <InviteButton className="btn dark" />
+            </div>
             <AccountPanel email={session.user.email} photoPath={profile.photo_path} onSignOut={signOut} />
           </>
         )}
