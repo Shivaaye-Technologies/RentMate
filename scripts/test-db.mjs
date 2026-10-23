@@ -5,6 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { DEFAULTS } from "./demo/generate-demo-profiles.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
@@ -26,9 +27,9 @@ console.log("Migrations applied.");
 for (let i = 0; i < 2; i++) await db.exec(read("supabase/seed/demo_profiles.sql"));
 const { rows } = await db.query("select count(*)::int as n from public.profiles where is_demo");
 console.log(`Demo seed applied twice: ${rows[0].n} demo profiles.`);
-if (rows[0].n !== 100) failed = true;
+if (rows[0].n !== DEFAULTS.count) failed = true;
 
-for (const test of ["rls_flow.sql", "demo_isolation.sql"]) {
+for (const test of ["rls_flow.sql", "demo_isolation.sql", "demo_mode.sql"]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
     console.error(`${test}: did not report results`);
@@ -44,6 +45,13 @@ for (const test of ["rls_flow.sql", "demo_isolation.sql"]) {
     if (!/ROLLED BACK/.test(e.message) || bad.length) failed = true;
   }
 }
+
+// Trim keeps demo profiles up to a number and removes the rest (nothing else).
+const { trimSql } = await import("./demo/generate-demo-profiles.mjs");
+await db.exec(trimSql(120));
+const trimmed = (await db.query("select count(*)::int as n from public.profiles where is_demo")).rows[0].n;
+console.log(`Trim to 120: ${trimmed} demo profiles left.`);
+if (trimmed !== 120) failed = true;
 
 // Cleanup removes every demo profile and nothing else.
 await db.exec(`

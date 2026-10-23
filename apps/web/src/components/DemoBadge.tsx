@@ -1,11 +1,11 @@
 import { useIsDemo } from "../demo";
 
-/** "Demo" label on fictional demo profiles (only testers ever see them). */
+/** "Fictional" label on demo profiles (Demo Mode and tester accounts only). */
 export function DemoBadge({ id }: { id: string }) {
   if (!useIsDemo(id)) return null;
   return (
-    <span className="demo-badge" title="Fictional demo profile, visible only to testers">
-      Demo
+    <span className="demo-badge" title="Fictional demo profile, not a real member">
+      Fictional
     </span>
   );
 }

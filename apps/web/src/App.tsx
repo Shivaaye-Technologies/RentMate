@@ -19,6 +19,10 @@ import { friendlyError, type ReportReason } from "./safety";
 import { clearPhotoCache, supabase, supabaseConfigured } from "./supabase";
 import { loadDemoIds, setDemoIds } from "./demo";
 import { touchLastSeen } from "./presence";
+import { DemoMode } from "./demoMode/DemoMode";
+
+/** Demo Mode lives at #demo so it can be linked from the landing page. */
+const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -33,6 +37,13 @@ const TABS: { key: Exclude<Tab, "profile">; label: string; icon: IconName }[] = 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
+  const [demo, setDemo] = useState(isDemoHash);
+
+  useEffect(() => {
+    const onHash = () => setDemo(isDemoHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -58,6 +69,17 @@ export function App() {
       <main className="empty full">
         <div className="spinner" aria-hidden="true" />
       </main>
+    );
+  }
+  if (demo) {
+    return (
+      <DemoMode
+        signedIn={session !== null}
+        onExit={() => {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setDemo(false);
+        }}
+      />
     );
   }
   if (!session) return <AuthScreen />;
@@ -477,6 +499,13 @@ function Home({ session }: { session: Session }) {
                 void loadPeople();
               }}
             />
+            <a className="demo-entry" href="#demo">
+              <Icon name="sparkle" size={18} />
+              <span>
+                <strong>Explore Demo Mode</strong>
+                <small>Try likes, matches and chat with 100+ fictional profiles. Nothing is shared.</small>
+              </span>
+            </a>
             <AccountPanel email={session.user.email} photoPath={profile.photo_path} onSignOut={signOut} />
           </>
         )}

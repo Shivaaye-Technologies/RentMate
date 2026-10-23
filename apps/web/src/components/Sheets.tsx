@@ -87,11 +87,14 @@ export function ProfileSheet({
 /** "It's a Match!" celebration. */
 export function MatchOverlay({
   person,
+  note,
   onChat,
   onProfile,
   onClose,
 }: {
   person: Person;
+  /** Extra line under the photo, e.g. that a Demo Mode match is simulated. */
+  note?: string;
   onChat: () => void;
   onProfile: () => void;
   onClose: () => void;
@@ -113,6 +116,7 @@ export function MatchOverlay({
           </span>
         </div>
         <p className="display-xl">Match!</p>
+        {note && <p className="sim-note on-color">{note}</p>}
         <button className="btn dark block" onClick={onChat}>
           Start a conversation
         </button>

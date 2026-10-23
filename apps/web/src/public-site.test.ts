@@ -17,6 +17,12 @@ describe("public landing page (signed out)", () => {
     expect(html).toMatch(/type="password"/);
   });
 
+  it("offers Demo Mode without signing up", () => {
+    expect(html).toContain('href="#demo"');
+    expect(html).toContain("Try Demo Mode");
+    expect(html).toMatch(/fictional profiles with simulated likes, matches and chat/);
+  });
+
   it("states the 18+ rule and links the legal pages", () => {
     expect(html).toContain("18 or older");
     for (const p of PUBLIC_PAGES) expect(html).toContain(`href="${p.href}"`);
