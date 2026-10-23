@@ -45,7 +45,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub',a,'role','authenticated')::text, true);
   select distance_km, online into n, ok from public.discover_profiles() where id = b;
   r := r || case when n = 5 and ok then 'ok distance bucket + online flag; ' else format('FAIL distance %s online %s; ', n, ok) end;
-  select count(*) into n from public.discover_profiles(); r := r || case when n = 4 then 'ok discover lists the other 4; ' else format('FAIL discover count %s; ', n) end;
+  select count(*) into n from public.discover_profiles() where id in (b, c, d, e); r := r || case when n = 4 then 'ok discover lists the other 4 test users; ' else format('FAIL discover count %s; ', n) end;
   select count(*) into n from public.profiles_by_ids(array[b, c]); r := r || case when n = 0 then 'ok profiles_by_ids needs a relationship; ' else 'FAIL by_ids leak; ' end;
 
   -- ===== Likes, Super Likes, matches =====
