@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 // Generates the fictional demo profiles used for testing SOULMATE.AI.
 //
-//   node scripts/demo/generate-demo-profiles.mjs [--female 50] [--male 50]
+//   node scripts/demo/generate-demo-profiles.mjs [--count 160] [--per-day 5] [--start 2026-10-24]
+//        [--female-share 0.5] [--female 50] [--male 50]
 //        [--lat 28.61] [--lng 77.21] [--radius-km 15] [--seed 42]
+//
+// The first 100 profiles (the "base" batch) never change. Profiles after that are
+// appended one by one, each from its own seed, and released over time (--per-day
+// new profiles a day from --start), so running again with a larger --count adds
+// new people without changing or duplicating existing ones.
 //
 // Writes (all deterministic for the same options):
 //   apps/web/public/demo/avatars/NNN.svg     illustrated portraits ("Personas" by Draftbit, CC BY 4.0)
 //   supabase/seed/demo_profiles.sql          repeatable seed (safe to run again)
+//   supabase/seed/demo_trim.sql              removes demo profiles numbered above --count
 //
 // Every person here is invented. No photo or detail comes from a real person.
 // Demo profiles are visible only to tester accounts (see the demo migration).
@@ -17,7 +24,24 @@ import { fileURLToPath } from "node:url";
 import { createAvatar } from "@dicebear/core";
 import * as personas from "@dicebear/personas";
 
-export const DEFAULTS = { female: 50, male: 50, lat: 28.61, lng: 77.21, radiusKm: 15, seed: 42 };
+export const DEFAULTS = {
+  female: 50,
+  male: 50,
+  lat: 28.61,
+  lng: 77.21,
+  radiusKm: 15,
+  seed: 42,
+  /** Total demo profiles including the base 100. */
+  count: 160,
+  /** New profiles released per day after the base batch. */
+  perDay: 5,
+  /** Release date of the first profile after the base batch (UTC day). */
+  start: "2026-10-24",
+  /** Share of women among profiles after the base batch. */
+  femaleShare: 0.5,
+};
+/** Hard cap so a typo cannot flood the database (the public demo list returns at most 500). */
+export const MAX_DEMO_PROFILES = 500;
 export const MIN_AGE = 18;
 export const MAX_AGE = 45;
 
@@ -310,48 +334,99 @@ export function buildProfiles(options = {}) {
   const maleNames = sample(r, MALE_NAMES, o.male);
   const bios = new Set();
 
-  return order.map(({ g }, idx) => {
-    const n = idx + 1;
-    const name = g === "female" ? femaleNames.pop() : maleNames.pop();
-    const age = pickAge(r);
-    const interests = sample(r, INTERESTS, 3 + Math.floor(r() * 4));
-    let bio;
+  return order.map(({ g }, idx) =>
+    makePerson(r, idx + 1, g, g === "female" ? femaleNames.pop() : maleNames.pop(), o, bios),
+  );
+}
+
+/** One fictional person. The order of random draws must not change: it defines the base batch. */
+function makePerson(r, n, g, name, o, bios) {
+  const age = pickAge(r);
+  const interests = sample(r, INTERESTS, 3 + Math.floor(r() * 4));
+  let bio;
+  do {
+    const [a, b] = sample(r, interests, 2).map((s) => s.toLowerCase());
+    const middle = pick(r, MIDDLES).replace("{a}", a).replace("{b}", b);
+    bio = `${pick(r, OPENERS)} ${middle.charAt(0).toUpperCase() + middle.slice(1)} ${pick(r, CLOSERS)}`;
+  } while (bios.has(bio));
+  bios.add(bio);
+  const roll = r();
+  const lookingFor = roll < 0.5 ? "relationship" : roll < 0.8 ? "friendship" : "casual";
+  return {
+    n,
+    id: demoId(n),
+    email: `demo-${String(n).padStart(3, "0")}@demo.soulmate.invalid`,
+    gender: g,
+    displayName: name,
+    age,
+    bio,
+    interests,
+    lookingFor,
+    ageMin: Math.max(MIN_AGE, age - 8),
+    ageMax: Math.min(60, age + 10),
+    ...pickLocation(r, o.lat, o.lng, o.radiusKm),
+    verified: r() < 0.3,
+    joinedHoursAgo: Math.floor(r() * 24 * 30),
+    seenMinutesAgo: Math.floor(r() * 60 * 24 * 3),
+    photoPath: `demo/avatars/${String(n).padStart(3, "0")}.svg`,
+    avatar: {
+      hair: pick(r, g === "female" ? FEMALE_HAIR : MALE_HAIR),
+      facialHair: g === "male" && r() < 0.45,
+      skin: Math.floor(r() * 7),
+      background: pick(r, BACKGROUNDS),
+      hairColor: age >= 40 && r() < 0.4 ? "dee1f5" : pick(r, HAIR_COLORS),
+      eyes: r() < 0.2 ? "glasses" : pick(r, ["open", "happy", "open", "wink"]),
+      mouth: pick(r, g === "female" ? ["smile", "bigSmile", "lips"] : ["smile", "bigSmile", "smirk"]),
+    },
+    releaseAt: null,
+  };
+}
+
+const LAST_INITIALS = "ABCDEGHIJKLMNPRSTVY".split("");
+
+/**
+ * Profiles numbered after the base batch, up to `count`. Each one uses its own
+ * seed, so profile n is the same whatever `count` is, and names and bios stay
+ * unique across all profiles.
+ */
+export function buildExtraProfiles(base, options = {}) {
+  const o = { ...DEFAULTS, ...options };
+  if (!Number.isInteger(o.count) || o.count < base.length || o.count > MAX_DEMO_PROFILES) {
+    throw new Error(`--count must be a whole number from ${base.length} to ${MAX_DEMO_PROFILES}`);
+  }
+  if (!(o.perDay >= 1) || !Number.isInteger(o.perDay))
+    throw new Error("--per-day must be a whole number of at least 1");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.start) || Number.isNaN(Date.parse(`${o.start}T00:00:00Z`))) {
+    throw new Error("--start must be a date like 2026-10-24");
+  }
+  if (!(o.femaleShare >= 0 && o.femaleShare <= 1)) throw new Error("--female-share must be between 0 and 1");
+  const names = new Set(base.map((p) => p.displayName));
+  const bios = new Set(base.map((p) => p.bio));
+  const out = [];
+  for (let n = base.length + 1; n <= o.count; n++) {
+    const r = rng((o.seed ^ Math.imul(n, 2654435761)) >>> 0);
+    const g = r() < o.femaleShare ? "female" : "male";
+    const pool = g === "female" ? FEMALE_NAMES : MALE_NAMES;
+    let name;
+    let tries = 0;
     do {
-      const [a, b] = sample(r, interests, 2).map((s) => s.toLowerCase());
-      const middle = pick(r, MIDDLES).replace("{a}", a).replace("{b}", b);
-      bio = `${pick(r, OPENERS)} ${middle.charAt(0).toUpperCase() + middle.slice(1)} ${pick(r, CLOSERS)}`;
-    } while (bios.has(bio));
-    bios.add(bio);
-    const roll = r();
-    const lookingFor = roll < 0.5 ? "relationship" : roll < 0.8 ? "friendship" : "casual";
-    return {
-      n,
-      id: demoId(n),
-      email: `demo-${String(n).padStart(3, "0")}@demo.soulmate.invalid`,
-      gender: g,
-      displayName: name,
-      age,
-      bio,
-      interests,
-      lookingFor,
-      ageMin: Math.max(MIN_AGE, age - 8),
-      ageMax: Math.min(60, age + 10),
-      ...pickLocation(r, o.lat, o.lng, o.radiusKm),
-      verified: r() < 0.3,
-      joinedHoursAgo: Math.floor(r() * 24 * 30),
-      seenMinutesAgo: Math.floor(r() * 60 * 24 * 3),
-      photoPath: `demo/avatars/${String(n).padStart(3, "0")}.svg`,
-      avatar: {
-        hair: pick(r, g === "female" ? FEMALE_HAIR : MALE_HAIR),
-        facialHair: g === "male" && r() < 0.45,
-        skin: Math.floor(r() * 7),
-        background: pick(r, BACKGROUNDS),
-        hairColor: age >= 40 && r() < 0.4 ? "dee1f5" : pick(r, HAIR_COLORS),
-        eyes: r() < 0.2 ? "glasses" : pick(r, ["open", "happy", "open", "wink"]),
-        mouth: pick(r, g === "female" ? ["smile", "bigSmile", "lips"] : ["smile", "bigSmile", "smirk"]),
-      },
-    };
-  });
+      name = `${pick(r, pool)} ${pick(r, LAST_INITIALS)}.`;
+      if (++tries > 10_000) throw new Error("Ran out of unique names");
+    } while (names.has(name));
+    names.add(name);
+    const person = makePerson(r, n, g, name, o, bios);
+    const day = Math.floor((n - base.length - 1) / o.perDay);
+    // 06:30 UTC = noon in India, the launch city.
+    const release = new Date(Date.parse(`${o.start}T06:30:00Z`) + day * 86_400_000);
+    out.push({ ...person, releaseAt: release.toISOString() });
+  }
+  return out;
+}
+
+/** The base batch plus extra profiles up to `count`. */
+export function buildAllProfiles(options = {}) {
+  const base = buildProfiles(options);
+  return [...base, ...buildExtraProfiles(base, options)];
 }
 
 const SKIN = ["eeb4a4", "e7a391", "e5a07e", "d78774", "b16a5b", "92594b", "623d36"];
@@ -379,7 +454,7 @@ export function seedSql(profiles, o = DEFAULTS) {
       (p) =>
         `  (${q(p.id)}, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', ${q(p.email)}, ` +
         `'{"provider":"email","providers":["email"],"demo":true}'::jsonb, '{}'::jsonb, ` +
-        `now() - interval '${p.joinedHoursAgo} hours', now(), '', '', '', '')`,
+        `${p.releaseAt ? `${q(p.releaseAt)}::timestamptz` : `now() - interval '${p.joinedHoursAgo} hours'`}, now(), '', '', '', '')`,
     )
     .join(",\n");
   const rows = profiles
@@ -387,15 +462,20 @@ export function seedSql(profiles, o = DEFAULTS) {
       (p) =>
         `  (${q(p.id)}, ${q(p.displayName)}, ${p.age}, ${q(p.bio)}, ${textArray(p.interests)}, ${q(p.lookingFor)}, ` +
         `${p.ageMin}, ${p.ageMax}, ${q(p.photoPath)}, ${p.lat}, ${p.lng}, ` +
-        `now() - interval '${p.seenMinutesAgo} minutes', ${p.verified}, now() - interval '${p.joinedHoursAgo} hours', true)`,
+        (p.releaseAt
+          ? `${q(p.releaseAt)}::timestamptz, ${p.verified}, ${q(p.releaseAt)}::timestamptz, true, ${q(p.releaseAt)}::timestamptz)`
+          : `now() - interval '${p.seenMinutesAgo} minutes', ${p.verified}, now() - interval '${p.joinedHoursAgo} hours', true, null)`),
     )
     .join(",\n");
   return `-- GENERATED by scripts/demo/generate-demo-profiles.mjs — do not edit by hand.
 -- ${profiles.length} fictional demo profiles (${profiles.filter((p) => p.gender === "female").length} female, ${profiles.filter((p) => p.gender === "male").length} male), ages ${MIN_AGE}-${MAX_AGE},
--- around ${o.lat}, ${o.lng} (radius ${o.radiusKm} km). Visible only to tester accounts.
+-- around ${o.lat}, ${o.lng} (radius ${o.radiusKm} km). ${profiles.filter((p) => p.releaseAt).length} of them are released over time
+-- (${o.perDay} a day from ${o.start}); each appears only from its demo_visible_from time.
+-- Shown only in Demo Mode (clearly labelled) and to tester accounts, never as real members.
 -- Safe to run more than once: rows are matched on fixed ids and updated.
 -- Demo accounts have no password and an undeliverable email, so nobody can sign in as them.
--- Run in the Supabase SQL Editor (or psql) as the database owner. Remove with demo_cleanup.sql.
+-- Run in the Supabase SQL Editor (or psql) as the database owner, after the demo_mode migration.
+-- Remove all with demo_cleanup.sql, or those above --count with demo_trim.sql.
 begin;
 
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
@@ -405,7 +485,7 @@ ${users}
 on conflict (id) do nothing;
 
 insert into public.profiles (id, display_name, age, bio, interests, looking_for, age_min, age_max,
-  photo_path, lat, lng, last_seen_at, verified, created_at, is_demo)
+  photo_path, lat, lng, last_seen_at, verified, created_at, is_demo, demo_visible_from)
 values
 ${rows}
 on conflict (id) do update set
@@ -413,11 +493,31 @@ on conflict (id) do update set
   interests = excluded.interests, looking_for = excluded.looking_for,
   age_min = excluded.age_min, age_max = excluded.age_max, photo_path = excluded.photo_path,
   lat = excluded.lat, lng = excluded.lng, last_seen_at = excluded.last_seen_at,
-  verified = excluded.verified, created_at = excluded.created_at, is_demo = true;
+  verified = excluded.verified, created_at = excluded.created_at, is_demo = true,
+  demo_visible_from = excluded.demo_visible_from;
 
 commit;
 
 select count(*) as demo_profiles from public.profiles where is_demo;
+`;
+}
+
+/** Deletes demo profiles numbered above `count` (and their demo likes, matches, messages). */
+export function trimSql(count) {
+  return `-- GENERATED by scripts/demo/generate-demo-profiles.mjs — do not edit by hand.
+-- Removes demo profiles numbered above ${count}. Only reserved demo emails are matched,
+-- and only rows marked is_demo, so real accounts are never touched. Deletes data:
+-- run only with approval, in the Supabase SQL Editor as the database owner.
+begin;
+
+delete from auth.users u
+where u.email ~ '^demo-[0-9]+@demo\\.soulmate\\.invalid$'
+  and substring(u.email from '^demo-([0-9]+)@')::int > ${count}
+  and exists (select 1 from public.profiles p where p.id = u.id and p.is_demo);
+
+commit;
+
+select count(*) as demo_profiles_left from public.profiles where is_demo;
 `;
 }
 
@@ -430,12 +530,17 @@ function parseArgs(argv) {
     "--lng": "lng",
     "--radius-km": "radiusKm",
     "--seed": "seed",
+    "--count": "count",
+    "--per-day": "perDay",
+    "--female-share": "femaleShare",
+    "--start": "start",
   };
   for (let i = 0; i < argv.length; i += 2) {
     const key = keys[argv[i]];
-    const value = Number(argv[i + 1]);
-    if (!key || !Number.isFinite(value))
-      throw new Error(`Unknown or invalid option: ${argv[i]} ${argv[i + 1] ?? ""}`);
+    const raw = argv[i + 1];
+    const value = key === "start" ? raw : Number(raw);
+    if (!key || raw === undefined || (key !== "start" && !Number.isFinite(value)))
+      throw new Error(`Unknown or invalid option: ${argv[i]} ${raw ?? ""}`);
     o[key] = value;
   }
   return o;
@@ -444,11 +549,14 @@ function parseArgs(argv) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
   const o = parseArgs(process.argv.slice(2));
-  const profiles = buildProfiles(o);
+  const profiles = buildAllProfiles(o);
   const avatarDir = join(root, "apps/web/public/demo/avatars");
   mkdirSync(avatarDir, { recursive: true });
   for (const p of profiles) writeFileSync(join(root, "apps/web/public", p.photoPath), avatarSvg(p));
   mkdirSync(join(root, "supabase/seed"), { recursive: true });
   writeFileSync(join(root, "supabase/seed/demo_profiles.sql"), seedSql(profiles, o));
-  console.log(`Wrote ${profiles.length} demo profiles and avatars.`);
+  writeFileSync(join(root, "supabase/seed/demo_trim.sql"), trimSql(o.count));
+  console.log(
+    `Wrote ${profiles.length} demo profiles and avatars (${profiles.filter((p) => p.releaseAt).length} released over time).`,
+  );
 }

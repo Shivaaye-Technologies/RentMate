@@ -10,10 +10,16 @@ declare
   mid uuid;
   r text := '';
   n int;
+  total int;
+  unreleased uuid[];
   i int;
 begin
-  select array_agg(id order by id) into demo_ids from public.profiles where is_demo;
-  r := r || case when coalesce(array_length(demo_ids, 1), 0) = 100 then 'ok 100 demo profiles seeded; ' else 'FAIL demo count ' || coalesce(array_length(demo_ids, 1), 0) || '; ' end;
+  -- Released demo profiles (later ones appear over time via demo_visible_from).
+  select array_agg(id order by id) into demo_ids from public.profiles
+  where is_demo and (demo_visible_from is null or demo_visible_from <= now());
+  select count(*) into total from public.profiles where is_demo;
+  select coalesce(array_agg(id), '{}') into unreleased from public.profiles where is_demo and demo_visible_from > now();
+  r := r || case when coalesce(array_length(demo_ids, 1), 0) >= 100 then 'ok at least 100 demo profiles released; ' else 'FAIL released ' || coalesce(array_length(demo_ids, 1), 0) || '; ' end;
 
   insert into auth.users (id, email, aud, role, instance_id) values
     (t, 't@demo-test.test', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000'),
@@ -55,13 +61,15 @@ begin
   -- ===== Tester: sees demo profiles, they like back and reply =====
   perform set_config('request.jwt.claims', json_build_object('sub', t, 'role', 'authenticated')::text, true);
   select count(*) into n from public.discover_profiles() where id = any (demo_ids);
-  r := r || case when n = 100 then 'ok tester discovers all 100 demo; ' else 'FAIL tester discovers ' || n || '; ' end;
+  r := r || case when n = array_length(demo_ids, 1) then 'ok tester discovers every released demo; ' else 'FAIL tester discovers ' || n || '; ' end;
+  select count(*) into n from public.discover_profiles() where id = any (unreleased);
+  r := r || case when n = 0 then 'ok unreleased demo hidden from tester; ' else 'FAIL unreleased shown ' || n || '; ' end;
   select count(*) into n from public.discover_profiles() where id = any (demo_ids) and distance_km is not null and distance_km <= 30;
-  r := r || case when n = 100 then 'ok demo distances within 30 km; ' else 'FAIL distances ' || n || '; ' end;
+  r := r || case when n = array_length(demo_ids, 1) then 'ok demo distances within 30 km; ' else 'FAIL distances ' || n || '; ' end;
   select count(*) into n from public.discover_profiles() where id = any (demo_ids) and online;
   r := r || case when n between 5 and 50 then 'ok some demo online (' || n || '); ' else 'FAIL online ' || n || '; ' end;
   select count(*) into n from public.demo_profile_ids();
-  r := r || case when n = 100 then 'ok tester gets demo ids; ' else 'FAIL tester demo ids ' || n || '; ' end;
+  r := r || case when n = total then 'ok tester gets demo ids; ' else 'FAIL tester demo ids ' || n || '; ' end;
 
   d := demo_ids[1];
   insert into public.likes (liker_id, liked_id, is_super, message) values (t, d, true, 'Hi!');
