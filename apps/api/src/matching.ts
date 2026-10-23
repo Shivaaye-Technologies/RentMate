@@ -87,11 +87,43 @@ export function excludeSeen<T extends { id: string }>(candidates: T[], seenIds: 
   return candidates.filter((c) => !seen.has(c.id));
 }
 
-/** Ranks candidates for a user, dropping zero scores, highest first. */
-export function rankMatches(user: MatchProfile, candidates: MatchProfile[], limit = 20): ScoredMatch[] {
+/**
+ * Who may appear in Discover: anyone else whose age fits both people's
+ * preferred ranges. The score only orders people; a score of 0 (no shared
+ * interests and a different goal) must not hide someone, or a small
+ * community shows an empty Discover even though eligible people exist.
+ */
+export function isEligible(user: MatchProfile, candidate: MatchProfile): boolean {
+  return user.id !== candidate.id && isMutualAgeFit(user, candidate);
+}
+
+export const DEFAULT_MATCH_LIMIT = 100;
+
+/** Ranks eligible candidates for a user, highest score first. */
+export function rankMatches(
+  user: MatchProfile,
+  candidates: MatchProfile[],
+  limit = DEFAULT_MATCH_LIMIT,
+): ScoredMatch[] {
   return candidates
+    .filter((c) => isEligible(user, c))
     .map((c) => compatibility(user, c))
-    .filter((m) => m.score > 0)
     .sort((x, y) => y.score - x.score || x.id.localeCompare(y.id))
     .slice(0, limit);
+}
+
+/** Why Discover may be empty: how many people exist and how many fit age preferences. */
+export interface DiscoverSummary {
+  /** People not yet liked, passed or blocked. */
+  candidates: number;
+  /** Of those, how many are outside your age range or you are outside theirs. */
+  outsideAgeRange: number;
+}
+
+export function summarize(user: MatchProfile, candidates: MatchProfile[]): DiscoverSummary {
+  const others = candidates.filter((c) => c.id !== user.id);
+  return {
+    candidates: others.length,
+    outsideAgeRange: others.filter((c) => !isMutualAgeFit(user, c)).length,
+  };
 }

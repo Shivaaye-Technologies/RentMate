@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { filterPeople, type Filter, type Person } from "../api";
+import { discoverEmptyState, filterPeople, type DiscoverSummary, type Filter, type Person } from "../api";
 import { isNew, type LookingFor } from "../profile";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
@@ -7,6 +7,8 @@ import { DemoBadge } from "./DemoBadge";
 
 interface Props {
   people: Person[];
+  summary: DiscoverSummary | null;
+  onEditProfile: () => void;
   likesCount: number;
   onOpenLikes: () => void;
   onOpen: (p: Person) => void;
@@ -20,7 +22,7 @@ const MOODS: { value: LookingFor | "any"; label: string }[] = [
 ];
 
 /** "Check out profiles selected just for you". */
-export function DiscoverHub({ people, likesCount, onOpenLikes, onOpen }: Props) {
+export function DiscoverHub({ people, summary, onEditProfile, likesCount, onOpenLikes, onOpen }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [mood, setMood] = useState<LookingFor | "any">("any");
   const shown = filterPeople(people, filter, mood);
@@ -91,11 +93,19 @@ export function DiscoverHub({ people, likesCount, onOpenLikes, onOpen }: Props) 
 
         {shown.length === 0 ? (
           <div className="empty small">
-            <p className="muted">
-              {people.length === 0
-                ? "No new profiles right now. Check back soon."
-                : "No one matches these filters. Try another mood or filter."}
-            </p>
+            {people.length === 0 ? (
+              <>
+                <p className="display-sm">{discoverEmptyState(summary).title}</p>
+                <p className="muted">{discoverEmptyState(summary).body}</p>
+                {discoverEmptyState(summary).editProfile && (
+                  <button className="btn" onClick={onEditProfile}>
+                    Edit age range
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="muted">No one matches these filters. Try another mood or filter.</p>
+            )}
           </div>
         ) : (
           <div className="grid">

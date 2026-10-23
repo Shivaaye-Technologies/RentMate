@@ -1,4 +1,4 @@
-import type { Person } from "../api";
+import { discoverEmptyState, type DiscoverSummary, type Person } from "../api";
 import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
 import { Photo } from "./Photo";
@@ -6,6 +6,8 @@ import { DemoBadge } from "./DemoBadge";
 
 interface Props {
   people: Person[];
+  summary: DiscoverSummary | null;
+  onEditProfile: () => void;
   busy: boolean;
   canRewind: boolean;
   onPass: (p: Person) => void;
@@ -16,18 +18,32 @@ interface Props {
 }
 
 /** "Find your Crush": one big card at a time. */
-export function CrushStack({ people, busy, canRewind, onPass, onLike, onSuper, onRewind, onRefresh }: Props) {
+export function CrushStack({
+  people,
+  summary,
+  onEditProfile,
+  busy,
+  canRewind,
+  onPass,
+  onLike,
+  onSuper,
+  onRewind,
+  onRefresh,
+}: Props) {
   const p = people[0];
 
   if (!p) {
+    const empty = discoverEmptyState(summary);
     return (
       <div className="empty">
-        <p className="display-sm">You're all caught up</p>
-        <p className="muted">
-          No one new matches your preferences right now. Try widening your age range in your profile, or come
-          back later.
-        </p>
+        <p className="display-sm">{empty.title}</p>
+        <p className="muted">{empty.body}</p>
         <div className="row-center">
+          {empty.editProfile && (
+            <button className="btn" onClick={onEditProfile}>
+              Edit age range
+            </button>
+          )}
           {canRewind && (
             <button className="btn" onClick={onRewind}>
               <Icon name="undo" size={18} /> Undo last pass

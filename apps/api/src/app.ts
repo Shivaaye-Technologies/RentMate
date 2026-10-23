@@ -5,7 +5,7 @@ import helmet from "helmet";
 import { createRequire } from "node:module";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
-import { displayDistanceKm, isOnline, rankMatches, type MatchProfile } from "./matching.js";
+import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
 import { ProfileInput } from "./validation.js";
 
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
@@ -44,6 +44,7 @@ export interface AppDeps {
 export function createApp({ config, verifyToken, storeFor }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
   app.use(helmet());
   app.use(cors({ origin: config.CORS_ORIGINS }));
   app.use(express.json({ limit: "100kb" }));
@@ -112,7 +113,7 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
           joinedAt: c.joinedAt ?? null,
         };
       });
-      res.json({ matches });
+      res.json({ matches, summary: summarize(me, candidates) });
     } catch (err) {
       next(err);
     }
