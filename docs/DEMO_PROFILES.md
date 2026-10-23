@@ -1,45 +1,76 @@
-# Demo profiles (testing only)
+# Demo profiles and Demo Mode
 
-100 fictional profiles (50 female, 50 male, ages 18–45) for testing Discover, the card stack,
-likes, matching and chat. **Only tester accounts can see them.** Ordinary users never see demo
-profiles anywhere: not in Discover, not by id, not in the table, and they cannot like them.
+160 fictional profiles (ages 18–45): the original 100 plus 60 released over time (5 a day from
+24 Oct 2026). They appear in two places only:
+
+1. **Demo Mode** (`/#demo`), open to everyone from the landing page ("Try Demo Mode, no sign-up")
+   and to members from their profile tab ("Explore Demo Mode"). A yellow banner on every screen
+   says that every profile, like, match and message is fictional and simulated.
+2. **Tester accounts** (`profiles.is_tester`), which also see them in the real app, labelled.
+
+Ordinary members never see demo profiles in real Discover, Likes, Chats or by id, and cannot like
+them. Demo profiles never appear as genuine members anywhere.
 
 ## What makes them safe
 
 - Every person is invented. Names, bios and details are generated; portraits are illustrations
   ("Personas" by Draftbit, CC BY 4.0), not photos of real people.
-- `profiles.is_demo` marks them; `profiles.is_tester` marks who may see them. Users cannot set
-  either column (outside the column grants). Enforced in RLS (restrictive policies) and in the
-  discovery functions. Covered by `supabase/tests/demo_isolation.sql`.
-- Demo accounts have no password and an undeliverable `@demo.soulmate.invalid` email, so nobody
-  can sign in as them.
-- In the app, testers see a yellow **DEMO** label on every demo profile, and the tenth automatic
-  chat reply says it is a demo profile.
+- `profiles.is_demo` marks them. Users cannot set `is_demo`, `is_tester` or `demo_visible_from`
+  (outside the column grants).
+- `public.demo_mode_profiles()` is the only way visitors reach profile data. It returns **only**
+  released demo profiles and only card fields (no coordinates, no last-seen times). Visitors still
+  cannot read the `profiles` table, call real discovery or write anything.
+- Demo Mode likes, matches and chats are **simulated in the visitor's browser** (`apps/web/src/demoMode/sim.ts`).
+  Every record is marked `simulated: true` and stored only in this browser under
+  `soulmate-demo-mode-v1`; nothing is written to `likes`, `matches` or `messages`, so no real member
+  can see, receive or be represented by them. "Start over" resets it.
+- Cards show a **Fictional** label; likes say "Simulated like"; matches say "Simulated: demo profiles
+  are fictional…"; every reply says "Simulated reply", and the tenth says it is a demo profile.
+- Demo accounts have no password and an undeliverable `@demo.soulmate.invalid` email.
+- Tests: `supabase/tests/demo_mode.sql`, `demo_isolation.sql` (run by `npm run test:db`),
+  `apps/web/src/demoMode/*.test.ts`.
 
-## Behaviour (so flows can be tested end to end)
+## Simulated behaviour in Demo Mode (deterministic per browser)
 
-- A tester's like is returned about 3 times in 4 (always for a Super Like), creating a match.
-- Messaging a demo match gets an instant short reply, up to 10 per conversation.
-- About a quarter of demo profiles show as online at any time (rotates every 10 minutes).
+- About a quarter of profiles "like you"; a third of those are there at once and the rest arrive
+  over the first 30 minutes.
+- Liking someone who liked you is a match; a Super Like always matches; otherwise about 45% match.
+- A match sends an opener; each message you send gets a scripted reply after ~1.5 s, up to 10.
+- About a quarter show as online at any moment (rotates every 10 minutes).
 
-## Commands (run in the Supabase SQL Editor as the database owner; each needs approval)
+## Tester accounts (real app)
 
-| Step                                                        | File                                              |
-| ----------------------------------------------------------- | ------------------------------------------------- |
-| 1. Apply the migration                                      | `supabase/migrations/*_demo_profiles_testers.sql` |
-| 2. Seed / refresh the 100 profiles (safe to repeat)         | `supabase/seed/demo_profiles.sql`                 |
-| 3. Make an account a tester (edit the email first)          | `supabase/seed/grant_tester.sql`                  |
-| Remove all demo profiles and their likes, matches, messages | `supabase/seed/demo_cleanup.sql`                  |
+A tester's like is returned about 3 times in 4 (always for a Super Like) and messages get
+automatic replies; these do use the real tables, marked by the demo profile on one side.
 
-## Regenerating (different mix or city)
+## Commands (Supabase SQL Editor, as the database owner; each needs approval)
+
+| Step                                                          | File                                                                        |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1. Apply migrations                                           | `supabase/migrations/*_demo_profiles_testers.sql`, `*_demo_mode_public.sql` |
+| 2. Seed / refresh profiles (safe to repeat; never duplicates) | `supabase/seed/demo_profiles.sql`                                           |
+| Make an account a tester (edit the email first)               | `supabase/seed/grant_tester.sql`                                            |
+| Remove demo profiles above `--count`                          | `supabase/seed/demo_trim.sql`                                               |
+| Remove all demo profiles and their likes, matches, messages   | `supabase/seed/demo_cleanup.sql`                                            |
+
+## Generating more profiles
 
 ```sh
-node scripts/demo/generate-demo-profiles.mjs --female 50 --male 50 --lat 28.61 --lng 77.21 --radius-km 15
+node scripts/demo/generate-demo-profiles.mjs --count 160 --per-day 5 --start 2026-10-24 --female-share 0.5
 ```
 
-Default centre is New Delhi. The script rewrites `supabase/seed/demo_profiles.sql` and
-`apps/web/public/demo/avatars/*.svg` deterministically; run step 2 again afterwards.
+- The first 100 never change (a test pins their checksum). Profiles after that are appended one by
+  one, each from its own seed, so a larger `--count` adds new people without changing or
+  duplicating existing ones. Names, bios, ids and portraits stay unique.
+- `--per-day` and `--start` set when each new profile appears (`demo_visible_from`); nothing needs
+  to run on a schedule.
+- `--count` is capped at 500. Other options: `--lat`, `--lng`, `--radius-km` (default New Delhi,
+  15 km), `--seed`.
+- The script rewrites `supabase/seed/demo_profiles.sql`, `supabase/seed/demo_trim.sql` and
+  `apps/web/public/demo/avatars/*.svg`. Commit them, deploy the web app (for the portraits), then run
+  the seed.
 
 ## Before launch
 
-Run `demo_cleanup.sql`, or keep the profiles: real users cannot see them either way.
+Demo Mode is designed to stay on. To remove it, run `demo_cleanup.sql` (Demo Mode then shows an
+empty list) and remove the entry links.

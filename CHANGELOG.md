@@ -7,6 +7,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- **Demo Mode** (`/#demo`): anyone can try SOULMATE.AI with the fictional demo profiles from the landing page or the profile tab. Simulated likes (arriving over time), matches and scripted chats run only in the browser, are labelled as simulated on every screen, and never touch real likes, matches or messages. Cards show a "Fictional" label.
+- `public.demo_mode_profiles()`: read-only list of released demo profiles for Demo Mode (visitors still cannot read real profiles).
+- Demo profiles released over time: the generator appends profiles after the original 100 (which never change) with `demo_visible_from` dates, `--count` (max 500), `--per-day`, `--start`, `--female-share`, and writes `demo_trim.sql` to remove profiles above the count. 160 profiles by default.
 - Landing page links to Privacy, Terms, Dating safety and Delete your account, and states the terms at sign-up; tests for the public landing and public pages.
 - Demo profiles for testing: 100 fictional profiles (50/50, ages 18–45, illustrated portraits, unique bios) visible only to tester accounts, with like-back and auto-reply so matching and chat can be tested; repeatable seed, tester grant and cleanup scripts; "Demo" label in the app (`docs/DEMO_PROFILES.md`).
 - `npm run test:db`: applies all migrations to a throwaway local Postgres (PGlite) and runs the SQL permission tests, the demo isolation test and the cleanup check; part of `npm test` and CI.
