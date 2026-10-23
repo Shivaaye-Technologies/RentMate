@@ -132,3 +132,44 @@ describe("distance and online status", () => {
     expect(isOnline(undefined, now)).toBe(false);
   });
 });
+
+describe("standard interests (ranking only)", () => {
+  it("treats common spellings as the same interest", () => {
+    const a = base({ id: "a", interests: ["hike", "Traveling"], lookingFor: "casual" });
+    const b = base({ id: "b", interests: ["Hiking", "travel"], lookingFor: "relationship" });
+    const r = compatibility(a, b);
+    expect(r.sharedInterests).toEqual(["hiking", "travel"]);
+    expect(r.score).toBe(60);
+  });
+
+  // The live data on 2026-10-23: "hike" and "Traveling" never matched anything.
+  it("raises the order of people who share an aliased interest", () => {
+    const me = base({ id: "me", interests: ["hike"], lookingFor: "relationship" });
+    const ranked = rankMatches(me, [
+      base({ id: "x", interests: ["Traveling"], lookingFor: "casual" }),
+      base({ id: "y", interests: ["Hiking"], lookingFor: "casual" }),
+    ]);
+    expect(ranked.map((m) => m.id)).toEqual(["y", "x"]);
+  });
+
+  it("never changes who is eligible", () => {
+    const me = base({ id: "me", age: 30, ageMin: 25, ageMax: 35, interests: ["hike"] });
+    const people = [
+      base({ id: "fits", age: 28, interests: ["Hiking"] }),
+      base({ id: "too-old", age: 50, interests: ["Hiking"] }),
+      base({ id: "range-excludes-me", age: 30, ageMin: 40, ageMax: 50, interests: ["hike"] }),
+      base({ id: "nothing-shared", age: 33, interests: ["Chess"] }),
+    ];
+    expect(
+      rankMatches(me, people)
+        .map((m) => m.id)
+        .sort(),
+    ).toEqual(["fits", "nothing-shared"]);
+    expect(
+      people
+        .filter((p) => isEligible(me, p))
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(["fits", "nothing-shared"]);
+  });
+});

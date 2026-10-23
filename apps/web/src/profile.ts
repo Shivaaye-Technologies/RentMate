@@ -1,3 +1,4 @@
+import { canonicalInterest, interestKey } from "./interests";
 export type LookingFor = "relationship" | "friendship" | "casual";
 
 /** "I'm here for" labels. */
@@ -79,6 +80,17 @@ export function parseInterests(input: string): string[] {
   return out;
 }
 
+/** Removes duplicates by standard spelling, keeping the first. */
+export function dedupeInterests(items: string[]): string[] {
+  const seen = new Set<string>();
+  return items.filter((i) => {
+    const k = interestKey(i);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 const toInt = (s: string) => (/^\d+$/.test(s.trim()) ? Number(s.trim()) : NaN);
 
 /** Mirrors the API's zod rules and the database constraints, including 18+. */
@@ -90,7 +102,8 @@ export function validateProfile(
   const age = toInt(d.age);
   const ageMin = toInt(d.ageMin);
   const ageMax = toInt(d.ageMax);
-  const interests = parseInterests(d.interests);
+  // Standard spellings ("hike" -> "Hiking") so people's interests line up.
+  const interests = dedupeInterests(parseInterests(d.interests).map(canonicalInterest));
   const bio = d.bio.trim();
 
   if (name.length < 2 || name.length > 40) errors.displayName = "Use 2 to 40 characters.";
@@ -212,3 +225,73 @@ export function demoPhotoUrl(path: string | null | undefined, base = "/"): strin
   if (!path || !DEMO_PHOTO.test(path)) return null;
   return `${base.endsWith("/") ? base : `${base}/`}${path}`;
 }
+
+/** Profile fields each onboarding step asks for (errors are shown per step). */
+export const STEP_FIELDS: Record<"basics" | "goals" | "interests" | "about", (keyof ProfileDraft)[]> = {
+  basics: ["displayName", "age"],
+  goals: ["lookingFor", "ageMin", "ageMax"],
+  interests: ["interests"],
+  about: ["bio"],
+};
+
+/** Validation errors for just these fields (the full check runs before saving). */
+export function stepErrors(d: ProfileDraft, fields: (keyof ProfileDraft)[]): DraftErrors {
+  const result = validateProfile(d);
+  if (result.ok) return {};
+  const out: DraftErrors = {};
+  for (const f of fields) if (result.errors[f]) out[f] = result.errors[f];
+  return out;
+}
+
+export interface StrengthItem {
+  key: "basics" | "photo" | "bio" | "interests" | "location";
+  label: string;
+  done: boolean;
+  hint: string;
+}
+
+/** How complete a profile is. Only real fields you can fill in yourself. */
+export function profileStrength(
+  p: Pick<ProfileRow, "display_name" | "age" | "bio" | "interests" | "photo_path" | "lat" | "lng">,
+): {
+  score: number;
+  total: number;
+  items: StrengthItem[];
+} {
+  const items: StrengthItem[] = [
+    { key: "basics", label: "Name and age", done: !!p.display_name && p.age >= 18, hint: "" },
+    {
+      key: "photo",
+      label: "A photo",
+      done: !!p.photo_path,
+      hint: "Profiles with a photo get far more likes.",
+    },
+    {
+      key: "bio",
+      label: "A short bio",
+      done: (p.bio ?? "").trim().length >= 40,
+      hint: "A couple of sentences gives people something to reply to.",
+    },
+    {
+      key: "interests",
+      label: "3 or more interests",
+      done: (p.interests ?? []).length >= 3,
+      hint: "Shared interests decide who you see first.",
+    },
+    {
+      key: "location",
+      label: "Approximate location",
+      done: p.lat != null && p.lng != null,
+      hint: "Shows distance (about 1 km). Your exact location is never shared.",
+    },
+  ];
+  return { score: items.filter((i) => i.done).length, total: items.length, items };
+}
+
+/** Starters for the bio, so a blank box is less daunting. */
+export const BIO_PROMPTS = [
+  "A perfect weekend for me is ",
+  "I'm happiest when ",
+  "Ask me about ",
+  "Looking for someone who ",
+] as const;

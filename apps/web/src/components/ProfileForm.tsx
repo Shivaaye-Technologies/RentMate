@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import {
   draftFromRow,
   LOOKING_FOR_LABELS,
-  parseInterests,
   validateProfile,
   type DraftErrors,
   type LookingFor,
@@ -11,6 +10,7 @@ import {
   type ProfileRow,
 } from "../profile";
 import { supabase } from "../supabase";
+import { InterestPicker } from "./InterestPicker";
 
 interface Props {
   userId: string;
@@ -53,8 +53,6 @@ export function ProfileForm({ userId, initial, title, subtitle, submitLabel, onS
     setSaved(true);
     onSaved(row);
   }
-
-  const chips = parseInterests(draft.interests);
 
   return (
     <form className="panel form" onSubmit={submit} noValidate>
@@ -102,24 +100,14 @@ export function ProfileForm({ userId, initial, title, subtitle, submitLabel, onS
         {errors.bio && <small className="err">{errors.bio}</small>}
       </label>
 
-      <label className="field">
-        <span>Interests (comma separated)</span>
-        <input
-          placeholder="hiking, music, cooking, travel"
+      <div className="field">
+        <span>Interests</span>
+        <InterestPicker
           value={draft.interests}
-          onChange={(e) => set("interests", e.target.value)}
+          onChange={(v) => set("interests", v)}
+          error={errors.interests}
         />
-        {errors.interests && <small className="err">{errors.interests}</small>}
-      </label>
-      {chips.length > 0 && (
-        <div className="chips">
-          {chips.map((c) => (
-            <span key={c} className="chip">
-              {c}
-            </span>
-          ))}
-        </div>
-      )}
+      </div>
 
       <fieldset className="field">
         <span>Show me people aged</span>

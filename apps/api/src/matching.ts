@@ -1,3 +1,5 @@
+import { interestKey } from "./interests.js";
+
 export interface MatchProfile {
   id: string;
   displayName?: string;
@@ -25,7 +27,8 @@ export interface ScoredMatch {
   sharedInterests: string[];
 }
 
-const normalize = (s: string) => s.trim().toLowerCase();
+/** Case-insensitive, with common spellings resolved ("hike" = "Hiking"). Ranking only. */
+const normalize = (s: string) => interestKey(s);
 
 /** True when each person falls inside the other's preferred age range. */
 export function isMutualAgeFit(a: MatchProfile, b: MatchProfile): boolean {

@@ -1743,3 +1743,163 @@ textarea {
 .demo-entry small {
   font-size: 12.5px;
 }
+
+/* ---------- Onboarding, interests, profile strength, invite ---------- */
+.steps {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.steps .step {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.steps .step.on {
+  background: var(--ink);
+}
+
+.center {
+  text-align: center;
+}
+
+.choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.choice {
+  text-align: left;
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.choice.on {
+  border-color: var(--ink);
+  background: var(--lilac);
+}
+
+.chips.pick {
+  gap: 8px;
+}
+
+.chip.toggle {
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+}
+
+.chip.toggle.on {
+  border-color: var(--ink);
+  background: var(--yellow);
+  font-weight: 700;
+}
+
+.chip.toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.add-own {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.add-own input {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-actions {
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn.grow {
+  flex: 1;
+}
+
+.strength-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 8px 0 12px;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+
+.strength-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.strength-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.strength-list li.done {
+  opacity: 0.6;
+}
+
+.empty-extras {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.invite {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.invite-link {
+  word-break: break-all;
+  font-weight: 700;
+}
+
+.btn.demo-link {
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.demo-link small {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.invite-panel {
+  margin: 16px 0;
+}

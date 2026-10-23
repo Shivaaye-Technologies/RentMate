@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { discoverEmptyState, filterPeople, type DiscoverSummary, type Filter, type Person } from "../api";
+import { filterPeople, type DiscoverSummary, type Filter, type Person } from "../api";
+import { EmptyDiscover, type EmptyExtras } from "./EmptyDiscover";
 import { isNew, type LookingFor } from "../profile";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
@@ -8,6 +9,8 @@ import { DemoBadge } from "./DemoBadge";
 interface Props {
   people: Person[];
   summary: DiscoverSummary | null;
+  /** Real-app empty-state extras (activity, review passes, invite, Demo Mode). */
+  emptyExtras?: EmptyExtras;
   onEditProfile: () => void;
   likesCount: number;
   onOpenLikes: () => void;
@@ -22,7 +25,15 @@ const MOODS: { value: LookingFor | "any"; label: string }[] = [
 ];
 
 /** "Check out profiles selected just for you". */
-export function DiscoverHub({ people, summary, onEditProfile, likesCount, onOpenLikes, onOpen }: Props) {
+export function DiscoverHub({
+  people,
+  summary,
+  emptyExtras,
+  onEditProfile,
+  likesCount,
+  onOpenLikes,
+  onOpen,
+}: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [mood, setMood] = useState<LookingFor | "any">("any");
   const shown = filterPeople(people, filter, mood);
@@ -94,15 +105,7 @@ export function DiscoverHub({ people, summary, onEditProfile, likesCount, onOpen
         {shown.length === 0 ? (
           <div className="empty small">
             {people.length === 0 ? (
-              <>
-                <p className="display-sm">{discoverEmptyState(summary).title}</p>
-                <p className="muted">{discoverEmptyState(summary).body}</p>
-                {discoverEmptyState(summary).editProfile && (
-                  <button className="btn" onClick={onEditProfile}>
-                    Edit age range
-                  </button>
-                )}
-              </>
+              <EmptyDiscover summary={summary} extras={emptyExtras} onEditProfile={onEditProfile} />
             ) : (
               <p className="muted">No one matches these filters. Try another mood or filter.</p>
             )}

@@ -87,3 +87,34 @@ describe("discoverEmptyState", () => {
     expect(discoverEmptyState(null).title).toBe("No new people yet");
   });
 });
+
+describe("discoverEmptyState with your activity", () => {
+  it("says how many likes are awaiting a reply (the live case: liked both members)", () => {
+    const e = discoverEmptyState({ candidates: 0, outsideAgeRange: 0 }, { awaitingReply: 2, passed: 0 });
+    expect(e.title).toBe("You're all caught up");
+    expect(e.body).toContain("You liked 2 people who haven't replied yet.");
+    expect(e.body).toContain("you'll match");
+    expect(e.reviewPasses).toBe(0);
+  });
+
+  it("offers to bring back passed profiles, with singular wording", () => {
+    const e = discoverEmptyState({ candidates: 0, outsideAgeRange: 0 }, { awaitingReply: 1, passed: 1 });
+    expect(e.body).toContain("You liked 1 person who hasn't replied yet.");
+    expect(e.body).toContain("You passed 1 person");
+    expect(e.reviewPasses).toBe(1);
+  });
+
+  it("keeps the age-range explanation and adds waiting likes", () => {
+    const e = discoverEmptyState({ candidates: 3, outsideAgeRange: 3 }, { awaitingReply: 1, passed: 2 });
+    expect(e.editProfile).toBe(true);
+    expect(e.body).toMatch(/^3 people are outside your age range/);
+    expect(e.reviewPasses).toBe(2);
+  });
+
+  it("is honest when nobody has joined yet", () => {
+    const e = discoverEmptyState({ candidates: 0, outsideAgeRange: 0 }, { awaitingReply: 0, passed: 0 });
+    expect(e.title).toBe("No new people yet");
+    expect(e.body).toMatch(/invite friends/);
+    expect(e.reviewPasses).toBe(0);
+  });
+});

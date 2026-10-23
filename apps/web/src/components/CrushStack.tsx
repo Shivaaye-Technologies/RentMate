@@ -1,4 +1,5 @@
-import { discoverEmptyState, type DiscoverSummary, type Person } from "../api";
+import type { DiscoverSummary, Person } from "../api";
+import { EmptyDiscover, type EmptyExtras } from "./EmptyDiscover";
 import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
 import { Photo } from "./Photo";
@@ -7,6 +8,8 @@ import { DemoBadge } from "./DemoBadge";
 interface Props {
   people: Person[];
   summary: DiscoverSummary | null;
+  /** Real-app empty-state extras (activity, review passes, invite, Demo Mode). */
+  emptyExtras?: EmptyExtras;
   onEditProfile: () => void;
   busy: boolean;
   canRewind: boolean;
@@ -21,6 +24,7 @@ interface Props {
 export function CrushStack({
   people,
   summary,
+  emptyExtras,
   onEditProfile,
   busy,
   canRewind,
@@ -33,17 +37,9 @@ export function CrushStack({
   const p = people[0];
 
   if (!p) {
-    const empty = discoverEmptyState(summary);
     return (
       <div className="empty">
-        <p className="display-sm">{empty.title}</p>
-        <p className="muted">{empty.body}</p>
-        <div className="row-center">
-          {empty.editProfile && (
-            <button className="btn" onClick={onEditProfile}>
-              Edit age range
-            </button>
-          )}
+        <EmptyDiscover summary={summary} extras={emptyExtras} onEditProfile={onEditProfile}>
           {canRewind && (
             <button className="btn" onClick={onRewind}>
               <Icon name="undo" size={18} /> Undo last pass
@@ -52,7 +48,7 @@ export function CrushStack({
           <button className="btn dark" onClick={onRefresh}>
             Refresh
           </button>
-        </div>
+        </EmptyDiscover>
       </div>
     );
   }
