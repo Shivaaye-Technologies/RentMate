@@ -63,6 +63,10 @@ export function AuthScreen() {
           Find your <em>Crush</em>
         </h1>
         <p className="lede">…or a new friend. Matched on what you love, not just a photo.</p>
+        <a className="btn demo-cta" href="#demo">
+          Try Demo Mode, no sign-up
+        </a>
+        <p className="demo-cta-note">Browse fictional profiles with simulated likes, matches and chat.</p>
         <ul className="hero-points">
           <li>
             <b className="dot lilac" /> Profiles picked for you

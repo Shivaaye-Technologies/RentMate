@@ -825,6 +825,7 @@ textarea {
   color: #fff;
   font-weight: 800;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -1629,4 +1630,116 @@ textarea {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* ---------- Demo Mode ---------- */
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  background: var(--yellow);
+  color: var(--ink);
+  border-bottom: 2px solid var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.demo-banner p {
+  margin: 0;
+  flex: 1 1 240px;
+}
+
+.demo-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.pill.sim-tag,
+.sim-tag {
+  background: var(--yellow);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.sim-label {
+  display: block;
+  margin: 3px 0 0 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sim-note {
+  margin: 8px auto 12px;
+  max-width: 36em;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.sim-note.on-color {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bubble.typing {
+  letter-spacing: 3px;
+  color: var(--muted);
+}
+
+.demo-chat {
+  flex: 1;
+  min-height: 0;
+}
+
+.btn.demo-cta {
+  margin: 4px 0 4px;
+  background: var(--yellow);
+  border-color: var(--yellow);
+  text-decoration: none;
+}
+
+.demo-cta-note {
+  margin: 0 0 14px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.demo-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  background: var(--yellow);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.demo-entry span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.demo-entry small {
+  font-size: 12.5px;
 }
