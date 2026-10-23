@@ -2,10 +2,29 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { createRequire } from "node:module";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, type MatchProfile } from "./matching.js";
 import { ProfileInput } from "./validation.js";
+
+// apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
+const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+
+export const SERVICE_NAME = "soulmate-api";
+
+/** Public route documentation served at GET /. Keep in sync with the routes below. */
+export const ROUTES = [
+  { method: "GET", path: "/", auth: false, description: "API information and available routes" },
+  {
+    method: "GET",
+    path: "/health",
+    auth: false,
+    description: "Liveness check: 200 while the server is running",
+  },
+  { method: "PUT", path: "/api/v1/profile", auth: true, description: "Create or update your profile" },
+  { method: "GET", path: "/api/v1/matches", auth: true, description: "Ranked people for you to discover" },
+] as const;
 
 /** Data access the routes depend on. */
 export interface ProfileStore {
@@ -29,8 +48,23 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
   app.use(cors({ origin: config.CORS_ORIGINS }));
   app.use(express.json({ limit: "100kb" }));
 
+  // Root: what this service is and how to use it. Never includes configuration values.
+  app.get("/", (_req, res) => {
+    res.json({
+      name: "SOULMATE.AI API",
+      service: SERVICE_NAME,
+      version,
+      status: "ok",
+      authentication: "Routes under /api/v1 need the header Authorization: Bearer <Supabase access token>.",
+      routes: ROUTES,
+    });
+  });
+
+  // Liveness for Render's health check: answers 200 whenever the process is up.
+  // Deliberately does not call Supabase, so a database hiccup does not restart the server.
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", service: "soulmate-api", authConfigured: verifyToken !== null });
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null });
   });
 
   const api = express.Router();

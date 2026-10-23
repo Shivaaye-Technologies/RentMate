@@ -14,7 +14,9 @@ Both Render services auto-deploy on every push to `main`. They were created thro
 not the Blueprint flow, so Render does **not** read `render.yaml` for them. Treat `render.yaml` as the
 reference configuration and mirror changes in the dashboard:
 
-- `soulmate-api` → Settings → **Health Check Path** = `/health`
+- `soulmate-api` → Settings → **Health Check Path** = `/health` (not set on the live service yet; without it
+  Render only checks that the port is open). `/health` answers 200 whenever the process runs and does
+  not call Supabase, so a database hiccup will not trigger restarts.
 - `soulmate-web` → Redirects/Rewrites → rewrite `/*` → `/index.html` (only needed once the app uses URL paths; today it has none, and the legal pages are separate static files)
 
 ## 1. Supabase

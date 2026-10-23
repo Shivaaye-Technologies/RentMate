@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- API: `GET /` returns service name, version and the documented routes (no configuration values); `GET /health` sends `Cache-Control: no-store`; tests for both, for `HEAD /health`, documented routes and `PORT` handling.
 - Safety: report (6 reasons, optional block), block, unmatch and delete account in the app; `reports` table; per-user write limits (messages 20/min, likes 300/day, reports 20/day).
 - Privacy: other people's coordinates and last-seen times are no longer readable; `discover_profiles` / `profiles_by_ids` return a coarse distance bucket and an online flag; photos bucket made private with signed links.
 - Public pages: Privacy Policy, Terms of Use, Dating safety tips, Delete your account.

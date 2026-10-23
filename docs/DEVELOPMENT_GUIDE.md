@@ -43,11 +43,12 @@ supabase/migrations  SQL schema with RLS
 
 ## API
 
-| Method | Path              | Auth | Description                     |
-| ------ | ----------------- | ---- | ------------------------------- |
-| GET    | `/health`         | No   | Liveness and auth config status |
-| PUT    | `/api/v1/profile` | Yes  | Create or update your profile   |
-| GET    | `/api/v1/matches` | Yes  | Ranked matches for you          |
+| Method | Path              | Auth | Description                    |
+| ------ | ----------------- | ---- | ------------------------------ |
+| GET    | `/`               | No   | API information and route list |
+| GET    | `/health`         | No   | Liveness check (200 while up)  |
+| PUT    | `/api/v1/profile` | Yes  | Create or update your profile  |
+| GET    | `/api/v1/matches` | Yes  | Ranked matches for you         |
 
 ## Adding a feature
 
