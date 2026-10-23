@@ -57,7 +57,7 @@ Protect `main`: Settings → Branches → add a rule requiring a pull request an
 
 ## 3. Render environment variables
 
-- `soulmate-api`: `NODE_ENV=production`, `NODE_VERSION=22`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable key), `CORS_ORIGINS` (the website URL)
+- `soulmate-api`: `NODE_ENV=production`, `NODE_VERSION=22`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable key), `CORS_ORIGINS` (every website address, comma-separated: currently `https://soulmate-web.onrender.com` and `https://soulmate-ai-eta.vercel.app`); optional `TRUST_PROXY` (proxy hops, defaults to 1 in production so rate limits apply per visitor)
 - `soulmate-web`: `NODE_VERSION=22`, `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (publishable key)
 
 Build commands use `npm ci --include=dev` because `NODE_ENV=production` would otherwise skip TypeScript and Vite.

@@ -3,6 +3,14 @@ import { supabase } from "../supabase";
 
 type Mode = "signin" | "signup";
 
+/** Public pages anyone can read without an account (served from public/). */
+export const PUBLIC_PAGES = [
+  { href: "/privacy.html", label: "Privacy" },
+  { href: "/terms.html", label: "Terms" },
+  { href: "/safety.html", label: "Dating safety" },
+  { href: "/delete-account.html", label: "Delete your account" },
+] as const;
+
 export function AuthScreen() {
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
@@ -20,19 +28,25 @@ export function AuthScreen() {
       return;
     }
     setBusy(true);
-    if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: window.location.origin },
-      });
-      if (error) setError(error.message);
-      else if (!data.session) setNotice("Check your email to confirm your account, then sign in.");
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
+    try {
+      if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) setError(error.message);
+        else if (!data.session) setNotice("Check your email to confirm your account, then sign in.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) setError(error.message);
+      }
+    } catch (e) {
+      console.error("Authentication request failed", e);
+      setError("Can't reach the sign-in service. Check your internet connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
@@ -112,8 +126,19 @@ export function AuthScreen() {
         <button className="btn dark block" disabled={busy}>
           {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
         </button>
-        <p className="fine">You must be 18 or older to use SOULMATE.AI.</p>
+        <p className="fine">
+          You must be 18 or older to use SOULMATE.AI. By creating an account you agree to the{" "}
+          <a href="/terms.html">Terms of Use</a> and <a href="/privacy.html">Privacy Policy</a>.
+        </p>
       </form>
+
+      <footer className="public-links" aria-label="About SOULMATE.AI">
+        {PUBLIC_PAGES.map((p) => (
+          <a key={p.href} href={p.href}>
+            {p.label}
+          </a>
+        ))}
+      </footer>
     </main>
   );
 }
