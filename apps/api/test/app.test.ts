@@ -54,6 +54,14 @@ describe("API", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects more than 10 interests, like the database", async () => {
+    const res = await request(makeApp())
+      .put("/api/v1/profile")
+      .set("Authorization", "Bearer token-alice")
+      .send({ ...profile, interests: Array.from({ length: 11 }, (_, i) => `i${i}`) });
+    expect(res.status).toBe(400);
+  });
+
   it("returns 404 from /matches until the user has a profile", async () => {
     const res = await request(makeApp()).get("/api/v1/matches").set("Authorization", "Bearer token-alice");
     expect(res.status).toBe(404);
