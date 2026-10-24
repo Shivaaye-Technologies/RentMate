@@ -2,7 +2,8 @@ import type { Session } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
 import { DiscoverError, fetchDiscover, type DiscoverSummary, type Person } from "./api";
 import { AccountPanel } from "./components/AccountPanel";
-import { AuthScreen } from "./components/AuthScreen";
+import { AuthScreen, NewPasswordScreen } from "./components/AuthScreen";
+import { hasAuthParams, parseAuthRedirect, type AuthProblem } from "./auth";
 import { Chat } from "./components/Chat";
 import { ChatsList } from "./components/ChatsList";
 import { CrushStack } from "./components/CrushStack";
@@ -38,10 +39,18 @@ const TABS: { key: Exclude<Tab, "profile">; label: string; icon: IconName }[] = 
   { key: "chats", label: "Chats", icon: "chat" },
 ];
 
+/** Email links come back with parameters in the URL; read them once at start-up. */
+const startRedirect =
+  typeof window === "undefined"
+    ? { type: null, problem: null }
+    : parseAuthRedirect(window.location.hash, window.location.search);
+
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [demo, setDemo] = useState(isDemoHash);
+  const [recovery, setRecovery] = useState(startRedirect.type === "recovery");
+  const [linkProblem] = useState<AuthProblem | null>(startRedirect.problem);
 
   useEffect(() => {
     const onHash = () => setDemo(isDemoHash());
@@ -54,8 +63,14 @@ export function App() {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setReady(true);
+      // The client has read any tokens from the link; tidy the address bar.
+      const { hash, search, pathname } = window.location;
+      if (hasAuthParams(hash, search)) window.history.replaceState(null, "", pathname);
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      setSession(s);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -86,7 +101,8 @@ export function App() {
       />
     );
   }
-  if (!session) return <AuthScreen />;
+  if (recovery && session) return <NewPasswordScreen onDone={() => setRecovery(false)} />;
+  if (!session) return <AuthScreen initialProblem={linkProblem} />;
   return <Home key={session.user.id} session={session} />;
 }
 

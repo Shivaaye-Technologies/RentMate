@@ -42,3 +42,21 @@ describe("public information pages", () => {
     });
   }
 });
+
+describe("sign-up form", () => {
+  it("has a show/hide password control and explains email confirmation", () => {
+    const html = renderToStaticMarkup(createElement(AuthScreen));
+    expect(html).toContain('aria-label="Show password"');
+    expect(html).toMatch(/email you a link to confirm/);
+  });
+
+  it("explains an expired email link when one brought the visitor back", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthScreen, {
+        initialProblem: { kind: "link_expired", message: "That email link has expired or was already used." },
+      }),
+    );
+    expect(html).toContain("expired or was already used");
+    expect(html).toContain('role="alert"');
+  });
+});
