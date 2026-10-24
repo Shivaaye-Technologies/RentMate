@@ -152,7 +152,7 @@ export const RESEND_COOLDOWN_S = 60;
 
 export function cooldownLeft(lastSentAt: number | null, now = Date.now(), seconds = RESEND_COOLDOWN_S) {
   if (!lastSentAt) return 0;
-  return Math.max(0, Math.ceil((lastSentAt + seconds * 1000 - now) / 1000));
+  return Math.min(seconds, Math.max(0, Math.ceil((lastSentAt + seconds * 1000 - now) / 1000)));
 }
 
 const SENT_KEY = "soulmate-auth-email-sent";

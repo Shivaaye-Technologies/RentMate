@@ -39,9 +39,10 @@ Every result line must start with `ok`.
 
 ### Auth settings (dashboard → Authentication)
 
-- **URL Configuration:** Site URL `https://soulmate-web.onrender.com`; Redirect URLs `https://soulmate-web.onrender.com/**`
-- **Sign In / Providers → Email:** "Confirm email" off for testing; on for launch with custom SMTP configured.
-- **Leaked password protection:** enable when your plan allows it.
+- **URL Configuration:** Site URL `https://soulmate-ai-eta.vercel.app` (the address that works best in India). Redirect URLs: `https://soulmate-ai-eta.vercel.app/**` and `https://soulmate-web.onrender.com/**`. Confirmation and password-reset links go back to the site the person signed up on, so both must be listed. If the Site URL is left as `http://localhost:3000`, links open a page that doesn't exist on phones (seen in the auth logs on 2026-10-23).
+- **Sign In / Providers → Email:** keep "Confirm email" on. The built-in email sender only allows a few emails per hour for the whole project, which causes "email rate limit exceeded". Before inviting people, set up custom SMTP (Authentication → Emails → SMTP settings) with a transactional email provider, then raise the email rate limit (Authentication → Rate limits).
+- **Leaked password protection:** enable it (Authentication → Sign In / Providers → Email → "Prevent use of leaked passwords") when your plan allows it.
+- **Minimum password length:** 8 (the website also asks for letters and numbers).
 
 ### Moderation
 

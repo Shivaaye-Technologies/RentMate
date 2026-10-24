@@ -214,7 +214,6 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
           <ul className="tips">
             <li>It can take a few minutes. Check Spam or Promotions too.</li>
             <li>Only the newest email works: each new email replaces the previous link.</li>
-            <li>The sender is a Supabase address on behalf of SOULMATE.AI.</li>
           </ul>
           {problem && (
             <p className="alert error" role="alert">

@@ -96,5 +96,7 @@ describe("cooldownLeft", () => {
     expect(cooldownLeft(null, 1000)).toBe(0);
     expect(cooldownLeft(0 + 1, 1 + 15_000)).toBe(45);
     expect(cooldownLeft(1, 1 + 61_000)).toBe(0);
+    // A clock that hasn't caught up never shows more than the full cooldown.
+    expect(cooldownLeft(10_000, 0)).toBe(60);
   });
 });

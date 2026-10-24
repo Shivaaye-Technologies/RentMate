@@ -2219,14 +2219,12 @@ details > .chips {
 }
 
 .chip.toggle {
-  border: 2px solid transparent;
-  cursor: pointer;
-  min-height: 36px;
+  min-height: 38px;
 }
 
-.chip.toggle:disabled {
-  opacity: 0.4;
-  cursor: default;
+.field > label:first-child {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .city-field {
