@@ -1,3 +1,4 @@
+import { EMPTY_DETAILS } from "./details";
 import { describe, expect, it } from "vitest";
 import { filterPeople, personFromRow, type Person } from "./api";
 import { fitWithin } from "./photo";
@@ -12,6 +13,7 @@ import {
   otherUserId,
   parseInterests,
   profileStrength,
+  allPhotos,
   STEP_FIELDS,
   stepErrors,
   validateProfile,
@@ -131,6 +133,8 @@ describe("helpers", () => {
 describe("discover filters", () => {
   const now = Date.parse("2026-10-23T12:00:00Z");
   const base: Person = {
+    details: EMPTY_DETAILS,
+    photos: [],
     id: "x",
     score: 50,
     sharedInterests: [],
@@ -192,6 +196,8 @@ describe("discover filters", () => {
       online: true,
       distanceKm: 5,
       joinedAt: "2026-10-01T00:00:00Z",
+      details: EMPTY_DETAILS,
+      photos: [],
     });
     expect(p).not.toHaveProperty("lat");
   });
@@ -219,35 +225,69 @@ describe("onboarding steps", () => {
 });
 
 describe("profileStrength", () => {
-  const p = {
+  const p: ProfileRow = {
+    id: "u",
     display_name: "Asha",
     age: 27,
     bio: "",
     interests: ["hike"],
+    looking_for: "relationship",
+    age_min: 24,
+    age_max: 34,
     photo_path: null,
     lat: null,
     lng: null,
   };
 
-  it("counts only fields the member fills in", () => {
-    expect(profileStrength(p)).toMatchObject({ score: 1, total: 5 });
-    const full = {
+  it("counts only saved fields and starts at zero", () => {
+    expect(profileStrength(p)).toMatchObject({ score: 0, total: 12, percent: 0 });
+  });
+
+  it("reaches 100% only when every task is really done", () => {
+    const full: ProfileRow = {
       ...p,
       bio: "I love long walks, chai at sunrise and finding new street food.",
       interests: ["Hiking", "Travel", "Books"],
       photo_path: "u/a.jpg",
+      photos: ["u/a.jpg", "u/b.jpg", "u/c.jpg"],
       lat: 28.6,
       lng: 77.2,
+      prompts: [{ q: "My ideal Sunday", a: "Trek, then dosa." }],
+      height_cm: 165,
+      job: "Architect",
+      education: "postgraduate",
+      exercise: "often",
+      smoking: "never",
+      city: "Pune",
+      neighbourhoods: ["Baner"],
+      favourite_places: ["Specialty coffee"],
     };
-    expect(profileStrength(full)).toMatchObject({ score: 5, total: 5 });
-    expect(profileStrength(full).items.every((i) => i.done)).toBe(true);
+    expect(profileStrength(full)).toMatchObject({ score: 12, total: 12, percent: 100 });
   });
 
-  it("names what is missing", () => {
-    expect(
-      profileStrength(p)
-        .items.filter((i) => !i.done)
-        .map((i) => i.key),
-    ).toEqual(["photo", "bio", "interests", "location"]);
+  it("names what is missing and where to fix it", () => {
+    const missing = profileStrength({ ...p, photo_path: "u/a.jpg" }).items.filter((i) => !i.done);
+    expect(missing.map((i) => i.key)).toEqual([
+      "photos3",
+      "bio",
+      "interests",
+      "prompts",
+      "facts",
+      "job",
+      "education",
+      "city",
+      "neighbourhoods",
+      "places",
+      "location",
+    ]);
+    expect(missing.find((i) => i.key === "city")?.section).toBe("places");
+  });
+
+  it("orders photos with the main one first, without duplicates", () => {
+    expect(allPhotos({ photo_path: "u/b.jpg", photos: ["u/a.jpg", "u/b.jpg"] })).toEqual([
+      "u/b.jpg",
+      "u/a.jpg",
+    ]);
+    expect(allPhotos({ photo_path: null, photos: null })).toEqual([]);
   });
 });

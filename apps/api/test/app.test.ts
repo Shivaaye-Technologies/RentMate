@@ -86,6 +86,8 @@ describe("API", () => {
         online: false,
         distanceKm: null,
         joinedAt: null,
+        details: {},
+        photos: [],
       },
     ]);
   });
@@ -183,14 +185,29 @@ describe("precomputed fields from the database", () => {
         upsertProfile: async () => undefined,
         getProfile: async () => ({ id: "alice", ...base }),
         listCandidates: async () => [
-          { id: "bob", displayName: "Bob", ...base, distanceKm: 15, online: true },
+          {
+            id: "bob",
+            displayName: "Bob",
+            ...base,
+            distanceKm: 15,
+            online: true,
+            details: { city: "Pune", prompts: [{ q: "My ideal Sunday", a: "Chai and a long walk" }] },
+            photos: ["bob/2.jpg"],
+          },
         ],
       }),
     });
     void store;
     const res = await request(app).get("/api/v1/matches").set("Authorization", "Bearer token-alice");
     expect(res.status).toBe(200);
-    expect(res.body.matches[0]).toMatchObject({ id: "bob", distanceKm: 15, online: true });
+    expect(res.body.matches[0]).toMatchObject({
+      id: "bob",
+      distanceKm: 15,
+      online: true,
+      details: { city: "Pune", prompts: [{ q: "My ideal Sunday", a: "Chai and a long walk" }] },
+      photos: ["bob/2.jpg"],
+    });
+    expect(res.body.matches[0]).not.toHaveProperty("lat");
   });
 
   it("no longer exposes the unused messages endpoint", async () => {

@@ -4,6 +4,7 @@ import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
 import { Photo } from "./Photo";
 import { DemoBadge } from "./DemoBadge";
+import { PhotoCarousel } from "./ProfileCardPreview";
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -45,11 +46,14 @@ export function ProfileSheet({
           <DemoBadge id={person.id} />
         </div>
         <div className="crush-photo">
-          <Photo id={person.id} name={person.displayName} path={person.photoPath} textSize={72} />
-          {person.distanceKm != null && (
+          <PhotoCarousel person={person} />
+          {(person.details.city || person.distanceKm != null) && (
             <div className="photo-tags">
               <span className="pill glass">
-                <Icon name="pin" size={14} /> {person.distanceKm} km away
+                <Icon name="pin" size={14} />{" "}
+                {[person.details.city, person.distanceKm != null ? `${person.distanceKm} km away` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
             </div>
           )}

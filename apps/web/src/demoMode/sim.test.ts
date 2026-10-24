@@ -16,8 +16,11 @@ import {
   sendMessage,
   visibleMessages,
 } from "./sim";
+import { EMPTY_DETAILS } from "../details";
 
 const person = (i: number): Person => ({
+  details: EMPTY_DETAILS,
+  photos: [],
   id: `00000000-0000-5000-8000-${String(i).padStart(12, "0")}`,
   score: 0,
   sharedInterests: [],

@@ -104,4 +104,53 @@ describe("people from the database", () => {
     expect(p.lat).toBeUndefined();
     expect(p.lastSeenAt).toBeUndefined();
   });
+
+  it("passes public details through without changing eligibility fields", () => {
+    const p = personToMatchProfile({
+      id: "u3",
+      display_name: "Meera",
+      age: 27,
+      bio: "",
+      interests: ["Books"],
+      looking_for: "relationship",
+      age_min: 24,
+      age_max: 34,
+      photo_path: "u3/a.jpg",
+      verified: false,
+      created_at: "2026-10-01T00:00:00Z",
+      distance_km: null,
+      online: false,
+      city: "Pune",
+      height_cm: 162,
+      prompts: [{ q: "My ideal Sunday", a: "Books and chai" }],
+      photos: ["u3/b.jpg"],
+    });
+    expect(p.details).toEqual({
+      city: "Pune",
+      height_cm: 162,
+      prompts: [{ q: "My ideal Sunday", a: "Books and chai" }],
+    });
+    expect(p.photos).toEqual(["u3/b.jpg"]);
+    expect(p).toMatchObject({ age: 27, ageMin: 24, ageMax: 34, lookingFor: "relationship" });
+  });
+
+  it("works with rows from before the details migration", () => {
+    const p = personToMatchProfile({
+      id: "u4",
+      display_name: "Old",
+      age: 30,
+      bio: "",
+      interests: [],
+      looking_for: "casual",
+      age_min: 25,
+      age_max: 35,
+      photo_path: null,
+      verified: false,
+      created_at: "2026-10-01T00:00:00Z",
+      distance_km: null,
+      online: false,
+    });
+    expect(p.details).toEqual({});
+    expect(p.photos).toEqual([]);
+  });
 });

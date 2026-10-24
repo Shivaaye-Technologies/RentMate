@@ -1,4 +1,5 @@
-import { isNew, type LookingFor, type PersonRow } from "./profile";
+import { detailsFromRow, type DetailFields } from "./details";
+import { allPhotos, isNew, type LookingFor, type PersonRow, type ProfileRow } from "./profile";
 
 export type HealthState = "checking" | "online" | "offline";
 
@@ -34,6 +35,23 @@ export interface Person {
   online: boolean;
   distanceKm: number | null;
   joinedAt: string | null;
+  /** Optional public details (empty until filled in, or before the migration). */
+  details: DetailFields;
+  /** Extra photo paths after the main one. */
+  photos: string[];
+}
+
+const photoList = (v: unknown, main: string | null) =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== main) : [];
+
+/** Fills in details and photos so older API responses still work. */
+export function normalizePerson(raw: Partial<Person> & { details?: unknown; photos?: unknown }): Person {
+  const main = raw.photoPath ?? null;
+  return {
+    ...(raw as Person),
+    details: detailsFromRow((raw.details ?? null) as Parameters<typeof detailsFromRow>[0]),
+    photos: photoList(raw.photos, main),
+  };
 }
 
 /** Why Discover may be empty (from the API). */
@@ -90,7 +108,7 @@ export async function fetchDiscover(
   if (!body || !Array.isArray(body.matches)) {
     throw new DiscoverError("The server sent an unexpected response. Please try again.", res.status);
   }
-  return { people: body.matches as Person[], summary: body.summary ?? null };
+  return { people: (body.matches as Partial<Person>[]).map(normalizePerson), summary: body.summary ?? null };
 }
 
 export interface EmptyState {
@@ -174,6 +192,8 @@ export function personFromRow(row: PersonRow): Person {
     online: row.online ?? false,
     distanceKm: row.distance_km ?? null,
     joinedAt: row.created_at ?? null,
+    details: detailsFromRow(row as Parameters<typeof detailsFromRow>[0]),
+    photos: photoList(row.photos, row.photo_path ?? null),
   };
 }
 
@@ -188,4 +208,26 @@ export function filterPeople(people: Person[], filter: Filter, mood: LookingFor 
     if (filter === "online") return p.online;
     return true;
   });
+}
+
+/** Your own profile as others would see it (for "View profile"). */
+export function personFromOwnRow(row: ProfileRow): Person {
+  const photos = allPhotos(row);
+  return {
+    id: row.id,
+    score: 0,
+    sharedInterests: [],
+    displayName: row.display_name,
+    age: row.age,
+    bio: row.bio,
+    interests: row.interests ?? [],
+    lookingFor: row.looking_for,
+    photoPath: photos[0] ?? null,
+    verified: row.verified ?? false,
+    online: false,
+    distanceKm: null,
+    joinedAt: row.created_at ?? null,
+    details: detailsFromRow(row as Parameters<typeof detailsFromRow>[0]),
+    photos: photos.slice(1),
+  };
 }

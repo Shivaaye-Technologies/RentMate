@@ -1,7 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState } from "react";
-import { DiscoverError, fetchDiscover, type DiscoverSummary, type Person } from "./api";
-import { AccountPanel } from "./components/AccountPanel";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DiscoverError, fetchDiscover, personFromOwnRow, type DiscoverSummary, type Person } from "./api";
 import { AuthScreen, NewPasswordScreen } from "./components/AuthScreen";
 import { hasAuthParams, parseAuthRedirect, type AuthProblem } from "./auth";
 import { Chat } from "./components/Chat";
@@ -11,8 +10,6 @@ import { DiscoverHub } from "./components/DiscoverHub";
 import { Icon, type IconName } from "./components/Icon";
 import { LikesView, loadReceivedLikes } from "./components/LikesView";
 import { Photo } from "./components/Photo";
-import { ProfileExtras } from "./components/ProfileExtras";
-import { ProfileForm } from "./components/ProfileForm";
 import { SafetySheet } from "./components/SafetySheet";
 import { MatchOverlay, ProfileSheet, SuperLikeSheet } from "./components/Sheets";
 import { orderedPair, type ProfileRow } from "./profile";
@@ -22,8 +19,14 @@ import { loadDemoIds, setDemoIds } from "./demo";
 import { touchLastSeen } from "./presence";
 import { clearMyPasses, loadActivity, type Activity } from "./activity";
 import { Onboarding } from "./components/Onboarding";
-import { ProfileStrength, StrengthNudge } from "./components/ProfileStrength";
-import { InviteButton } from "./components/InviteButton";
+import { StrengthNudge } from "./components/ProfileStrength";
+import { ProfileDashboard, type DashboardPage } from "./components/ProfileDashboard";
+import { MapView } from "./components/MapView";
+import { Notifications } from "./components/Notifications";
+import { SafetyIntro } from "./components/SafetyIntro";
+import { alertsFor, buildNotices, loadMatches, type Counts, type Notice } from "./inbox";
+import { showAlert } from "./notify";
+import { saveProfileFields, type ProfilePatch } from "./profileApi";
 import { DemoMode } from "./demoMode/DemoMode";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
@@ -112,6 +115,12 @@ function Home({ session }: { session: Session }) {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("crush");
+  const [dashPage, setDashPage] = useState<DashboardPage | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [cityVibe, setCityVibe] = useState(false);
+  const [noticesOpen, setNoticesOpen] = useState(false);
+  const [safetyIntro, setSafetyIntro] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   const [people, setPeople] = useState<Person[]>([]);
   const [status, setStatus] = useState<Status>("loading");
@@ -143,6 +152,12 @@ function Home({ session }: { session: Session }) {
         setLoaded(true);
       });
   }, [me]);
+
+  // Existing members see the safety introduction once (only when the database records it).
+  const needsSafetyIntro = !!profile && "safety_intro_at" in profile && !profile.safety_intro_at;
+  useEffect(() => {
+    if (needsSafetyIntro) setSafetyIntro(true);
+  }, [needsSafetyIntro]);
 
   // Online status: refresh last_seen_at while the app is open.
   const hasProfile = profile !== null;
@@ -218,16 +233,85 @@ function Home({ session }: { session: Session }) {
     if (hasProfile) void loadDemoIds();
   }, [hasProfile, me]);
 
-  // Likes badge count.
+  // Notifications: real likes, matches and unread messages, refreshed every minute.
+  const [notices, setNotices] = useState<Notice[] | null>(null);
+  const [noticesLoading, setNoticesLoading] = useState(false);
+  const [noticesError, setNoticesError] = useState<string | null>(null);
+  const [unread, setUnread] = useState<number | null>(null);
+  const [seenAt, setSeenAt] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`soulmate-notices-seen-${me}`) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const lastCounts = useRef<Counts | null>(null);
+  const prefs = profile?.notify_prefs ?? null;
+
+  const refreshActivity = useCallback(async () => {
+    setNoticesLoading(true);
+    try {
+      const [likes, matches] = await Promise.all([loadReceivedLikes(me), loadMatches(me)]);
+      const list = buildNotices(likes, matches, prefs);
+      setNotices(list);
+      setNoticesError(null);
+      setLikesCount(likes.length);
+      const known = matches.every((m) => m.unread !== null);
+      const totalUnread = known ? matches.reduce((n, m) => n + (m.unread ?? 0), 0) : null;
+      setUnread(totalUnread);
+      const counts = { likes: likes.length, matches: matches.length, unread: totalUnread ?? 0 };
+      for (const text of alertsFor(lastCounts.current, counts, prefs)) showAlert(text);
+      lastCounts.current = counts;
+    } catch (e) {
+      setNoticesError(e instanceof Error ? e.message : "Could not load notifications.");
+    } finally {
+      setNoticesLoading(false);
+    }
+  }, [me, prefs]);
+
   useEffect(() => {
-    if (!profile) return;
-    loadReceivedLikes(me)
-      .then((l) => setLikesCount(l.length))
-      // The Likes tab shows this error itself; the badge just stays unchanged.
-      .catch((e: unknown) => console.error("Could not count likes", e));
-    // Only on first load and when likes are refreshed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasProfile, me, likesKey]);
+    if (!hasProfile) return;
+    void refreshActivity();
+    const t = setInterval(() => void refreshActivity(), 60 * 1000);
+    const onVisible = () => document.visibilityState === "visible" && void refreshActivity();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [hasProfile, refreshActivity, likesKey]);
+
+  const unseen = (notices ?? []).filter((n) => n.at > seenAt).length;
+  const openNotices = () => {
+    setNoticesOpen(true);
+    const newest = notices?.[0]?.at ?? new Date().toISOString();
+    setSeenAt(newest);
+    try {
+      localStorage.setItem(`soulmate-notices-seen-${me}`, newest);
+    } catch {
+      // Without storage the bell resets on reload; nothing else depends on it.
+    }
+  };
+
+  const patchProfile = (patch: ProfilePatch) =>
+    setProfile((p) => (p ? ({ ...p, ...patch } as ProfileRow) : p));
+
+  async function finishSafetyIntro() {
+    setSafetyIntro(false);
+    const at = new Date().toISOString();
+    patchProfile({ safety_intro_at: at });
+    await saveProfileFields(me, { safety_intro_at: at }).catch((e: unknown) =>
+      console.error("Could not save safety introduction", e),
+    );
+  }
+
+  async function dismissWelcome() {
+    const at = new Date().toISOString();
+    patchProfile({ welcome_seen_at: at });
+    await saveProfileFields(me, { welcome_seen_at: at }).catch((e: unknown) =>
+      console.error("Could not save welcome", e),
+    );
+  }
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -389,8 +473,9 @@ function Home({ session }: { session: Session }) {
         userId={me}
         onSignOut={signOut}
         onDone={(row) => {
-          setProfile(row);
+          setProfile({ ...row, safety_intro_at: null, welcome_seen_at: null });
           setTab("crush");
+          setSafetyIntro(true);
           flash(`Welcome to SOULMATE.AI, ${row.display_name}!`);
         }}
       />
@@ -405,7 +490,10 @@ function Home({ session }: { session: Session }) {
           myProfile={profile}
           matchId={chat.matchId}
           person={chat.person}
-          onBack={() => setChat(null)}
+          onBack={() => {
+            setChat(null);
+            void refreshActivity();
+          }}
           onProfile={() => setSheet({ person: chat.person, actions: false })}
           onSafety={() => setSafety({ person: chat.person, matchId: chat.matchId })}
         />
@@ -457,8 +545,17 @@ function Home({ session }: { session: Session }) {
     return content;
   };
 
+  const goTab = (t: Tab) => {
+    setTab(t);
+    setMapOpen(false);
+    setNoticesOpen(false);
+    if (t !== "profile") setDashPage(null);
+  };
+  const myCity = typeof profile.city === "string" ? profile.city : null;
+  const overlayPage = noticesOpen ? "notices" : mapOpen && tab === "discover" ? "map" : null;
+
   return (
-    <div className={tab === "discover" ? "app dark-top" : "app"}>
+    <div className={tab === "discover" && !overlayPage ? "app dark-top" : "app"}>
       <header className="topbar">
         <span className="brand">
           <span className="logo-mark small" aria-hidden="true">
@@ -466,31 +563,83 @@ function Home({ session }: { session: Session }) {
           </span>
           SOULMATE.AI
         </span>
-        <button
-          className={tab === "profile" ? "me-btn active" : "me-btn"}
-          aria-label="Your profile"
-          onClick={() => setTab("profile")}
-        >
-          <Photo
-            id={profile.id}
-            name={profile.display_name}
-            path={profile.photo_path}
-            className="mini"
-            textSize={13}
-          />
-        </button>
+        <span className="topbar-actions">
+          <button
+            className={noticesOpen ? "bell-btn active" : "bell-btn"}
+            aria-label={unseen > 0 ? `Notifications, ${unseen} new` : "Notifications"}
+            onClick={openNotices}
+          >
+            <Icon name="bell" size={20} />
+            {unseen > 0 && <i className="badge-dot" />}
+          </button>
+          <button
+            className={tab === "profile" ? "me-btn active" : "me-btn"}
+            aria-label="Your profile"
+            onClick={() => goTab("profile")}
+          >
+            <Photo
+              id={profile.id}
+              name={profile.display_name}
+              path={profile.photo_path}
+              className="mini"
+              textSize={13}
+            />
+          </button>
+        </span>
       </header>
 
-      <main className={tab === "discover" ? "shell flush" : "shell"}>
-        {tab === "crush" &&
+      <main className={tab === "discover" && !overlayPage ? "shell flush" : "shell"}>
+        {overlayPage === "notices" && (
+          <Notifications
+            notices={notices}
+            loading={noticesLoading}
+            error={noticesError}
+            onRetry={() => void refreshActivity()}
+            onBack={() => setNoticesOpen(false)}
+            onSettings={() => {
+              setNoticesOpen(false);
+              setTab("profile");
+              setDashPage("notifications");
+            }}
+            onOpen={(n) => {
+              setNoticesOpen(false);
+              if (n.matchId && n.kind !== "like" && n.kind !== "super") {
+                setChat({ matchId: n.matchId, person: n.person });
+              } else setSheet({ person: n.person, actions: true });
+            }}
+          />
+        )}
+
+        {overlayPage === "map" && (
+          <MapView
+            me={profile}
+            people={people}
+            onBack={() => setMapOpen(false)}
+            onOpenPrivacy={() => {
+              setMapOpen(false);
+              setTab("profile");
+              setDashPage("privacy");
+            }}
+            onShowCity={() => {
+              setMapOpen(false);
+              setCityVibe(true);
+            }}
+          />
+        )}
+
+        {!overlayPage &&
+          tab === "crush" &&
           peopleBody(
             <>
-              <StrengthNudge profile={profile} onOpen={() => setTab("profile")} />
+              <StrengthNudge profile={profile} onOpen={() => goTab("profile")} />
               <CrushStack
                 people={people}
                 summary={summary}
                 emptyExtras={emptyExtras}
-                onEditProfile={() => setTab("profile")}
+                onEditProfile={() => {
+                  goTab("profile");
+                  setDashPage("preferences");
+                }}
                 busy={busy}
                 canRewind={passed.length > 0}
                 onPass={(p) => void decide(p, "pass")}
@@ -502,63 +651,64 @@ function Home({ session }: { session: Session }) {
             </>,
           )}
 
-        {tab === "discover" &&
+        {!overlayPage &&
+          tab === "discover" &&
           peopleBody(
             <DiscoverHub
+              key={cityVibe ? "city" : "all"}
               people={people}
               summary={summary}
               emptyExtras={emptyExtras}
-              onEditProfile={() => setTab("profile")}
+              onEditProfile={() => {
+                goTab("profile");
+                setDashPage("preferences");
+              }}
               likesCount={likesCount}
-              onOpenLikes={() => setTab("likes")}
+              onOpenLikes={() => goTab("likes")}
               onOpen={(p) => setSheet({ person: p, actions: true })}
+              me={{ interests: profile.interests ?? [], city: myCity }}
+              onOpenMap={() => setMapOpen(true)}
+              initialVibe={cityVibe ? "local" : null}
             />,
           )}
 
-        {tab === "likes" && (
+        {!overlayPage && tab === "likes" && (
           <LikesView
             me={me}
             refreshKey={likesKey}
             onCount={setLikesCount}
-            onOpen={(l) => setSheet({ person: l.person, actions: true })}
+            onOpen={(person, actions) => setSheet({ person, actions })}
+            onOpenMatch={(m) => setChat({ matchId: m.matchId, person: m.person })}
           />
         )}
 
-        {tab === "chats" && (
-          <ChatsList me={me} onOpen={(m) => setChat({ matchId: m.matchId, person: m.person })} />
+        {!overlayPage && tab === "chats" && (
+          <ChatsList
+            me={me}
+            showWelcome={"welcome_seen_at" in profile && !profile.welcome_seen_at}
+            onDismissWelcome={() => void dismissWelcome()}
+            onUnread={setUnread}
+            onOpen={(m) => setChat({ matchId: m.matchId, person: m.person })}
+          />
         )}
 
-        {tab === "profile" && (
-          <>
-            <ProfileStrength profile={profile} />
-            <ProfileExtras profile={profile} onChange={(patch) => setProfile({ ...profile, ...patch })} />
-            <ProfileForm
-              userId={me}
-              initial={profile}
-              title="About you"
-              submitLabel="Save changes"
-              onSaved={(row) => {
-                setProfile({ ...profile, ...row });
+        {!overlayPage && tab === "profile" && (
+          <ProfileDashboard
+            profile={profile}
+            email={session.user.email}
+            page={dashPage}
+            onPage={setDashPage}
+            onChange={(patch) => {
+              patchProfile(patch);
+              // Age range and visibility change who you see.
+              if ("age_min" in patch || "age_max" in patch || "interests" in patch || "city" in patch) {
                 void loadPeople();
-              }}
-            />
-            <a className="demo-entry" href="#demo">
-              <Icon name="sparkle" size={18} />
-              <span>
-                <strong>Explore Demo Mode</strong>
-                <small>Try likes, matches and chat with 100+ fictional profiles. Nothing is shared.</small>
-              </span>
-            </a>
-            <div className="panel invite-panel">
-              <h2 className="display-sm">Bring your friends</h2>
-              <p className="muted">
-                SOULMATE.AI grows one real person at a time. Share the link; there is no tracking or referral
-                code.
-              </p>
-              <InviteButton className="btn dark" />
-            </div>
-            <AccountPanel email={session.user.email} photoPath={profile.photo_path} onSignOut={signOut} />
-          </>
+              }
+            }}
+            onPreview={() => setPreview(true)}
+            onSafetyIntro={() => setSafetyIntro(true)}
+            onSignOut={signOut}
+          />
         )}
       </main>
 
@@ -566,13 +716,20 @@ function Home({ session }: { session: Session }) {
         {TABS.map((t) => (
           <button
             key={t.key}
-            className={tab === t.key ? "active" : ""}
+            className={tab === t.key && !overlayPage ? "active" : ""}
             aria-current={tab === t.key ? "page" : undefined}
-            aria-label={t.label}
-            onClick={() => setTab(t.key)}
+            aria-label={
+              t.key === "chats" && unread
+                ? `${t.label}, ${unread} unread`
+                : t.key === "likes" && likesCount > 0
+                  ? `${t.label}, ${likesCount} new`
+                  : t.label
+            }
+            onClick={() => goTab(t.key)}
           >
             <Icon name={t.icon} size={24} />
             {t.key === "likes" && likesCount > 0 && <i className="badge-dot" />}
+            {t.key === "chats" && !!unread && <b className="tab-count">{unread > 9 ? "9+" : unread}</b>}
             <span>{t.label}</span>
           </button>
         ))}
@@ -582,6 +739,12 @@ function Home({ session }: { session: Session }) {
         <div className="toast" role="status">
           {toast}
         </div>
+      )}
+
+      {preview && <ProfileSheet person={personFromOwnRow(profile)} onClose={() => setPreview(false)} />}
+
+      {safetyIntro && (
+        <SafetyIntro onFinish={() => void finishSafetyIntro()} onClose={() => setSafetyIntro(false)} />
       )}
 
       {sheet && (

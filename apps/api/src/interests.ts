@@ -37,7 +37,51 @@ export const STANDARD_INTERESTS = [
   "Travel",
   "Yoga",
   "Anime",
+  "Painting",
+  "Theatre",
+  "Museums",
+  "TV series",
+  "Badminton",
+  "Tennis",
+  "Camping",
+  "Beaches",
+  "Meditation",
+  "Podcasts",
+  "Volunteering",
+  "History",
+  "Languages",
+  "Karaoke",
 ] as const;
+
+/** Groups for the interest picker. Every standard interest is in exactly one group. */
+export const INTEREST_CATEGORIES: readonly { name: string; items: readonly string[] }[] = [
+  { name: "Art and creativity", items: ["Art", "Painting", "Photography", "Poetry", "Fashion"] },
+  { name: "Music", items: ["Music", "Live music", "Dancing", "Karaoke"] },
+  { name: "Movies and TV", items: ["Movies", "TV series", "Anime", "Theatre"] },
+  { name: "Food and drinks", items: ["Cooking", "Baking", "Coffee", "Street food"] },
+  { name: "Travel", items: ["Travel", "Road trips", "Beaches"] },
+  {
+    name: "Sport and fitness",
+    items: [
+      "Fitness",
+      "Running",
+      "Cycling",
+      "Swimming",
+      "Yoga",
+      "Cricket",
+      "Football",
+      "Badminton",
+      "Tennis",
+    ],
+  },
+  { name: "Gaming and technology", items: ["Gaming", "Tech", "Startups", "Podcasts"] },
+  { name: "Books", items: ["Books"] },
+  { name: "Outdoors", items: ["Hiking", "Camping", "Gardening"] },
+  { name: "City life", items: ["Museums", "Stand-up comedy"] },
+  { name: "Home activities", items: ["Board games", "Meditation"] },
+  { name: "Animals", items: ["Dogs", "Cats"] },
+  { name: "Culture", items: ["History", "Languages", "Volunteering"] },
+];
 
 /** Lower-case spellings people type, mapped to a standard interest. */
 export const INTEREST_ALIASES: Readonly<Record<string, string>> = {
@@ -93,6 +137,24 @@ export const INTEREST_ALIASES: Readonly<Record<string, string>> = {
   garden: "Gardening",
   plants: "Gardening",
   "street-food": "Street food",
+  paint: "Painting",
+  painting: "Painting",
+  theater: "Theatre",
+  plays: "Theatre",
+  museum: "Museums",
+  series: "TV series",
+  "tv shows": "TV series",
+  "web series": "TV series",
+  shuttle: "Badminton",
+  camp: "Camping",
+  beach: "Beaches",
+  meditate: "Meditation",
+  mindfulness: "Meditation",
+  podcast: "Podcasts",
+  volunteer: "Volunteering",
+  charity: "Volunteering",
+  language: "Languages",
+  "learning languages": "Languages",
 };
 
 const STANDARD_BY_LOWER = new Map(STANDARD_INTERESTS.map((i) => [i.toLowerCase(), i as string]));

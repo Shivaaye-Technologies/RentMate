@@ -1,4 +1,5 @@
 import { canonicalInterest, interestKey } from "./interests";
+import { detailsFromRow, profileFacts, type DetailFields } from "./details";
 export type LookingFor = "relationship" | "friendship" | "casual";
 
 /** "I'm here for" labels. */
@@ -24,6 +25,30 @@ export interface ProfileRow {
   last_seen_at?: string;
   created_at?: string;
   verified?: boolean;
+  /** Columns added by migration 20261024090000 (absent before it is applied). */
+  photos?: string[] | null;
+  hidden?: boolean | null;
+  notify_prefs?: NotifyPrefs | null;
+  safety_intro_at?: string | null;
+  welcome_seen_at?: string | null;
+  gender?: string | null;
+  show_me?: string | null;
+  height_cm?: number | null;
+  job?: string | null;
+  education?: string | null;
+  exercise?: string | null;
+  smoking?: string | null;
+  children?: string | null;
+  city?: string | null;
+  neighbourhoods?: string[] | null;
+  favourite_places?: string[] | null;
+  prompts?: unknown;
+}
+
+export interface NotifyPrefs {
+  likes?: boolean;
+  matches?: boolean;
+  messages?: boolean;
 }
 
 /**
@@ -43,6 +68,19 @@ export interface PersonRow {
   created_at: string;
   distance_km: number | null;
   online: boolean;
+  /** Public details (migration 20261024090000); missing on older rows. */
+  photos?: string[] | null;
+  gender?: string | null;
+  height_cm?: number | null;
+  job?: string | null;
+  education?: string | null;
+  exercise?: string | null;
+  smoking?: string | null;
+  children?: string | null;
+  city?: string | null;
+  neighbourhoods?: string[] | null;
+  favourite_places?: string[] | null;
+  prompts?: unknown;
 }
 
 /** The columns a user is allowed to write (matches the database column grants). */
@@ -64,7 +102,8 @@ export interface ProfileDraft {
 
 export type DraftErrors = Partial<Record<keyof ProfileDraft, string>>;
 
-export const MAX_INTERESTS = 15;
+/** Matches the database check (interests_limit). */
+export const MAX_INTERESTS = 10;
 
 /** Splits "Hiking, music,  hiking" into ["Hiking", "music"] (trimmed, case-insensitive dedupe). */
 export function parseInterests(input: string): string[] {
@@ -243,49 +282,124 @@ export function stepErrors(d: ProfileDraft, fields: (keyof ProfileDraft)[]): Dra
   return out;
 }
 
+/** Which profile editor a completion task opens. */
+export type ProfileSection =
+  "photos" | "about" | "interests" | "prompts" | "lifestyle" | "places" | "privacy";
+
 export interface StrengthItem {
-  key: "basics" | "photo" | "bio" | "interests" | "location";
+  key:
+    | "photo"
+    | "photos3"
+    | "bio"
+    | "interests"
+    | "prompts"
+    | "facts"
+    | "job"
+    | "education"
+    | "city"
+    | "neighbourhoods"
+    | "places"
+    | "location";
   label: string;
   done: boolean;
   hint: string;
+  section: ProfileSection;
 }
 
-/** How complete a profile is. Only real fields you can fill in yourself. */
-export function profileStrength(
-  p: Pick<ProfileRow, "display_name" | "age" | "bio" | "interests" | "photo_path" | "lat" | "lng">,
-): {
+/** All photos in order: the primary photo first, then the rest. */
+export function allPhotos(p: Pick<ProfileRow, "photo_path" | "photos">): string[] {
+  const rest = (p.photos ?? []).filter((x) => x && x !== p.photo_path);
+  return p.photo_path ? [p.photo_path, ...rest] : rest;
+}
+
+/**
+ * How complete a profile is. Only real, saved fields count; nothing here is
+ * estimated, and none of it says the profile is verified.
+ */
+export function profileStrength(p: ProfileRow): {
   score: number;
   total: number;
+  percent: number;
   items: StrengthItem[];
 } {
+  const d: DetailFields = detailsFromRow(p as Partial<Record<keyof DetailFields, unknown>>);
+  const photos = allPhotos(p).length;
   const items: StrengthItem[] = [
-    { key: "basics", label: "Name and age", done: !!p.display_name && p.age >= 18, hint: "" },
     {
       key: "photo",
       label: "A photo",
-      done: !!p.photo_path,
+      done: photos >= 1,
       hint: "Profiles with a photo get far more likes.",
+      section: "photos",
+    },
+    {
+      key: "photos3",
+      label: "3 or more photos",
+      done: photos >= 3,
+      hint: "Show a little more of your life.",
+      section: "photos",
     },
     {
       key: "bio",
       label: "A short bio",
       done: (p.bio ?? "").trim().length >= 40,
       hint: "A couple of sentences gives people something to reply to.",
+      section: "about",
     },
     {
       key: "interests",
       label: "3 or more interests",
       done: (p.interests ?? []).length >= 3,
       hint: "Shared interests decide who you see first.",
+      section: "interests",
+    },
+    {
+      key: "prompts",
+      label: "A profile prompt",
+      done: d.prompts.length >= 1,
+      hint: "Answers make great conversation starters.",
+      section: "prompts",
+    },
+    {
+      key: "facts",
+      label: "5 profile facts",
+      done: profileFacts(d).length >= 5,
+      hint: "Height, work, education and lifestyle.",
+      section: "lifestyle",
+    },
+    { key: "job", label: "Your work", done: !!d.job, hint: "", section: "lifestyle" },
+    { key: "education", label: "Your education", done: !!d.education, hint: "", section: "lifestyle" },
+    {
+      key: "city",
+      label: "Your city",
+      done: !!d.city,
+      hint: "Others see your city, never your exact location.",
+      section: "places",
+    },
+    {
+      key: "neighbourhoods",
+      label: "Favourite neighbourhoods",
+      done: d.neighbourhoods.length >= 1,
+      hint: "",
+      section: "places",
+    },
+    {
+      key: "places",
+      label: "Favourite places",
+      done: d.favourite_places.length >= 1,
+      hint: "Coffee spots, trails, live music…",
+      section: "places",
     },
     {
       key: "location",
-      label: "Approximate location",
+      label: "Approximate distance",
       done: p.lat != null && p.lng != null,
       hint: "Shows distance (about 1 km). Your exact location is never shared.",
+      section: "privacy",
     },
   ];
-  return { score: items.filter((i) => i.done).length, total: items.length, items };
+  const score = items.filter((i) => i.done).length;
+  return { score, total: items.length, percent: Math.round((score / items.length) * 100), items };
 }
 
 /** Starters for the bio, so a blank box is less daunting. */

@@ -40,6 +40,40 @@ export interface PersonRow {
   created_at: string;
   distance_km: number | null;
   online: boolean;
+  /** Optional details (migration 20261024090000); absent before it is applied. */
+  photos?: string[] | null;
+  gender?: string | null;
+  height_cm?: number | null;
+  job?: string | null;
+  education?: string | null;
+  exercise?: string | null;
+  smoking?: string | null;
+  children?: string | null;
+  city?: string | null;
+  neighbourhoods?: string[] | null;
+  favourite_places?: string[] | null;
+  prompts?: unknown;
+}
+
+/** Public detail fields copied to the API response as they are. */
+export const DETAIL_KEYS = [
+  "gender",
+  "height_cm",
+  "job",
+  "education",
+  "exercise",
+  "smoking",
+  "children",
+  "city",
+  "neighbourhoods",
+  "favourite_places",
+  "prompts",
+] as const;
+
+export function detailsOf(r: PersonRow): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of DETAIL_KEYS) if (r[k] !== undefined) out[k] = r[k];
+  return out;
 }
 
 const num = (v: number | string | null | undefined) => (v == null ? null : Number(v));
@@ -79,6 +113,8 @@ export function personToMatchProfile(r: PersonRow): MatchProfile {
     verified: r.verified ?? false,
     distanceKm: r.distance_km,
     online: r.online,
+    details: detailsOf(r),
+    photos: Array.isArray(r.photos) ? r.photos : [],
   };
 }
 

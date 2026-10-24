@@ -26,3 +26,12 @@ describe("interests", () => {
     for (const key of Object.keys(INTEREST_ALIASES)) expect(key).toBe(key.toLowerCase());
   });
 });
+
+describe("interest categories", () => {
+  it("puts every standard interest in exactly one category", async () => {
+    const { INTEREST_CATEGORIES } = await import("../src/interests.js");
+    const all = INTEREST_CATEGORIES.flatMap((c) => c.items);
+    expect(new Set(all).size).toBe(all.length);
+    expect([...all].sort()).toEqual([...STANDARD_INTERESTS].sort());
+  });
+});

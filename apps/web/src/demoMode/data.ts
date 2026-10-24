@@ -1,4 +1,5 @@
 import type { Person } from "../api";
+import { EMPTY_DETAILS } from "../details";
 import { supabase } from "../supabase";
 
 /** Row returned by public.demo_mode_profiles(): only fictional demo profiles. */
@@ -31,6 +32,8 @@ export function personFromDemoRow(r: DemoRow): Person {
     online: r.online,
     distanceKm: r.distance_km,
     joinedAt: r.created_at,
+    details: EMPTY_DETAILS,
+    photos: [],
   };
 }
 

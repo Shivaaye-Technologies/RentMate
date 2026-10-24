@@ -3,13 +3,22 @@ import { DELETE_CONFIRM_WORD, isDeleteConfirmed } from "../safety";
 import { clearPhotoCache, supabase } from "../supabase";
 
 /** Legal links, sign out, and permanent account deletion. */
+/** Every file in your own photo folder (Storage RLS only lists your own folder for writing). */
+async function ownPhotoFiles(userId: string, known: string[]): Promise<string[]> {
+  const { data } = await supabase.storage.from("photos").list(userId, { limit: 100 });
+  const listed = (data ?? []).map((f) => `${userId}/${f.name}`);
+  return [...new Set([...known, ...listed])];
+}
+
 export function AccountPanel({
+  userId,
   email,
-  photoPath,
+  photoPaths,
   onSignOut,
 }: {
+  userId: string;
   email: string | undefined;
-  photoPath: string | null | undefined;
+  photoPaths: string[];
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -22,7 +31,17 @@ export function AccountPanel({
     setBusy(true);
     setError(null);
     // Photos live in Storage, which the database cannot delete for us.
-    if (photoPath) await supabase.storage.from("photos").remove([photoPath]);
+    const files = await ownPhotoFiles(userId, photoPaths).catch(() => photoPaths);
+    if (files.length > 0) {
+      const { error: removeError } = await supabase.storage.from("photos").remove(files);
+      if (removeError) {
+        setBusy(false);
+        setError(
+          `Couldn't delete your photos, so your account wasn't deleted yet. Please try again. (${removeError.message})`,
+        );
+        return;
+      }
+    }
     const { error } = await supabase.rpc("delete_my_account");
     if (error) {
       setBusy(false);
@@ -37,11 +56,6 @@ export function AccountPanel({
   return (
     <div className="panel account">
       <p className="muted small center">Signed in as {email}</p>
-      <nav className="legal-links" aria-label="Legal">
-        <a href="/privacy.html">Privacy Policy</a>
-        <a href="/terms.html">Terms of Use</a>
-        <a href="/safety.html">Dating safety tips</a>
-      </nav>
       <button className="btn block" onClick={onSignOut}>
         Sign out
       </button>
@@ -54,7 +68,9 @@ export function AccountPanel({
         <div className="danger-zone">
           <h3>Delete your account</h3>
           <p className="small">
-            This permanently deletes your profile, photo, likes, matches and messages. It can't be undone.
+            This permanently deletes your sign-in, profile, all your photos, likes, passes, matches, messages
+            and blocks. Safety reports are kept without your name so the team can still act on them. It can't
+            be undone.
           </p>
           <label className="field">
             <span>Type {DELETE_CONFIRM_WORD} to confirm</span>
