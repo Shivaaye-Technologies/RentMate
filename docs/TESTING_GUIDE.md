@@ -24,7 +24,7 @@ API tests inject a fake token verifier and the in-memory store, so they need no 
 ## Not yet covered
 
 - RLS policies against a real Postgres. Recommended: `supabase start` locally and pgTAP tests in `supabase/tests/`.
-- Browser end-to-end flows. Recommended: Playwright once sign-up UI exists.
+- Signed-in browser flows (profile, likes, chat). `npm run test:e2e` covers the signed-out app only; signed-in flows need a disposable Supabase project.
 
 ## Self-repair loop
 
