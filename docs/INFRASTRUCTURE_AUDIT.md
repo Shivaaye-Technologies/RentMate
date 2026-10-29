@@ -18,6 +18,7 @@ Audit date: 2026-10-29. Run from a Claude Code cloud session with access to the 
 | Hunterexch on Render     | `hunterexch` (free, Oregon). **Auto-deploy is off** in the dashboard, though `render.yaml` says `autoDeploy: true`. Live is `a9f1f98`, five commits behind `main`.                                                      |
 | Hunterexch on Supabase   | Project `Hunterexch` is active, and its security advisor reports no issues.                                                                                                                                             |
 | Other Supabase projects  | `Shivaaye` (active) and `TestPilot-AI` (paused). No repo for either is connected to Claude.                                                                                                                             |
+| Vercel                   | A Vercel project (`jerry-19d4/soulmate-ai`) builds preview deployments for soulmate-ai PRs. Nothing in the repo configures it; it was connected in the Vercel dashboard. Render already hosts production.               |
 | Other Render services    | `TestPilot-AI` (Docker, free, Oregon), from a repo that is not connected to Claude.                                                                                                                                     |
 | Claude Code tooling      | soulmate-ai has 7 agents, 8 skills, guard hooks, permission rules and `.mcp.json` (secrets referenced by variable name only). Hunterexch has only a CLAUDE.md.                                                          |
 | Playwright               | Hunterexch had one browser test that skipped without a database. soulmate-ai had none; a smoke suite is added here.                                                                                                     |
@@ -121,5 +122,6 @@ Together, that is the structure an off-platform real-money operation would use, 
 3. **GitHub:** review and merge the two draft PRs once CI is green, and enable branch protection on `main`.
 4. **MacBook:** install Claude Code, run `aihub setup --link --repo …` and `aihub doctor`, and turn on Remote Control if you want Claude to reach it.
 5. **DeepSeek Harness:** send the exact project link.
-6. **OmniRoute:** decide whether you want it at all, and which upstream is official.
-7. **soulmate-ai PRs #9 and #7:** still open; #9 says its migration is not applied.
+6. **Vercel:** decide whether to keep its preview deployments for soulmate-ai or disconnect the project.
+7. **OmniRoute:** decide whether you want it at all, and which upstream is official.
+8. **soulmate-ai PRs #9 and #7:** still open; #9 says its migration is not applied.
