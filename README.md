@@ -22,3 +22,5 @@ npm run check             # format, lint, typecheck, test, build
 - [Testing guide](docs/TESTING_GUIDE.md)
 - [Deployment guide](docs/DEPLOYMENT_GUIDE.md)
 - [Security checklist](docs/SECURITY_CHECKLIST.md)
+- [aihub: local control command](docs/AIHUB.md)
+- [Infrastructure audit and plan](docs/INFRASTRUCTURE_AUDIT.md)
