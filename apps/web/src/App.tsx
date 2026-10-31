@@ -24,9 +24,12 @@ import { Onboarding } from "./components/Onboarding";
 import { ProfileStrength, StrengthNudge } from "./components/ProfileStrength";
 import { InviteButton } from "./components/InviteButton";
 import { DemoMode } from "./demoMode/DemoMode";
+import { CreatorStudio } from "./live/CreatorStudio";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
+/** SOULMATE LIVE creator studio (signed-in members only). */
+const isCreatorHash = () => typeof window !== "undefined" && window.location.hash === "#creator";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -42,9 +45,13 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [demo, setDemo] = useState(isDemoHash);
+  const [creator, setCreator] = useState(isCreatorHash);
 
   useEffect(() => {
-    const onHash = () => setDemo(isDemoHash());
+    const onHash = () => {
+      setDemo(isDemoHash());
+      setCreator(isCreatorHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -87,6 +94,17 @@ export function App() {
     );
   }
   if (!session) return <AuthScreen />;
+  if (creator) {
+    return (
+      <CreatorStudio
+        me={session.user.id}
+        onExit={() => {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setCreator(false);
+        }}
+      />
+    );
+  }
   return <Home key={session.user.id} session={session} />;
 }
 
@@ -526,6 +544,13 @@ function Home({ session }: { session: Session }) {
                 void loadPeople();
               }}
             />
+            <a className="demo-entry" href="#creator">
+              <Icon name="star" size={18} />
+              <span>
+                <strong>SOULMATE LIVE creator studio</strong>
+                <small>Apply to broadcast, verify, schedule streams and manage consent.</small>
+              </span>
+            </a>
             <a className="demo-entry" href="#demo">
               <Icon name="sparkle" size={18} />
               <span>

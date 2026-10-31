@@ -1903,3 +1903,125 @@ textarea {
 .invite-panel {
   margin: 16px 0;
 }
+
+/* ---------- SOULMATE LIVE: creator studio and dashboards ---------- */
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.studio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.segmented.scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.segmented.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.segmented.scroll button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.checklist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklist li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.checklist li > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.checklist li.done > span:first-child {
+  color: #2f8f26;
+  font-weight: 800;
+}
+
+.check-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.check-row input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  margin-top: 2px;
+}
+
+.stream-list,
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stream-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plain-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.plain-list li > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.row.between {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pill.status-live {
+  background: var(--coral);
+  color: #fff;
+}
+
+.pill.status-scheduled {
+  background: var(--sky);
+}
+
+.pill.status-terminated {
+  background: var(--danger);
+  color: #fff;
+}
+
+.pill.status-ended,
+.pill.status-cancelled {
+  background: var(--sand);
+}
