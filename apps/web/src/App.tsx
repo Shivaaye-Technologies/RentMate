@@ -25,11 +25,14 @@ import { ProfileStrength, StrengthNudge } from "./components/ProfileStrength";
 import { InviteButton } from "./components/InviteButton";
 import { DemoMode } from "./demoMode/DemoMode";
 import { CreatorStudio } from "./live/CreatorStudio";
+import { AdminConsole } from "./live/AdminConsole";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
 /** SOULMATE LIVE creator studio (signed-in members only). */
 const isCreatorHash = () => typeof window !== "undefined" && window.location.hash === "#creator";
+/** SOULMATE LIVE admin console (the database checks the admin/moderator role). */
+const isAdminHash = () => typeof window !== "undefined" && window.location.hash === "#admin";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -46,11 +49,13 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [demo, setDemo] = useState(isDemoHash);
   const [creator, setCreator] = useState(isCreatorHash);
+  const [admin, setAdmin] = useState(isAdminHash);
 
   useEffect(() => {
     const onHash = () => {
       setDemo(isDemoHash());
       setCreator(isCreatorHash());
+      setAdmin(isAdminHash());
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -94,6 +99,16 @@ export function App() {
     );
   }
   if (!session) return <AuthScreen />;
+  if (admin) {
+    return (
+      <AdminConsole
+        onExit={() => {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setAdmin(false);
+        }}
+      />
+    );
+  }
   if (creator) {
     return (
       <CreatorStudio
