@@ -1,26 +1,43 @@
-/* SOULMATE.AI — cream & ink with lilac, green, yellow and sky accents. */
+/* RentMate — black and charcoal surfaces, champagne gold accents, white type. */
 :root {
-  --cream: #fbf7ef;
-  --paper: #ffffff;
-  --sand: #f2ece0;
-  --ink: #17140f;
-  --ink-2: #2a251d;
-  --muted: #736a5c;
-  --line: #e9e1d2;
-  --lilac: #dcb6e8;
-  --green: #6bcb63;
-  --yellow: #f4c542;
-  --gold: #c99a12;
-  --sky: #afd3f5;
-  --coral: #ef6a80;
-  --danger: #c8283f;
-  --info-bg: #e9f3fd;
-  --info-ink: #1d4c80;
-  --err-bg: #fde9ec;
-  --radius: 26px;
-  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  /* Design tokens */
+  --bg: #0b0a09;
+  --surface: #161513;
+  --surface-2: #1f1d1a;
+  --surface-3: #2a2723;
+  --text: #f6f2ea;
+  --text-muted: #a8a196;
+  --line: #2e2b27;
+  --line-strong: #4a453d;
+  --gold: #d4b26a;
+  --gold-strong: #e6c886;
+  --gold-deep: #a9873f;
+  --on-gold: #14110b;
+  --gold-tint: #2b2416;
+  --success: #57c27a;
+  --success-tint: #16281c;
+  --info-tint: #142333;
+  --rose: #e2667c;
+  --danger: #ef5b6f;
+  --info-bg: #142333;
+  --info-ink: #9cc8f2;
+  --err-bg: #3a1820;
+  --radius: 22px;
+  --display: "Cormorant Garamond", "Fraunces", Georgia, serif;
   --body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color-scheme: light;
+  /* Legacy names kept so older rules keep working */
+  --cream: var(--bg);
+  --paper: var(--surface);
+  --sand: var(--surface-2);
+  --ink: var(--text);
+  --ink-2: var(--surface-3);
+  --muted: var(--text-muted);
+  --lilac: var(--gold-tint);
+  --green: var(--success);
+  --yellow: var(--gold);
+  --sky: var(--info-tint);
+  --coral: var(--rose);
+  color-scheme: dark;
 }
 
 * {
@@ -133,8 +150,8 @@ h3 {
 }
 
 .app.dark-top .topbar {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .brand {
@@ -150,7 +167,7 @@ h3 {
 .logo-mark {
   display: grid;
   place-items: center;
-  color: var(--ink);
+  color: var(--on-gold);
   background: var(--yellow);
 }
 
@@ -219,7 +236,7 @@ h3 {
   display: flex;
   justify-content: space-around;
   padding: 8px;
-  background: var(--ink);
+  background: var(--surface);
   border-radius: 22px;
   box-shadow: 0 12px 30px rgba(23, 20, 15, 0.25);
 }
@@ -233,7 +250,7 @@ h3 {
   gap: 2px;
   border: 0;
   background: none;
-  color: #8e877c;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
   padding: 6px 4px;
@@ -242,8 +259,8 @@ h3 {
 }
 
 .tabbar button.active {
-  color: var(--cream);
-  background: var(--ink-2);
+  color: var(--on-gold);
+  background: var(--gold);
 }
 
 .badge-dot {
@@ -254,7 +271,7 @@ h3 {
   height: 9px;
   border-radius: 50%;
   background: var(--coral);
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
 }
 
 /* ---------- Panels, forms ---------- */
@@ -304,7 +321,7 @@ input:focus,
 select:focus,
 textarea:focus,
 button:focus-visible {
-  outline: 3px solid var(--lilac);
+  outline: 3px solid var(--gold);
   outline-offset: 1px;
 }
 
@@ -366,7 +383,7 @@ textarea {
   justify-content: center;
   gap: 8px;
   font-weight: 700;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--paper);
   color: var(--ink);
   border-radius: 16px;
@@ -375,13 +392,13 @@ textarea {
 }
 
 .btn.dark {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 .btn.soft {
   border-color: transparent;
-  background: rgba(23, 20, 15, 0.12);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .btn.link {
@@ -418,7 +435,7 @@ textarea {
   padding: 10px 14px;
   margin: 4px 0 12px;
   border: 2px dashed var(--gold);
-  background: #fff8dd;
+  background: var(--gold-tint);
   border-radius: 16px;
   font-weight: 700;
   font-size: 13px;
@@ -466,7 +483,7 @@ textarea {
 }
 
 .chip.tint {
-  background: #ffd9dd;
+  background: var(--err-bg);
 }
 
 .chip.shared {
@@ -490,11 +507,12 @@ textarea {
 }
 
 .pill.white {
-  background: #fff;
+  background: var(--surface);
 }
 
 .pill.gold {
   background: var(--yellow);
+  color: var(--on-gold);
 }
 
 .dot {
@@ -509,6 +527,7 @@ textarea {
 }
 .dot.yellow {
   background: var(--yellow);
+  color: var(--on-gold);
 }
 .dot.green {
   background: var(--green);
@@ -542,9 +561,9 @@ textarea {
   flex: none;
   padding: 1px 7px;
   border-radius: 999px;
-  border: 1.5px solid var(--ink);
+  border: 1.5px solid var(--line-strong);
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -629,10 +648,11 @@ textarea {
   place-items: center;
   border: 0;
   border-radius: 20px;
-  background: var(--ink);
+  background: var(--gold);
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(23, 20, 15, 0.22);
   transition: transform 0.12s ease;
+  color: var(--on-gold);
 }
 
 .act:active {
@@ -644,8 +664,8 @@ textarea {
   height: 50px;
   align-self: center;
   border-radius: 16px;
-  color: var(--cream);
-  background: #4a443a;
+  color: var(--text);
+  background: var(--surface-3);
 }
 
 .act.pass {
@@ -659,13 +679,13 @@ textarea {
 }
 
 .act.super {
-  color: var(--sky);
+  color: var(--info-ink);
 }
 
 /* ---------- Discover hub ---------- */
 .hub-head {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
   padding: 8px 16px 40px;
 }
 
@@ -689,7 +709,7 @@ textarea {
   gap: 8px;
   border: 0;
   background: none;
-  color: var(--cream);
+  color: var(--text);
   cursor: pointer;
   padding: 0;
 }
@@ -707,7 +727,7 @@ textarea {
 }
 
 .circle.active .circle-img {
-  border-color: var(--cream);
+  border-color: var(--text);
 }
 
 .circle-img.lilac {
@@ -715,6 +735,7 @@ textarea {
 }
 .circle-img.yellow {
   background: var(--yellow);
+  color: var(--on-gold);
 }
 .circle-img.green {
   background: var(--green);
@@ -774,8 +795,8 @@ textarea {
 }
 
 .mood.active {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 .grid {
@@ -798,7 +819,7 @@ textarea {
 }
 
 .tile.super {
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--gold);
 }
 
 .tile::after {
@@ -901,7 +922,7 @@ textarea {
 }
 
 .close-x.on-color {
-  background: rgba(23, 20, 15, 0.12);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .celebrate {
@@ -909,7 +930,7 @@ textarea {
   overflow: hidden;
   width: 100%;
   max-width: 400px;
-  border: 4px solid var(--ink);
+  border: 4px solid var(--line-strong);
   border-radius: 40px;
   padding: 44px 22px 22px;
   display: flex;
@@ -952,6 +973,7 @@ textarea {
   background: var(--gold);
   bottom: -100%;
   left: -60%;
+  color: var(--on-gold);
 }
 
 .celebrate-photo {
@@ -1002,8 +1024,8 @@ textarea {
   transform: translateX(-50%);
   z-index: 40;
   max-width: calc(100% - 32px);
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
   font-weight: 700;
   font-size: 14px;
   padding: 12px 16px;
@@ -1109,12 +1131,12 @@ textarea {
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .chat-head .icon-btn {
-  color: var(--cream);
+  color: var(--text);
 }
 
 .chat-who {
@@ -1123,7 +1145,7 @@ textarea {
   gap: 10px;
   border: 0;
   background: none;
-  color: var(--cream);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
   padding: 0;
@@ -1223,7 +1245,7 @@ textarea {
   text-align: center;
   background:
     radial-gradient(circle at 20% 20%, var(--yellow) 0 22%, transparent 23%),
-    radial-gradient(circle at 90% 85%, var(--yellow) 0 18%, transparent 19%), #b3b0ec;
+    radial-gradient(circle at 90% 85%, var(--yellow) 0 18%, transparent 19%), var(--surface-2);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1248,7 +1270,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--paper);
   font-weight: 700;
   font-size: 13px;
@@ -1267,7 +1289,7 @@ textarea {
 }
 
 .composer input {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 18px;
   background: var(--paper);
 }
@@ -1279,8 +1301,8 @@ textarea {
   place-items: center;
   border: 0;
   border-radius: 16px;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--gold);
+  color: var(--on-gold);
   cursor: pointer;
 }
 
@@ -1325,8 +1347,8 @@ textarea {
   place-items: center;
   border: 0;
   border-radius: 10px;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--gold);
+  color: var(--on-gold);
   cursor: pointer;
 }
 
@@ -1340,8 +1362,8 @@ textarea {
 .auth {
   min-height: 100dvh;
   overflow-x: clip;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
   padding: 32px 16px 40px;
   display: flex;
   flex-direction: column;
@@ -1427,8 +1449,8 @@ textarea {
 }
 
 .segmented button.active {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 /* ---------- States ---------- */
@@ -1539,7 +1561,7 @@ textarea {
 }
 
 .reason.active {
-  border-color: var(--ink);
+  border-color: var(--gold);
   background: var(--lilac);
 }
 
@@ -1621,7 +1643,7 @@ textarea {
 }
 
 .public-links a {
-  color: var(--cream);
+  color: var(--text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -1644,7 +1666,7 @@ textarea {
   gap: 8px 12px;
   padding: 10px 16px;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
   border-bottom: 2px solid var(--ink);
   font-size: 13px;
   line-height: 1.35;
@@ -1670,8 +1692,8 @@ textarea {
 .pill.sim-tag,
 .sim-tag {
   background: var(--yellow);
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
+  color: var(--on-gold);
+  border: 1.5px solid var(--line-strong);
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 999px;
@@ -1713,6 +1735,7 @@ textarea {
   background: var(--yellow);
   border-color: var(--yellow);
   text-decoration: none;
+  color: var(--on-gold);
 }
 
 .demo-cta-note {
@@ -1727,10 +1750,10 @@ textarea {
   gap: 12px;
   margin: 16px 0;
   padding: 14px 16px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 18px;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
   text-decoration: none;
 }
 
@@ -1759,7 +1782,8 @@ textarea {
 }
 
 .steps .step.on {
-  background: var(--ink);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 .center {
@@ -1783,7 +1807,7 @@ textarea {
 }
 
 .choice.on {
-  border-color: var(--ink);
+  border-color: var(--gold);
   background: var(--lilac);
 }
 
@@ -1801,9 +1825,10 @@ textarea {
 }
 
 .chip.toggle.on {
-  border-color: var(--ink);
+  border-color: var(--gold);
   background: var(--yellow);
   font-weight: 700;
+  color: var(--on-gold);
 }
 
 .chip.toggle:disabled {
@@ -1932,7 +1957,7 @@ textarea {
 }
 
 .reveal:focus-visible {
-  outline: 3px solid var(--lilac);
+  outline: 3px solid var(--gold);
 }
 
 .auth-sub {
@@ -2068,13 +2093,13 @@ textarea {
 .btn.yellow {
   background: var(--yellow);
   border-color: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
 }
 
 .btn.ghost-dark {
   background: transparent;
-  border-color: #5a5348;
-  color: var(--cream);
+  border-color: var(--line-strong);
+  color: var(--text);
 }
 
 .small-link {
@@ -2116,7 +2141,8 @@ textarea {
   height: 6px;
   margin-top: -3px;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 .range-track input[type="range"] {
@@ -2139,7 +2165,7 @@ textarea {
   height: 28px;
   border-radius: 50%;
   background: var(--paper);
-  border: 3px solid var(--ink);
+  border: 3px solid var(--line-strong);
   cursor: pointer;
 }
 
@@ -2149,7 +2175,7 @@ textarea {
   height: 24px;
   border-radius: 50%;
   background: var(--paper);
-  border: 3px solid var(--ink);
+  border: 3px solid var(--line-strong);
   cursor: pointer;
 }
 
@@ -2158,7 +2184,7 @@ textarea {
 }
 
 .range-track input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px var(--lilac);
+  box-shadow: 0 0 0 4px var(--gold);
 }
 
 .single-range {
@@ -2238,7 +2264,7 @@ details > .chips {
   border: 2px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
-  box-shadow: 0 10px 24px rgba(23, 20, 15, 0.12);
+  box-shadow: 0 10px 24px rgba(255, 255, 255, 0.08);
   max-height: 260px;
   overflow-y: auto;
 }
@@ -2415,7 +2441,7 @@ details > .chips {
 }
 
 .carousel .bars i.on {
-  background: #fff;
+  background: var(--surface);
 }
 
 .carousel .tap {
@@ -2442,7 +2468,7 @@ details > .chips {
 }
 
 .carousel:focus-visible {
-  outline: 3px solid var(--lilac);
+  outline: 3px solid var(--gold);
   outline-offset: 2px;
 }
 
@@ -2505,13 +2531,14 @@ details > .chips {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s;
 }
 
 .switch:checked {
-  background: var(--ink);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 .switch:checked::after {
@@ -2624,11 +2651,11 @@ details > .chips {
 }
 
 .task.done {
-  background: #eaf7e8;
+  background: var(--success-tint);
 }
 
 .task.done svg:first-child {
-  color: #2f8f26;
+  color: var(--success);
 }
 
 .menu {
@@ -2653,8 +2680,8 @@ details > .chips {
 
 /* ---------- Chats ---------- */
 .welcome-card {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
   border-radius: var(--radius);
   padding: 18px;
   margin: 8px 0 16px;
@@ -2691,7 +2718,7 @@ details > .chips {
   align-self: flex-start;
   background: var(--yellow);
   border-color: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
 }
 
 .convo-meta {
@@ -2767,7 +2794,7 @@ details > .chips {
     linear-gradient(25deg, transparent 58%, #fff 58% 61%, transparent 61%),
     linear-gradient(160deg, transparent 30%, #fff 30% 33%, transparent 33%),
     radial-gradient(circle at 20% 30%, var(--lilac) 0 22%, transparent 23%),
-    radial-gradient(circle at 85% 80%, #cfe9c9 0 18%, transparent 19%), #ece6da;
+    radial-gradient(circle at 85% 80%, var(--gold-tint) 0 18%, transparent 19%), var(--surface-2);
 }
 
 .map-cta .btn {
@@ -2810,7 +2837,7 @@ details > .chips {
   min-height: 260px;
   position: relative;
   overflow: hidden;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
 }
 
 .vibe-card p {
@@ -2827,19 +2854,19 @@ details > .chips {
   background: var(--lilac);
 }
 .vibe-card.green {
-  background: #b8e3b2;
+  background: var(--success-tint);
 }
 .vibe-card.yellow {
-  background: #f8dc87;
+  background: var(--gold-tint);
 }
 .vibe-card.sky {
   background: var(--sky);
 }
 .vibe-card.coral {
-  background: #f7b3bd;
+  background: var(--err-bg);
 }
 .vibe-card.sand {
-  background: #eadfc9;
+  background: var(--surface-2);
 }
 
 .vibe-art {
@@ -2887,7 +2914,8 @@ details > .chips {
 
 .dot-btn.on::after {
   width: 18px;
-  background: var(--ink);
+  background: var(--gold);
+  color: var(--on-gold);
 }
 
 /* ---------- Map ---------- */
@@ -2924,8 +2952,8 @@ details > .chips {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -2972,8 +3000,8 @@ details > .chips {
 
 /* ---------- Safety introduction ---------- */
 .dark-sheet {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .safety-intro {
@@ -2997,11 +3025,12 @@ details > .chips {
   flex: 1;
   height: 5px;
   border-radius: 999px;
-  background: #4a443a;
+  background: var(--surface-3);
 }
 
 .progress-bars i.on {
   background: var(--yellow);
+  color: var(--on-gold);
 }
 
 .safety-icon {
@@ -3011,7 +3040,7 @@ details > .chips {
   display: grid;
   place-items: center;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-gold);
 }
 
 .tips.on-dark,
@@ -3024,8 +3053,8 @@ details > .chips {
 }
 
 .close-x.on-dark {
-  background: #2f2a22;
-  color: var(--cream);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 /* ---------- Wider screens ---------- */
@@ -3116,7 +3145,7 @@ details > .chips {
 }
 
 .checklist li.done > span:first-child {
-  color: #2f8f26;
+  color: var(--success);
   font-weight: 800;
 }
 
@@ -3252,4 +3281,215 @@ details > .chips {
 .panel.emergency.on {
   border: 2px solid var(--danger);
   background: var(--err-bg);
+}
+
+/* =========================================================
+   RentMate design system layer
+   Black/charcoal surfaces, champagne gold accents, white type.
+   ========================================================= */
+.display-xl,
+.display-lg,
+.display-md,
+.display-sm {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.monogram {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 28%;
+  background: #050505;
+  border: 1px solid var(--gold-deep);
+  box-shadow: inset 0 0 0 1px rgba(212, 178, 106, 0.18);
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  background-image: linear-gradient(145deg, #1a1712, #050505);
+  color: var(--gold-strong);
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.brand .wordmark {
+  text-transform: none;
+}
+
+.eyebrow {
+  margin: 18px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* Landing: deep black with a soft gold glow. */
+.auth {
+  background:
+    radial-gradient(120% 60% at 80% -10%, rgba(212, 178, 106, 0.16), transparent 60%),
+    radial-gradient(90% 50% at -10% 110%, rgba(212, 178, 106, 0.08), transparent 60%), var(--bg);
+}
+
+.auth-hero .display-xl {
+  margin: 14px 0 12px;
+}
+
+.auth-hero em {
+  font-style: italic;
+  color: var(--gold-strong);
+}
+
+.pillars {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.pillars li {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold-deep);
+  border-radius: 14px;
+  background: rgba(22, 21, 19, 0.7);
+  animation: rm-rise 0.5s ease both;
+}
+
+.pillars li:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.pillars li:nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+.pillars strong {
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--gold-strong);
+}
+
+.pillars span {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.pill-status {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.pill-status.ready {
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.pill-status.soon {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.hero-rule {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Primary actions: champagne gold with a subtle sheen. */
+.btn.dark,
+.send,
+.btn.yellow,
+.welcome-card .btn {
+  background: linear-gradient(180deg, var(--gold-strong), var(--gold));
+  border-color: var(--gold);
+  color: var(--on-gold);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn.dark:hover:not(:disabled),
+.btn.yellow:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(212, 178, 106, 0.25);
+}
+
+.btn.dark:active:not(:disabled),
+.btn.yellow:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn {
+  border-width: 1.5px;
+}
+
+.panel,
+.auth-card {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+input,
+textarea,
+select {
+  color-scheme: dark;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6f695f;
+}
+
+:focus-visible {
+  outline-color: var(--gold);
+}
+
+.tabbar {
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Crush actions: charcoal tiles with coloured icons and a gold edge. */
+.act {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.act.like {
+  border-color: var(--gold-deep);
+}
+
+@keyframes rm-rise {
+  from {
+    opacity: 0.35;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pillars li {
+    animation: none;
+  }
 }

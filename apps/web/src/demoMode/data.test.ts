@@ -40,7 +40,7 @@ describe("loadDemoPeople", () => {
       loadDemoPeople(async () => {
         throw new TypeError("Failed to fetch");
       }),
-    ).rejects.toThrow(/Can't reach SOULMATE.AI/);
+    ).rejects.toThrow(/Can't reach RentMate/);
     await expect(loadDemoPeople(async () => ({ data: { nope: 1 }, error: null }))).rejects.toThrow(
       /unexpected/,
     );

@@ -5,7 +5,7 @@
  */
 export type InviteResult = "shared" | "copied" | "cancelled" | "unavailable";
 
-export const INVITE_TEXT = "I'm trying SOULMATE.AI, a dating app that matches on what you love. Join me:";
+export const INVITE_TEXT = "I'm trying RentMate, a dating app that matches on what you love. Join me:";
 
 export interface InviteEnv {
   share?: (data: ShareData) => Promise<void>;
@@ -19,7 +19,7 @@ export function inviteUrl(origin: string): string {
 export async function invite(url: string, env: InviteEnv): Promise<InviteResult> {
   if (env.share) {
     try {
-      await env.share({ title: "SOULMATE.AI", text: INVITE_TEXT, url });
+      await env.share({ title: "RentMate", text: INVITE_TEXT, url });
       return "shared";
     } catch (e) {
       // Closing the share sheet is not an error worth reporting.

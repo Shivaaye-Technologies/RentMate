@@ -1,4 +1,4 @@
-// Browser notifications. These only appear while SOULMATE.AI is open in a tab
+// Browser notifications. These only appear while RentMate is open in a tab
 // (for example in the background). There is no push service yet, so nothing
 // arrives when the site is closed, and the app says so.
 
@@ -24,7 +24,7 @@ export function showAlert(text: string): boolean {
   if (notificationPermission() !== "granted" || typeof document === "undefined" || !document.hidden)
     return false;
   try {
-    new Notification("SOULMATE.AI", { body: text, tag: text, icon: "/favicon.svg" });
+    new Notification("RentMate", { body: text, tag: text, icon: "/favicon.svg" });
     return true;
   } catch {
     // Some Android browsers only allow notifications from a service worker.

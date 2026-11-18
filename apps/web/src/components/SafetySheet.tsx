@@ -111,7 +111,7 @@ export function SafetySheet({ person, canUnmatch, busy, onReport, onBlock, onUnm
           <>
             <h2 className="display-sm">Block {name}?</h2>
             <p className="muted">
-              You won't see each other anywhere in SOULMATE.AI, and any match and chat between you will
+              You won't see each other anywhere in RentMate, and any match and chat between you will
               disappear.
             </p>
             <button className="btn dark block" disabled={busy} onClick={onBlock}>

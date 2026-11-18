@@ -84,7 +84,7 @@ describe("alertsFor", () => {
         { likes: 2, matches: 1, unread: 1 },
         { messages: false },
       ),
-    ).toEqual(["Someone new likes you on SOULMATE.AI"]);
+    ).toEqual(["Someone new likes you on RentMate"]);
   });
 });
 

@@ -134,7 +134,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       },
     });
   } catch {
-    throw new Error("Can't reach the SOULMATE.AI server. Try again in a moment.");
+    throw new Error("Can't reach the RentMate server. Try again in a moment.");
   }
   const body = (await res.json().catch(() => null)) as { error?: string } | null;
   if (!res.ok) throw new Error(body?.error ?? `The server returned an error (${res.status}).`);

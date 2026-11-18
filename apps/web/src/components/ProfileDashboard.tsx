@@ -231,7 +231,7 @@ export function ProfileDashboard({
       <a className="demo-entry" href="#creator">
         <Icon name="star" size={18} />
         <span>
-          <strong>SOULMATE LIVE creator studio</strong>
+          <strong>RentMate Live creator studio</strong>
           <small>Apply to broadcast, verify, schedule streams and manage consent.</small>
         </span>
       </a>
@@ -245,7 +245,7 @@ export function ProfileDashboard({
       <div className="panel invite-panel">
         <h2 className="display-sm">Bring your friends</h2>
         <p className="muted">
-          SOULMATE.AI grows one real person at a time. Share the link; there is no tracking or referral code.
+          RentMate grows one real person at a time. Share the link; there is no tracking or referral code.
         </p>
         <InviteButton className="btn dark" />
       </div>

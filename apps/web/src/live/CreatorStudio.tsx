@@ -161,7 +161,7 @@ export function ApplicationForm({
         {state.categories.some((x) => x.explicit) && (
           <small className="muted">
             Adult categories are never available in India. Elsewhere they open only in countries where
-            SOULMATE has written legal clearance, and every viewer must pass an age check.
+            RentMate has written legal clearance, and every viewer must pass an age check.
           </small>
         )}
         {errors.categories && <small className="err">{errors.categories}</small>}
@@ -757,7 +757,7 @@ function Support({ me, state, reload }: { me: string; state: CreatorState; reloa
   );
 }
 
-/** SOULMATE LIVE creator portal: apply, verify, agree, schedule, consent, support. */
+/** RentMate Live creator portal: apply, verify, agree, schedule, consent, support. */
 export function CreatorStudio({ me, onExit }: { me: string; onExit: () => void }) {
   const [state, setState] = useState<CreatorState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -771,7 +771,7 @@ export function CreatorStudio({ me, onExit }: { me: string; onExit: () => void }
       const msg = e instanceof Error ? e.message : "";
       setError(
         /creators|content_categories|does not exist|schema cache/i.test(msg)
-          ? "SOULMATE LIVE isn't switched on yet. Please check back soon."
+          ? "RentMate Live isn't switched on yet. Please check back soon."
           : "Couldn't load the creator studio. Please try again.",
       );
     }
@@ -787,7 +787,7 @@ export function CreatorStudio({ me, onExit }: { me: string; onExit: () => void }
         <button className="btn small" onClick={onExit}>
           ← Back
         </button>
-        <span className="brand">SOULMATE LIVE · Creator studio</span>
+        <span className="brand">RentMate Live · Creator studio</span>
       </header>
       <main className="shell studio">
         {error && (

@@ -54,7 +54,7 @@ export async function loadDemoPeople(
   try {
     result = await rpc("demo_mode_profiles", { p_limit: 500 });
   } catch {
-    throw new Error("Can't reach SOULMATE.AI right now. Check your connection and try again.");
+    throw new Error("Can't reach RentMate right now. Check your connection and try again.");
   }
   if (result.error) throw new Error(`Could not load demo profiles: ${result.error.message}`);
   if (!Array.isArray(result.data)) throw new Error("Could not load demo profiles: unexpected response.");

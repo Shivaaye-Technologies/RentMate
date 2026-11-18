@@ -199,9 +199,9 @@ export function alertsFor(
   if (!prev) return [];
   const p = prefsOf(prefs);
   const out: string[] = [];
-  if (p.likes && next.likes > prev.likes) out.push("Someone new likes you on SOULMATE.AI");
-  if (p.matches && next.matches > prev.matches) out.push("You have a new Match on SOULMATE.AI");
-  if (p.messages && next.unread > prev.unread) out.push("You have a new message on SOULMATE.AI");
+  if (p.likes && next.likes > prev.likes) out.push("Someone new likes you on RentMate");
+  if (p.matches && next.matches > prev.matches) out.push("You have a new Match on RentMate");
+  if (p.messages && next.unread > prev.unread) out.push("You have a new message on RentMate");
   return out;
 }
 

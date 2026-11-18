@@ -1,4 +1,4 @@
-// Plain-language text and small pure helpers for SOULMATE LIVE screens.
+// Plain-language text and small pure helpers for RentMate Live screens.
 
 const PROBLEMS: Record<string, string> = {
   stream_not_found: "This stream doesn't exist.",

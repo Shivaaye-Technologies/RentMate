@@ -4,7 +4,7 @@ import { Icon } from "./Icon";
 
 /**
  * Map tab, privacy first. Crossed paths would need people's movement history,
- * which SOULMATE.AI does not collect, so this shows an honest "not available
+ * which RentMate does not collect, so this shows an honest "not available
  * yet" state, city-level counts from real profiles, and your location settings.
  */
 export function MapView({

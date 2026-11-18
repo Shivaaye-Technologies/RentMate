@@ -31,7 +31,7 @@ interface ErrorLike {
 
 const MESSAGES: Record<AuthErrorKind, string> = {
   email_not_confirmed:
-    "Your email isn't confirmed yet. Open the newest email from SOULMATE.AI and tap the link, or send a new one below.",
+    "Your email isn't confirmed yet. Open the newest email from RentMate and tap the link, or send a new one below.",
   invalid_credentials:
     "That email and password don't match an account. Check them, or reset your password if you've forgotten it.",
   rate_limited: "Too many attempts. Please wait a few minutes before trying again.",

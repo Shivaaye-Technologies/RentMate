@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import { Monogram } from "./components/Monogram";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DiscoverError, fetchDiscover, personFromOwnRow, type DiscoverSummary, type Person } from "./api";
 import { AuthScreen, NewPasswordScreen } from "./components/AuthScreen";
@@ -33,9 +34,9 @@ import { AdminConsole } from "./live/AdminConsole";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
-/** SOULMATE LIVE creator studio (signed-in members only). */
+/** RentMate Live creator studio (signed-in members only). */
 const isCreatorHash = () => typeof window !== "undefined" && window.location.hash === "#creator";
-/** SOULMATE LIVE admin console (the database checks the admin/moderator role). */
+/** RentMate Live admin console (the database checks the admin/moderator role). */
 const isAdminHash = () => typeof window !== "undefined" && window.location.hash === "#admin";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
@@ -509,7 +510,7 @@ function Home({ session }: { session: Session }) {
           setProfile({ ...row, safety_intro_at: null, welcome_seen_at: null });
           setTab("crush");
           setSafetyIntro(true);
-          flash(`Welcome to SOULMATE.AI, ${row.display_name}!`);
+          flash(`Welcome to RentMate, ${row.display_name}!`);
         }}
       />
     );
@@ -591,10 +592,8 @@ function Home({ session }: { session: Session }) {
     <div className={tab === "discover" && !overlayPage ? "app dark-top" : "app"}>
       <header className="topbar">
         <span className="brand">
-          <span className="logo-mark small" aria-hidden="true">
-            <Icon name="heart" size={14} />
-          </span>
-          SOULMATE.AI
+          <Monogram />
+          RentMate
         </span>
         <span className="topbar-actions">
           <button

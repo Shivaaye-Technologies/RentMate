@@ -103,7 +103,7 @@ describe("admin screens", () => {
 
   it("starts by checking the member's role", () => {
     const html = renderToStaticMarkup(createElement(AdminConsole, { onExit: () => undefined }));
-    expect(html).toContain("SOULMATE LIVE · Admin");
+    expect(html).toContain("RentMate Live · Admin");
     expect(html).toContain("spinner");
   });
 });

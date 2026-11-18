@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Monogram } from "../components/Monogram";
 import type { Person } from "../api";
 import { CrushStack } from "../components/CrushStack";
 import { DiscoverHub } from "../components/DiscoverHub";
@@ -198,10 +199,8 @@ export function DemoMode({ signedIn, onExit }: { signedIn: boolean; onExit: () =
       {banner}
       <header className="topbar">
         <span className="brand">
-          <span className="logo-mark small" aria-hidden="true">
-            <Icon name="heart" size={14} />
-          </span>
-          SOULMATE.AI <span className="demo-badge">Demo</span>
+          <Monogram />
+          RentMate <span className="demo-badge">Demo</span>
         </span>
       </header>
 

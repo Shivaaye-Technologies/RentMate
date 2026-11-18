@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Monogram } from "./Monogram";
 import { loadMatches, shortTime, type MatchSummary } from "../inbox";
 import { supabase } from "../supabase";
 import { Icon } from "./Icon";
@@ -7,16 +8,14 @@ import { DemoBadge } from "./DemoBadge";
 
 export type { MatchSummary };
 
-/** Official welcome from the SOULMATE.AI team (an in-app card, not a dating profile). */
+/** Official welcome from the RentMate team (an in-app card, not a dating profile). */
 export function WelcomeCard({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <article className="welcome-card" aria-label="Welcome from the SOULMATE.AI team">
+    <article className="welcome-card" aria-label="Welcome from the RentMate team">
       <header>
-        <span className="logo-mark small" aria-hidden="true">
-          <Icon name="heart" size={14} />
-        </span>
+        <Monogram />
         <span>
-          <strong>SOULMATE.AI Team</strong>
+          <strong>RentMate Team</strong>
           <small>Official message · not a member profile</small>
         </span>
       </header>

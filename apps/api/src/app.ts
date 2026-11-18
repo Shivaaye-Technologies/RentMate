@@ -94,7 +94,7 @@ export function createApp({ config, verifyToken, storeFor, live }: AppDeps) {
   // Root: what this service is and how to use it. Never includes configuration values.
   app.get("/", (_req, res) => {
     res.json({
-      name: "SOULMATE.AI API",
+      name: "RentMate API",
       service: SERVICE_NAME,
       version,
       status: "ok",

@@ -99,14 +99,14 @@ export function NotificationSettings({
 
       <h3>Browser alerts</h3>
       <p className="muted small">
-        Alerts appear on this device while SOULMATE.AI is open in a browser tab, even in the background. When
-        the site is closed you won't get alerts yet; check the bell when you come back.
+        Alerts appear on this device while RentMate is open in a browser tab, even in the background. When the
+        site is closed you won't get alerts yet; check the bell when you come back.
       </p>
       {permission === "unsupported" && <p className="alert info">This browser doesn't support alerts.</p>}
       {permission === "denied" && (
         <p className="alert info">
-          Alerts are blocked for this site. To allow them, open your browser's site settings for SOULMATE.AI
-          and allow notifications.
+          Alerts are blocked for this site. To allow them, open your browser's site settings for RentMate and
+          allow notifications.
         </p>
       )}
       {permission === "granted" && <p className="alert info">Alerts are on for this browser.</p>}
@@ -334,7 +334,7 @@ export function HelpSafety({ onSafetyIntro }: { onSafetyIntro: () => void }) {
       </a>
       <p className="muted small">
         To report someone, open their profile or your chat with them and choose Report or block. Reports go to
-        the SOULMATE.AI team; if you're in danger, contact local emergency services first.
+        the RentMate team; if you're in danger, contact local emergency services first.
       </p>
       <nav className="legal-links" aria-label="Legal">
         <a href="/privacy.html">Privacy Policy</a>

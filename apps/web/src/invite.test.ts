@@ -10,7 +10,7 @@ describe("invite", () => {
       },
     });
     expect(r).toBe("shared");
-    expect(shared).toEqual({ title: "SOULMATE.AI", text: INVITE_TEXT, url: "https://soulmate.example/" });
+    expect(shared).toEqual({ title: "RentMate", text: INVITE_TEXT, url: "https://soulmate.example/" });
     expect(inviteUrl("https://soulmate.example")).not.toMatch(/[?#]/);
   });
 

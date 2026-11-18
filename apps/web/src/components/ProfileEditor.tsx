@@ -107,7 +107,7 @@ export function SectionFields({
                 />
                 {coreErrors.age && <small className="err">{coreErrors.age}</small>}
               </label>
-              <p className="fine">You must be 18 or older to use SOULMATE.AI.</p>
+              <p className="fine">You must be 18 or older to use RentMate.</p>
             </>
           )}
           {part !== "basics" && (

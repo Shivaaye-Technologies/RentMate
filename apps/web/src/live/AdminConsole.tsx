@@ -1180,7 +1180,7 @@ export function AdminConsole({ onExit }: { onExit: () => void }) {
     adminApi
       .roles()
       .then(setRoles)
-      .catch(() => setError("SOULMATE LIVE isn't switched on yet, or you aren't signed in."));
+      .catch(() => setError("RentMate Live isn't switched on yet, or you aren't signed in."));
   }, []);
 
   const isAdmin = roles?.includes("admin") ?? false;
@@ -1198,7 +1198,7 @@ export function AdminConsole({ onExit }: { onExit: () => void }) {
         <button className="btn small" onClick={onExit}>
           ← Back
         </button>
-        <span className="brand">SOULMATE LIVE · Admin</span>
+        <span className="brand">RentMate Live · Admin</span>
       </header>
       <main className="shell studio admin">
         {error && <p className="alert error">{error}</p>}

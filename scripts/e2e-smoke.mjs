@@ -106,7 +106,10 @@ try {
     ["phone", { width: 390, height: 844 }],
   ]) {
     const { context, page, errors } = await open(browser, base, viewport);
-    check(`${label}: page title is SOULMATE.AI`, (await page.title()) === "SOULMATE.AI");
+    check(
+      `${label}: page title is the RentMate title`,
+      (await page.title()) === "RentMate — Meet. Connect. Experience.",
+    );
     const email = page.locator('input[type="email"]');
     await email
       .first()
@@ -127,7 +130,7 @@ try {
   {
     const { context, page } = await open(browser, base, { width: 1280, height: 800 });
     await page.goto(base + "/some/deep/link", { waitUntil: "load" });
-    check("deep links load the app", (await page.title()) === "SOULMATE.AI");
+    check("deep links load the app", (await page.title()) === "RentMate — Meet. Connect. Experience.");
     await context.close();
   }
 

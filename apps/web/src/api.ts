@@ -89,7 +89,7 @@ export async function fetchDiscover(
     res = await fetchFn(`${base}/api/v1/matches`, { headers: { Authorization: `Bearer ${token}` } });
   } catch {
     throw new DiscoverError(
-      "Can't reach the SOULMATE.AI server. Check your internet connection and try again.",
+      "Can't reach the RentMate server. Check your internet connection and try again.",
       null,
     );
   }
@@ -170,7 +170,7 @@ export function discoverEmptyState(
   }
   return {
     title: "No new people yet",
-    body: "SOULMATE.AI is just getting started near you. New members appear here as they join, so check back soon, or invite friends to join.",
+    body: "RentMate is just getting started near you. New members appear here as they join, so check back soon, or invite friends to join.",
     editProfile: false,
     reviewPasses: 0,
   };

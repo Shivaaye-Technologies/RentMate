@@ -48,7 +48,7 @@ describe("fetchDiscover", () => {
     }) as unknown as typeof fetch;
     const err = await fetchDiscover("t", f, "x").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DiscoverError);
-    expect((err as Error).message).toMatch(/Can't reach the SOULMATE.AI server/);
+    expect((err as Error).message).toMatch(/Can't reach the RentMate server/);
     expect((err as { status: unknown }).status).toBeNull();
   });
 

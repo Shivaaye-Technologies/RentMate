@@ -27,7 +27,7 @@ describe("GET /", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/application\/json/);
     expect(res.body).toMatchObject({
-      name: "SOULMATE.AI API",
+      name: "RentMate API",
       service: "soulmate-api",
       version: pkg.version,
       status: "ok",

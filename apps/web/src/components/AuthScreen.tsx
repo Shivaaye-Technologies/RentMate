@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Monogram } from "./Monogram";
+import { BRAND } from "../brand";
 import {
   classifyAuthError,
   cooldownLeft,
@@ -155,39 +157,47 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
 
   const hero = (
     <div className="auth-hero">
-      <span className="squiggle" aria-hidden="true" />
       <p className="brand on-dark">
-        <span className="logo-mark small" aria-hidden="true">
-          ♥
-        </span>
-        SOULMATE.AI
+        <Monogram size={34} />
+        <span className="wordmark">{BRAND.name}</span>
       </p>
+      <p className="eyebrow">{BRAND.tagline}</p>
       <h1 className="display-xl">
-        Find your <em>Crush</em>
+        Real people. <em>Real experiences.</em>
       </h1>
-      <p className="lede">…or a new friend. Matched on what you love, not just a photo.</p>
+      <p className="lede">
+        Dating, friendship and social connection for verified adults, matched on what you love, not just a
+        photo.
+      </p>
       <a className="btn demo-cta" href="#demo">
         Try Demo Mode, no sign-up
       </a>
       <p className="demo-cta-note">
         Explore fictional profiles with simulated likes, matches and chat. No real people are involved.
       </p>
-      <ul className="hero-points">
+      <ul className="pillars" aria-label="RentMate experiences">
         <li>
-          <b className="dot lilac" /> Profiles picked for you
+          <strong>Online</strong>
+          <span>Matches, chat, and soon live rooms and private calls</span>
+          <small className="pill-status ready">Dating & chat available</small>
         </li>
         <li>
-          <b className="dot green" /> It's a Match when you both like
+          <strong>Physical</strong>
+          <span>Public meetups and non-sexual social companionship</span>
+          <small className="pill-status soon">In development</small>
         </li>
         <li>
-          <b className="dot yellow" /> Meet when you're both ready
+          <strong>Hybrid</strong>
+          <span>Meet online first, then choose to meet in public</span>
+          <small className="pill-status soon">In development</small>
         </li>
       </ul>
+      <p className="hero-rule">18+ only · Verified members · No sexual services of any kind</p>
     </div>
   );
 
   const footer = (
-    <footer className="public-links" aria-label="About SOULMATE.AI">
+    <footer className="public-links" aria-label="About RentMate">
       {PUBLIC_PAGES.map((p) => (
         <a key={p.href} href={p.href}>
           {p.label}
@@ -394,7 +404,7 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
           <p className="fine">We'll email you a link to confirm your address before you can sign in.</p>
         )}
         <p className="fine">
-          You must be 18 or older to use SOULMATE.AI. By creating an account you agree to the{" "}
+          You must be 18 or older to use RentMate. By creating an account you agree to the{" "}
           <a href="/terms.html">Terms of Use</a> and <a href="/privacy.html">Privacy Policy</a>.
         </p>
       </form>
