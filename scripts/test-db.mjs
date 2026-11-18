@@ -37,6 +37,7 @@ for (const test of [
   "profile_details.sql",
   "live_foundation.sql",
   "no_adult_content.sql",
+  "policy_audit.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));

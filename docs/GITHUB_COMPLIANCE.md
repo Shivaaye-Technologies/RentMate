@@ -36,11 +36,15 @@ Compliant set-up:
 if a change adds:
 
 - a real-looking secret (GitHub, Supabase, Stripe, AWS, Anthropic keys, private keys, long JWTs) or any `.env` file;
-- any raster image, video or audio file, or an SVG with an embedded image, script or remote link;
+- any image, video or audio file — by extension or by file signature (renamed media is caught) — or an SVG with an
+  embedded image, script or remote link;
 - any file over 2 MB;
-- adult or pornographic wording, unless the line states a prohibition.
+- adult, pornographic or sexual-solicitation wording, unless the line states a prohibition or carries a reviewed
+  `policy-guard: allow` marker (refusal tests only; never exempts secrets, media or migration rules);
+- a migration (from 20261118000000 on) that deletes or truncates data, drops tables/columns, disables triggers or RLS,
+  removes a no-adult protection or re-enables adult content; duplicate or badly named migrations.
 
-The guard has its own self-test (10 cases) that runs before every scan.
+The guard has its own self-test (52 cases) that runs before every scan. Audit results: `RENTMATE_POLICY_AUDIT.md`.
 
 ## Product rule: no adult content
 

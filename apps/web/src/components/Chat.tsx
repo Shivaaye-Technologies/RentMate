@@ -6,6 +6,7 @@ import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
 import { DemoBadge } from "./DemoBadge";
+import { POLICY_TEXT_BLOCKED } from "../safety";
 
 interface Message {
   id: string;
@@ -139,7 +140,13 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
               { id: localId, sender_id: me, body, created_at: new Date().toISOString(), failed: true },
             ],
       );
-      setError(/too fast/i.test(error.message) ? error.message : "Message not sent. Tap Retry to try again.");
+      setError(
+        /too fast/i.test(error.message)
+          ? error.message
+          : /RentMate does not allow/i.test(error.message)
+            ? POLICY_TEXT_BLOCKED
+            : "Message not sent. Tap Retry to try again.",
+      );
       return;
     }
     setMessages((list) =>

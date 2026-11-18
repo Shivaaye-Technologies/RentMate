@@ -40,3 +40,16 @@
 - App: the adult category is no longer offered; admin country settings show it as not supported.
 - `scripts/policy-check.mjs` (`npm run test:policy`) added to `npm run check` and CI: blocks secrets, `.env` files,
   media files, oversized files and adult wording.
+
+### Post-implementation policy audit
+
+- Report: `RENTMATE_POLICY_AUDIT.md` (compliance matrix, migration safety, moderation coverage, tests, guard, GitHub plan).
+- Migration `20261118100000_policy_hardening` (additive): screening of member-written text (profiles, chat, Super Like
+  notes, creator names/bios, stream titles); providers can't permit adult categories; report reasons
+  `sexual_content` and `sexual_solicitation` (live ones urgent).
+- New adversarial DB test `policy_audit.sql` (36 checks), incl. legacy records, owner/admin/creator/member bypass
+  attempts, evidence retention, suspension and appeals.
+- Guard rebuilt: no loopholes after "no"/"without", leetspeak, media by file signature, migration-safety and duplicate
+  rules, reviewed allow marker; self-test 52 cases.
+- Held destructive draft migration preserved as `docs/held-migrations/…HELD.sql.txt` (non-executable).
+- App: new report reasons; clear message when text is refused.

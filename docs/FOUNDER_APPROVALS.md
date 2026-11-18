@@ -22,6 +22,11 @@ here (date + decision + reference). Status date: 2026-11-18.
 | F-15 | HostyCare/cPanel credentials or a decision to stay on Render only                                             | Not audited                                    | Can't assess without access.                                                    |
 | F-16 | Production deploy of any RentMate change                                                                      | Not requested                                  | Always explicit.                                                                |
 | F-17 | Supabase Auth settings (Site URL, redirect URLs, custom SMTP, leaked-password protection) — carried over      | Pending                                        | Email links currently point to localhost; built-in sender is rate-limited.      |
+| F-18 | Automated image moderation for profile photos (vendor, cost, privacy review)                                  | Not built                                      | Photos are the one upload path with no content check.                           |
+| F-19 | Member suspension and appeals                                                                                 | Creators only                                  | Members who post prohibited content can only be blocked/reported today.         |
+| F-20 | Evidence retention after account deletion (chat, reporter/reported ids), with DPDP Act review                 | Reports kept, ids nulled, chat deleted         | Moderation and legal evidence can be lost.                                      |
+| F-21 | Restrict Supabase dashboard SQL access to the founder; constraint changes only via reviewed migrations        | Not documented                                 | The database owner can technically drop constraints.                            |
+| F-22 | Multilingual prohibited-term list (Hindi/Hinglish) owned by Trust & Safety                                    | English keywords only                          | Keyword screening misses other languages and coded wording.                     |
 
 ## Recorded decisions
 

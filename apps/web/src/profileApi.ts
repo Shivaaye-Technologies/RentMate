@@ -1,5 +1,6 @@
 import type { ProfileRow } from "./profile";
 import { supabase } from "./supabase";
+import { POLICY_TEXT_BLOCKED } from "./safety";
 
 /** True when the database doesn't have a column yet (migration not applied). */
 export function isMissingColumn(err: { code?: string; message?: string } | null | undefined): boolean {
@@ -16,6 +17,7 @@ export function saveErrorMessage(err: { code?: string; message?: string }): stri
   if (isMissingColumn(err)) {
     return "This part of your profile can't be saved yet because a database update is still pending. Your other details are safe.";
   }
+  if (/RentMate does not allow/i.test(err.message ?? "")) return POLICY_TEXT_BLOCKED;
   if (err.code === "23514")
     return "One of the values isn't allowed. Check the highlighted fields and try again.";
   if (/row-level security/i.test(err.message ?? "")) return "You can only change your own profile.";
