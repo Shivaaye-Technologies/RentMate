@@ -14,6 +14,7 @@ Migrations are additive. Rollback = a new forward migration, never editing appli
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `20261024090000_profile_details` (PR #9) | Drop added columns/tables listed in `docs/MIGRATION_20261024_PROFILE_DETAILS.md` (data in them is lost — back up first) |
 | `20261101090000_live_foundation`         | SQL below (drops live tables and functions; core dating tables are untouched)                                           |
+| `20261119090000_marketplace`             | SQL below (tested)                                                                                                      |
 | Future wallet/booking migrations         | Each ships with its own rollback SQL in its PR; ledgers are exported before any drop                                    |
 
 Restore from backup only if data was damaged: Supabase dashboard → Backups → restore (founder action; restores the
@@ -93,5 +94,72 @@ begin
 end $$;
 -- tables (reverse creation order)
 drop table if exists public.creator_appeals, public.creator_tickets, public.live_reports, public.private_sessions, public.creator_availability, public.performer_consents, public.live_streams, public.viewer_age_checks, public.creator_verifications, public.creators, public.creator_agreements, public.live_providers, public.country_policies, public.content_categories, public.live_settings, public.moderation_actions, private.user_roles cascade;
+commit;
+```
+
+## Marketplace rollback SQL
+
+Tested 2026-11-18 on a local PGlite copy of all migrations: the 16 marketplace tables, 36 functions and the two report
+columns were removed, and `rls_flow.sql` (53/53), `policy_audit.sql` (36/36) and `no_adult_content.sql` (16/16) still
+passed afterwards. Booking, review and conversation data is lost — export it first.
+
+```sql
+-- Marketplace rollback (founder approval + backup first). Removes everything 20261119090000_marketplace added
+-- and restores what it changed. Booking, review and message data is lost: export it before running.
+begin;
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname || '.' || p.proname in (
+      'private.booking_log',
+      'private.booking_price',
+      'private.check_service_category',
+      'private.check_timezone',
+      'private.companion_visible',
+      'private.conversation_message_written',
+      'private.conversation_peer',
+      'private.is_suspended',
+      'private.looks_like_address',
+      'private.notify',
+      'private.require_member',
+      'public.admin_decide_account_appeal',
+      'public.admin_lift_suspension',
+      'public.admin_list_account_appeals',
+      'public.admin_list_bookings',
+      'public.admin_list_companions',
+      'public.admin_list_reviews',
+      'public.admin_marketplace_stats',
+      'public.admin_resolve_dispute',
+      'public.admin_review_companion',
+      'public.admin_set_commission',
+      'public.admin_set_review_status',
+      'public.admin_suspend_account',
+      'public.appeal_suspension',
+      'public.booking_cancel',
+      'public.booking_complete',
+      'public.booking_dispute',
+      'public.booking_request',
+      'public.booking_respond',
+      'public.companion_earnings',
+      'public.companion_rating',
+      'public.companion_set_paused',
+      'public.companions_search',
+      'public.conversation_mark_read',
+      'public.conversation_open',
+      'public.review_create'
+    )
+  loop
+    execute 'drop function ' || r.sig || ' cascade';
+  end loop;
+end $$;
+alter table public.reports drop column if exists booking_id;
+alter table public.reports drop column if exists review_id;
+alter table public.reports drop constraint reports_reason_check;
+alter table public.reports add constraint reports_reason_check check (reason in (
+  'fake', 'inappropriate', 'harassment', 'underage', 'scam', 'other', 'sexual_content', 'sexual_solicitation'));
+drop table if exists public.transactions, public.subscription_plans, public.reviews, public.conversation_messages, public.conversations, public.notifications, public.booking_events, public.bookings, public.shortlists, public.companion_availability, public.companion_services, public.companion_profiles, public.account_appeals, public.account_suspensions, public.platform_settings, public.activity_categories cascade;
+-- private.reject_prohibited_text keeps working for the original tables (the extra table names are unused).
 commit;
 ```
