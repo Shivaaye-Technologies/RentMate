@@ -18,6 +18,11 @@ All results below were produced by commands run in this session. Nothing was run
 | aihub                                   | `npm run test:aihub`   | 32 passed, 0 failed                                                                                                               |
 | Browser smoke (Playwright)              | `npm run test:e2e`     | pass, 0 failures (title check updated to "RentMate — Meet. Connect. Experience.")                                                 |
 
+## Rollback rehearsal
+
+Live-foundation rollback SQL (`RENTMATE_ROLLBACK_PLAN.md`) run on PGlite after all migrations: live objects removed, core
+tables kept, `rls_flow.sql` 53/53 afterwards.
+
 ## Browser checks (local build + fake backend, fictional data)
 
 | Flow                                                                                  | Result                                                                 |
