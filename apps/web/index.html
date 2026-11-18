@@ -7,7 +7,15 @@
       name="description"
       content="RentMate — Meet. Connect. Experience. An 18+ platform for dating, friendship, social and live experiences."
     />
-    <meta name="theme-color" content="#0b0a09" />
+    <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0b" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Apply a saved Light/Dark choice before first paint (no flash).
+      try {
+        var t = localStorage.getItem("rm-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

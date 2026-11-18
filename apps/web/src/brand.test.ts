@@ -37,10 +37,22 @@ describe("RentMate brand", () => {
     expect(readFileSync(join(root, "public/favicon.svg"), "utf8")).toContain(">RM<");
   });
 
-  it("uses the dark champagne-gold design tokens", () => {
+  it("has light and dark themes and no gold", () => {
     const css = readFileSync(join(__dirname, "styles.css"), "utf8");
-    expect(css).toMatch(/--bg: #0b0a09/);
-    expect(css).toMatch(/--gold: #d4b26a/);
-    expect(css).toMatch(/color-scheme: dark/);
+    expect(css).toMatch(/:root \{[^}]*--bg: #f6f6f4[^}]*color-scheme: light;/);
+    expect(css).toMatch(
+      /@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{[^}]*--bg: #0b0b0b/,
+    );
+    expect(css).toMatch(/:root\[data-theme="dark"\] \{[^}]*--bg: #0b0b0b/);
+    expect(css).not.toMatch(/--gold|#d4b26a|champagne/i);
+    const pages = ["index.html", "public/privacy.html", "public/favicon.svg"].map((f) =>
+      readFileSync(join(root, f), "utf8"),
+    );
+    for (const page of pages) expect(page).not.toMatch(/#d4b26a|#e6c886|#a9873f/i);
+  });
+
+  it("offers a System / Light / Dark switch on the landing page", () => {
+    expect(landing).toMatch(/role="radiogroup" aria-label="Appearance"/);
+    for (const label of ["System", "Light", "Dark"]) expect(landing).toContain(`>${label}</button>`);
   });
 });

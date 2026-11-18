@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Monogram } from "./Monogram";
 import { BRAND } from "../brand";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   classifyAuthError,
   cooldownLeft,
@@ -157,10 +158,13 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
 
   const hero = (
     <div className="auth-hero">
-      <p className="brand on-dark">
-        <Monogram size={34} />
-        <span className="wordmark">{BRAND.name}</span>
-      </p>
+      <div className="auth-top">
+        <p className="brand on-dark">
+          <Monogram size={34} />
+          <span className="wordmark">{BRAND.name}</span>
+        </p>
+        <ThemeToggle />
+      </div>
       <p className="eyebrow">{BRAND.tagline}</p>
       <h1 className="display-xl">
         Real people. <em>Real experiences.</em>

@@ -15,6 +15,7 @@ import { Photo } from "./Photo";
 import { PhotoManager } from "./PhotoManager";
 import { ProfileEditor, SECTION_TITLES, type EditSection } from "./ProfileEditor";
 import { BlockedList, HelpSafety, NotificationSettings, PrivacySettings } from "./Settings";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type DashboardPage =
   EditSection | "photos" | "notifications" | "privacy" | "blocked" | "help" | "account";
@@ -248,6 +249,10 @@ export function ProfileDashboard({
           RentMate grows one real person at a time. Share the link; there is no tracking or referral code.
         </p>
         <InviteButton className="btn dark" />
+      </div>
+      <div className="panel appearance-panel">
+        <h2 className="display-sm">Appearance</h2>
+        <ThemeToggle />
       </div>
       <nav className="legal-links" aria-label="Legal">
         <a href="/privacy.html">Privacy Policy</a>

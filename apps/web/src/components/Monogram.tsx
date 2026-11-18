@@ -1,4 +1,4 @@
-/** The RentMate "RM" monogram: champagne-gold serif letters on a black tile. */
+/** The RentMate "RM" monogram: serif letters on an ink tile (inverts with the theme). */
 export function Monogram({ size = 28 }: { size?: number }) {
   return (
     <span

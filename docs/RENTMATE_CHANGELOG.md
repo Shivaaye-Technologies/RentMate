@@ -18,7 +18,15 @@
 ### Phase 1 — brand (`2abd05c`)
 
 - RentMate name, tagline "Meet. Connect. Experience.", RM monogram (component, favicon, headers).
-- Dark design system: black/charcoal, champagne gold, white type; Cormorant Garamond display font.
+- Design system: black/charcoal, champagne gold, white type (replaced the same day by light/dark monochrome, below).
 - Landing page: Online / Physical / Hybrid pillars with honest availability, 18+ and no-sexual-services rule.
 - Legal pages re-themed; API info name "RentMate API" (service id unchanged).
 - Tests: brand tests added; e2e title updated.
+
+### Theme change (founder request: no gold, light and dark)
+
+- Gold removed. Monochrome design system with a light theme (default) and a dark theme.
+- Follows the device setting; members can pick System / Light / Dark on the landing page and in Profile → Appearance.
+  The choice is saved on the device and applied before first paint (no flash); legal pages follow it too.
+- RM monogram and favicon invert with the theme.
+- Tests: light/dark token and no-gold checks, theme switch tests (incl. blocked storage); browser check of both themes.
