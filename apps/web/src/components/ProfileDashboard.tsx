@@ -229,6 +229,22 @@ export function ProfileDashboard({
         </nav>
       ))}
 
+      <a className="demo-entry" href="#companions">
+        <Icon name="star" size={18} />
+        <span>
+          <strong>Find a companion</strong>
+          <small>
+            Book verified companions for coffee, meals, events and city walks. Non-sexual, public places only.
+          </small>
+        </span>
+      </a>
+      <a className="demo-entry" href="#companion">
+        <Icon name="sparkle" size={18} />
+        <span>
+          <strong>Become a companion</strong>
+          <small>Offer friendly company for public activities, set your prices and availability.</small>
+        </span>
+      </a>
       <a className="demo-entry" href="#creator">
         <Icon name="star" size={18} />
         <span>

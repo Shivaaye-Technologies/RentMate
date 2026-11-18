@@ -20,9 +20,10 @@ describe("RentMate brand", () => {
   it("states the safety rules and does not offer unbuilt features as available", () => {
     expect(landing).toContain("No sexual services of any kind");
     expect(landing).toContain("18+ only");
-    // Physical and hybrid are shown as in development, never as bookable.
-    expect(landing.match(/In development/g)?.length).toBe(2);
-    expect(landing).not.toMatch(/Book now|Buy tokens|Withdraw/i);
+    // Physical companionship takes booking requests (no payments); hybrid is still in development.
+    expect(landing).toContain("Booking requests available");
+    expect(landing.match(/In development/g)?.length).toBe(1);
+    expect(landing).not.toMatch(/Buy tokens|Withdraw|Pay now/i);
   });
 
   it("leaves no old brand name in the shell, favicon or public pages", () => {

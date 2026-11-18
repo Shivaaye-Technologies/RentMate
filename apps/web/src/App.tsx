@@ -31,6 +31,9 @@ import { saveProfileFields, type ProfilePatch } from "./profileApi";
 import { DemoMode } from "./demoMode/DemoMode";
 import { CreatorStudio } from "./live/CreatorStudio";
 import { AdminConsole } from "./live/AdminConsole";
+import { Marketplace } from "./market/Marketplace";
+import { CompanionDashboard } from "./market/CompanionDashboard";
+import { MarketAdmin } from "./market/MarketAdmin";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
@@ -38,6 +41,19 @@ const isDemoHash = () => typeof window !== "undefined" && window.location.hash =
 const isCreatorHash = () => typeof window !== "undefined" && window.location.hash === "#creator";
 /** RentMate Live admin console (the database checks the admin/moderator role). */
 const isAdminHash = () => typeof window !== "undefined" && window.location.hash === "#admin";
+/** RentMate companionship marketplace: members, companions and moderators. */
+type MarketView = "companions" | "companion" | "market-admin" | null;
+const marketHash = (): MarketView => {
+  if (typeof window === "undefined") return null;
+  const h = window.location.hash;
+  return h === "#companions"
+    ? "companions"
+    : h === "#companion"
+      ? "companion"
+      : h === "#market-admin"
+        ? "market-admin"
+        : null;
+};
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -63,12 +79,14 @@ export function App() {
   const [linkProblem] = useState<AuthProblem | null>(startRedirect.problem);
   const [creator, setCreator] = useState(isCreatorHash);
   const [admin, setAdmin] = useState(isAdminHash);
+  const [market, setMarket] = useState<MarketView>(marketHash);
 
   useEffect(() => {
     const onHash = () => {
       setDemo(isDemoHash());
       setCreator(isCreatorHash());
       setAdmin(isAdminHash());
+      setMarket(marketHash());
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -119,6 +137,15 @@ export function App() {
   }
   if (recovery && session) return <NewPasswordScreen onDone={() => setRecovery(false)} />;
   if (!session) return <AuthScreen initialProblem={linkProblem} />;
+  if (market) {
+    const exit = () => {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      setMarket(null);
+    };
+    if (market === "companions") return <Marketplace me={session.user.id} onExit={exit} />;
+    if (market === "companion") return <CompanionDashboard me={session.user.id} onExit={exit} />;
+    return <MarketAdmin onExit={exit} />;
+  }
   if (admin) {
     return (
       <AdminConsole

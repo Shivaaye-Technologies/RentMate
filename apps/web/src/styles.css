@@ -3594,3 +3594,199 @@ textarea::placeholder {
   gap: 12px;
   flex-wrap: wrap;
 }
+
+/* ---------- RentMate companionship marketplace ---------- */
+.market .filters .filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.companion-grid {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.companion-card {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.companion-card:hover,
+.companion-card:focus-visible {
+  border-color: var(--line-strong);
+}
+
+.companion-photo {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.companion-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.companion-view {
+  display: grid;
+  gap: 12px;
+}
+
+.service-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.service-row:last-child {
+  border-bottom: 0;
+}
+
+.price-summary {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.price-summary strong {
+  font-size: 22px;
+}
+
+.booking-list {
+  display: grid;
+  gap: 10px;
+}
+
+.booking-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.booking-card p {
+  margin: 0;
+}
+
+.pill.status-requested,
+.pill.status-pending {
+  background: var(--info-bg);
+  color: var(--info-ink);
+}
+
+.pill.status-accepted,
+.pill.status-completed {
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.pill.status-rejected,
+.pill.status-cancelled,
+.pill.status-disputed {
+  background: var(--err-bg);
+  color: var(--danger);
+}
+
+.thread-list {
+  display: grid;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.thread-list li {
+  display: grid;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.thread-list li.mine {
+  justify-self: end;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.thread-list li.mine .muted {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat-grid > div {
+  display: grid;
+  gap: 2px;
+}
+
+.stat-grid strong {
+  font-size: 22px;
+}
+
+li.unread {
+  font-weight: 600;
+}
+
+.conv-list .menu-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+/* Marketplace lists stack their content (the generic .plain-list li is a single row). */
+.market .plain-list li {
+  display: block;
+}
+
+.market .plain-list li.service-row,
+.market .plain-list li.row {
+  display: flex;
+}
+
+.market .booking-list > li.booking-card {
+  display: grid;
+  padding: 14px;
+  border: 1px solid var(--line);
+}
+
+.market-top {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.market-top .brand {
+  flex: 1 1 auto;
+  min-width: 0;
+}

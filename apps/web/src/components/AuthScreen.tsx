@@ -187,8 +187,10 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
         </li>
         <li>
           <strong>Physical</strong>
-          <span>Public meetups and non-sexual social companionship</span>
-          <small className="pill-status soon">In development</small>
+          <span>
+            Verified companions for coffee, meals, events and city walks (non-sexual, public places)
+          </span>
+          <small className="pill-status ready">Booking requests available</small>
         </li>
         <li>
           <strong>Hybrid</strong>
