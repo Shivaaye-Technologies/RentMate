@@ -5,11 +5,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { DEFAULTS } from "./demo/generate-demo-profiles.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
-const db = new PGlite();
+// btree_gist backs the booking overlap constraint (installed on Supabase by the marketplace migration).
+const db = new PGlite({ extensions: { btree_gist } });
 let failed = false;
 
 await db.exec(read("supabase/tests/supabase_stubs.sql"));
@@ -38,6 +40,7 @@ for (const test of [
   "live_foundation.sql",
   "no_adult_content.sql",
   "policy_audit.sql",
+  "marketplace.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
