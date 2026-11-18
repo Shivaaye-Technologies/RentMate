@@ -1,0 +1,133 @@
+-- ============================================================================
+-- HELD FOR REVIEW — NOT A MIGRATION — DO NOT APPLY
+-- Original name: supabase/migrations/20261118120000_no_adult_content.sql
+-- sha256 of the original file: 73d6295c33aa55d6b17197dac5d2eb1f08ffcc18580b6abca773d54b7d9c7107
+-- Written 2026-11-18 17:57 IST by this Claude session in an abandoned attempt at the
+-- no-adult-content change, superseded by 20261118090000_no_adult_content.sql and
+-- 20261118100000_policy_hardening.sql. It is DESTRUCTIVE: it deletes the adult category
+-- row and rewrites creators.categories and live_providers.permitted_categories, which
+-- conflicts with the founder instruction not to remove content. Kept only as a record.
+-- The .txt extension keeps it out of Supabase migration tooling; the repository guard
+-- also fails if any file is added under supabase/migrations that deletes content.
+-- ============================================================================
+
+-- RentMate does not support adult or pornographic content of any kind (founder decision 2026-11-18).
+--
+-- This removes every explicit content category and makes it impossible to switch adult content on again,
+-- in any country, from the app, the API or the admin console. Changing this would need a new migration.
+--
+-- Safe to run on a database with live data: if anything still references an explicit category
+-- (a stream or a private session), the migration stops so a person can review it instead of
+-- silently rewriting that history.
+
+do $$
+begin
+  if exists (
+    select 1 from public.live_streams s join public.content_categories c on c.key = s.category where c.explicit
+  ) or exists (
+    select 1 from public.private_sessions p join public.content_categories c on c.key = p.category where c.explicit
+  ) then
+    raise exception 'Streams or sessions use an explicit category. End and review them before removing adult content.';
+  end if;
+end $$;
+
+-- 1. Remove explicit categories from applications and provider permissions, then delete them.
+update public.creators
+set categories = array(select k from unnest(categories) as k
+                       where k not in (select key from public.content_categories where explicit))
+where categories && (select coalesce(array_agg(key), '{}') from public.content_categories where explicit);
+
+update public.live_providers
+set permitted_categories = array(select k from unnest(permitted_categories) as k
+                                 where k not in (select key from public.content_categories where explicit))
+where permitted_categories && (select coalesce(array_agg(key), '{}') from public.content_categories where explicit);
+
+delete from public.content_categories where explicit;
+
+-- 2. No category can ever be explicit again.
+alter table public.content_categories
+  add constraint no_adult_categories check (not explicit);
+
+-- 3. No country can ever allow adult content.
+update public.country_policies
+set explicit_allowed = false, legal_clearance_ref = null, cleared_by = null, cleared_at = null,
+    notes = 'Adult content is not allowed on RentMate.', updated_at = now()
+where explicit_allowed or country_code = 'IN';
+
+alter table public.country_policies
+  add constraint no_adult_content check (not explicit_allowed);
+
+-- 4. Creators and providers can only list categories that exist (so "adult" can't be smuggled back in).
+create function private.categories_known(p_categories text[])
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select not exists (
+    select 1 from unnest(p_categories) as k
+    where k not in (select c.key from public.content_categories c)
+  );
+$$;
+revoke execute on function private.categories_known(text[]) from public;
+
+create function private.check_creator_categories()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.categories_known(new.categories) then
+    raise exception 'Unknown content category. Adult content is not allowed on RentMate.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function private.check_creator_categories() from public;
+create trigger creators_categories_known before insert or update of categories on public.creators
+  for each row execute function private.check_creator_categories();
+
+create function private.check_provider_categories()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.categories_known(new.permitted_categories) then
+    raise exception 'Unknown content category. Adult content is not allowed on RentMate.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function private.check_provider_categories() from public;
+create trigger live_providers_categories_known before insert or update of permitted_categories on public.live_providers
+  for each row execute function private.check_provider_categories();
+
+-- 5. Members can report sexual content in live streams and sessions; such reports are urgent.
+alter table public.live_reports drop constraint live_reports_reason_check;
+alter table public.live_reports add constraint live_reports_reason_check check (reason in (
+  'minor', 'non_consensual', 'trafficking_or_coercion', 'leaked_or_stolen', 'violence', 'sexual_content',
+  'harassment', 'hate', 'spam_or_scam', 'illegal_in_my_country', 'other'
+));
+
+create or replace function private.live_report_priority()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.priority := case when new.reason in ('minor', 'non_consensual', 'trafficking_or_coercion', 'leaked_or_stolen',
+                                            'violence', 'sexual_content')
+                       then 'urgent' else 'normal' end;
+  new.status := 'open';
+  new.handled_by := null;
+  new.handled_at := null;
+  if (select count(*) from public.live_reports r
+      where r.reporter_id = new.reporter_id and r.created_at > now() - interval '1 day') >= 20 then
+    raise exception 'Daily report limit reached.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;

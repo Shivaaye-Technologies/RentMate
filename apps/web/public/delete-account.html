@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Delete your account · RentMate</title>
+    <script>
+      try {
+        var t = localStorage.getItem("rm-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <meta name="description" content="Delete your account for RentMate." />
+    <style>
+      :root {
+        --cream: #f6f6f4;
+        --ink: #121212;
+        --muted: #5c5c58;
+        --line: #e2e2de;
+        --surface: #ffffff;
+        --head: #ffffff;
+        --link: #121212;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --cream: #0b0b0b;
+          --ink: #f4f4f4;
+          --muted: #a3a3a3;
+          --line: #2b2b2b;
+          --surface: #161616;
+          --head: #161616;
+          --link: #f4f4f4;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --cream: #0b0b0b;
+        --ink: #f4f4f4;
+        --muted: #a3a3a3;
+        --line: #2b2b2b;
+        --surface: #161616;
+        --head: #161616;
+        --link: #f4f4f4;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--cream);
+        color: var(--ink);
+        font:
+          16px/1.6 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      header {
+        background: var(--head);
+        border-bottom: 1px solid var(--line);
+        color: var(--ink);
+        padding: 20px 16px;
+      }
+      header a {
+        color: var(--ink);
+        text-decoration: none;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        font-size: 14px;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      h1 {
+        font:
+          800 34px/1.1 Georgia,
+          "Times New Roman",
+          serif;
+        margin: 8px 0 4px;
+      }
+      h2 {
+        font:
+          700 21px/1.2 Georgia,
+          "Times New Roman",
+          serif;
+        margin: 28px 0 8px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .box {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px;
+        margin: 16px 0;
+      }
+      a {
+        color: var(--link);
+      }
+      nav.foot {
+        margin-top: 40px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header><a href="/">RM · RentMate</a></header>
+    <main>
+      <h1>Delete your account</h1>
+      <p class="muted">Last updated 23 October 2026</p>
+
+      <h2>Delete in the app</h2>
+      <ol>
+        <li>Open <a href="/">RentMate</a> and sign in.</li>
+        <li>Tap your photo in the top-right corner to open <strong>Profile</strong>.</li>
+        <li>Scroll down and tap <strong>Delete my account</strong>.</li>
+        <li>Type <strong>DELETE</strong> and confirm.</li>
+      </ol>
+
+      <h2>What is deleted</h2>
+      <p>
+        Immediately and permanently: your account, profile, photo, location, likes, passes, Super Likes,
+        matches, messages and blocks. Reports you made or that were made about you are kept without the link
+        to your account so we can act on safety issues. Copies may remain in our providers' backups for a
+        limited time.
+      </p>
+
+      <h2>Can't sign in?</h2>
+      <p>
+        Questions or requests about your data: use <strong>Report</strong> in the app, or delete your account
+        yourself (see below). A support email address will be listed here before public launch.
+      </p>
+
+      <nav class="foot" aria-label="Legal">
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms of Use</a>
+        <a href="/safety.html">Dating safety tips</a>
+        <a href="/delete-account.html">Delete your account</a>
+        <a href="/">Back to the app</a>
+      </nav>
+    </main>
+  </body>
+</html>
