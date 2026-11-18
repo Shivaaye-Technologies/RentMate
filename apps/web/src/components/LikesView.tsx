@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { personFromRow, type Person } from "../api";
+import { loadMatches, type MatchSummary } from "../inbox";
 import type { PersonRow } from "../profile";
 import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
@@ -11,6 +12,13 @@ export interface ReceivedLike {
   isSuper: boolean;
   message: string | null;
   at: string;
+}
+
+async function peopleByIds(ids: string[]): Promise<Map<string, PersonRow>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase.rpc("profiles_by_ids", { p_ids: ids });
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as PersonRow[]).map((r) => [r.id, r]));
 }
 
 /**
@@ -35,14 +43,7 @@ export async function loadReceivedLikes(me: string): Promise<ReceivedLike[]> {
     ...(passed.data ?? []).map((p) => p.passed_id as string),
   ]);
   const pending = (received.data ?? []).filter((l) => !answered.has(l.liker_id as string));
-  if (pending.length === 0) return [];
-
-  const { data: rows, error } = await supabase.rpc("profiles_by_ids", {
-    p_ids: pending.map((l) => l.liker_id as string),
-  });
-  if (error) throw new Error(error.message);
-  const byId = new Map(((rows ?? []) as PersonRow[]).map((r) => [r.id, r]));
-
+  const byId = await peopleByIds(pending.map((l) => l.liker_id as string));
   return pending.flatMap((l) => {
     const row = byId.get(l.liker_id as string);
     if (!row) return [];
@@ -57,71 +58,217 @@ export async function loadReceivedLikes(me: string): Promise<ReceivedLike[]> {
   });
 }
 
+export interface SentLike {
+  person: Person;
+  isSuper: boolean;
+  at: string;
+}
+
+/** People you liked who haven't liked you back yet (no match). */
+export async function loadSentLikes(me: string): Promise<SentLike[]> {
+  const [mine, back] = await Promise.all([
+    supabase
+      .from("likes")
+      .select("liked_id, is_super, created_at")
+      .eq("liker_id", me)
+      .order("created_at", { ascending: false }),
+    supabase.from("likes").select("liker_id").eq("liked_id", me),
+  ]);
+  const failed = mine.error ?? back.error;
+  if (failed) throw new Error(failed.message);
+  const likedMe = new Set((back.data ?? []).map((l) => l.liker_id as string));
+  const waiting = (mine.data ?? []).filter((l) => !likedMe.has(l.liked_id as string));
+  const byId = await peopleByIds(waiting.map((l) => l.liked_id as string));
+  return waiting.flatMap((l) => {
+    const row = byId.get(l.liked_id as string);
+    return row
+      ? [{ person: personFromRow(row), isSuper: Boolean(l.is_super), at: l.created_at as string }]
+      : [];
+  });
+}
+
+type Tab = "received" | "sent" | "matches";
+
+function Tile({
+  person,
+  onClick,
+  tag,
+  msg,
+  super: isSuper,
+}: {
+  person: Person;
+  onClick: () => void;
+  tag?: string;
+  msg?: string | null;
+  super?: boolean;
+}) {
+  return (
+    <button className={isSuper ? "tile super" : "tile"} onClick={onClick}>
+      <Photo id={person.id} name={person.displayName} path={person.photoPath} textSize={44} />
+      {tag && (
+        <span className={isSuper ? "pill gold tile-tag" : "pill white tile-tag"}>
+          {isSuper && <Icon name="star" size={12} />} {tag}
+        </span>
+      )}
+      <span className="tile-name">
+        {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={15} />}{" "}
+        <DemoBadge id={person.id} />
+      </span>
+      {msg && <span className="tile-msg">“{msg}”</span>}
+    </button>
+  );
+}
+
 export function LikesView({
   me,
   refreshKey,
   onOpen,
+  onOpenMatch,
   onCount,
 }: {
   me: string;
   refreshKey: number;
-  onOpen: (like: ReceivedLike) => void;
+  /** Open a profile; `actions` = can like/pass from the sheet. */
+  onOpen: (person: Person, actions: boolean) => void;
+  onOpenMatch: (m: MatchSummary) => void;
   onCount: (n: number) => void;
 }) {
-  const [likes, setLikes] = useState<ReceivedLike[] | null>(null);
+  const [tab, setTab] = useState<Tab>("received");
+  const [received, setReceived] = useState<ReceivedLike[] | null>(null);
+  const [sent, setSent] = useState<SentLike[] | null>(null);
+  const [matches, setMatches] = useState<MatchSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [r, s, m] = await Promise.all([loadReceivedLikes(me), loadSentLikes(me), loadMatches(me)]);
+      setReceived(r);
+      setSent(s);
+      setMatches(m);
+      onCount(r.length);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load likes.");
+    } finally {
+      setLoading(false);
+    }
+  }, [me, onCount]);
 
   useEffect(() => {
-    let cancelled = false;
-    loadReceivedLikes(me)
-      .then((l) => {
-        if (cancelled) return;
-        setLikes(l);
-        onCount(l.length);
-      })
-      .catch((e: Error) => !cancelled && setError(e.message));
-    return () => {
-      cancelled = true;
-    };
-  }, [me, refreshKey, onCount]);
+    void load();
+  }, [load, refreshKey]);
 
-  if (error) return <p className="alert error">{error}</p>;
-  if (!likes) {
-    return (
-      <div className="empty">
-        <div className="spinner" aria-hidden="true" />
-      </div>
-    );
-  }
+  const tabs: { key: Tab; label: string; count: number | null }[] = [
+    { key: "received", label: "Liked you", count: received?.length ?? null },
+    { key: "sent", label: "You liked", count: sent?.length ?? null },
+    { key: "matches", label: "Matches", count: matches?.length ?? null },
+  ];
+
+  const empty = (text: string) => (
+    <div className="empty small">
+      <Icon name="heart" size={40} />
+      <p className="muted">{text}</p>
+    </div>
+  );
 
   return (
     <section>
-      <h2 className="display-md page-title">Likes</h2>
-      <p className="muted">People who liked you. Like them back to match.</p>
-      {likes.length === 0 ? (
+      <div className="page-head between">
+        <h2 className="display-md page-title">Likes</h2>
+        <button className="btn small" disabled={loading} onClick={() => void load()}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+      <div className="segmented" role="tablist" aria-label="Likes">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={tab === t.key ? "active" : ""}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            {t.count ? ` (${t.count})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {error && (
         <div className="empty small">
-          <Icon name="heart" size={40} />
-          <p className="muted">No new likes yet. A great photo and bio help you get noticed.</p>
-        </div>
-      ) : (
-        <div className="grid">
-          {likes.map((l) => (
-            <button key={l.person.id} className={l.isSuper ? "tile super" : "tile"} onClick={() => onOpen(l)}>
-              <Photo id={l.person.id} name={l.person.displayName} path={l.person.photoPath} textSize={44} />
-              {l.isSuper && (
-                <span className="pill gold tile-tag">
-                  <Icon name="star" size={12} /> Super Like
-                </span>
-              )}
-              <span className="tile-name">
-                {l.person.displayName}, {l.person.age} {l.person.verified && <VerifiedBadge size={15} />}{" "}
-                <DemoBadge id={l.person.id} />
-              </span>
-              {l.message && <span className="tile-msg">“{l.message}”</span>}
-            </button>
-          ))}
+          <p className="alert error" role="alert">
+            {error}
+          </p>
+          <button className="btn dark" onClick={() => void load()}>
+            Try again
+          </button>
         </div>
       )}
+      {!error && !received && (
+        <div className="empty">
+          <div className="spinner" aria-hidden="true" />
+        </div>
+      )}
+
+      {!error &&
+        received &&
+        tab === "received" &&
+        (received.length === 0 ? (
+          empty("No new likes yet. A great photo, a prompt and your city help you get noticed.")
+        ) : (
+          <>
+            <p className="muted">Like them back to match.</p>
+            <div className="grid">
+              {received.map((l) => (
+                <Tile
+                  key={l.person.id}
+                  person={l.person}
+                  super={l.isSuper}
+                  tag={l.isSuper ? "Super Like" : undefined}
+                  msg={l.message}
+                  onClick={() => onOpen(l.person, true)}
+                />
+              ))}
+            </div>
+          </>
+        ))}
+
+      {!error &&
+        sent &&
+        tab === "sent" &&
+        (sent.length === 0 ? (
+          empty("You haven't liked anyone who hasn't replied yet.")
+        ) : (
+          <>
+            <p className="muted">Waiting for them to like you back. When they do, it's a Match.</p>
+            <div className="grid">
+              {sent.map((l) => (
+                <Tile
+                  key={l.person.id}
+                  person={l.person}
+                  super={l.isSuper}
+                  tag={l.isSuper ? "Super Like" : "Pending"}
+                  onClick={() => onOpen(l.person, false)}
+                />
+              ))}
+            </div>
+          </>
+        ))}
+
+      {!error &&
+        matches &&
+        tab === "matches" &&
+        (matches.length === 0 ? (
+          empty("No matches yet. When you both like each other, they appear here.")
+        ) : (
+          <div className="grid">
+            {matches.map((m) => (
+              <Tile key={m.matchId} person={m.person} tag="Match" onClick={() => onOpenMatch(m)} />
+            ))}
+          </div>
+        ))}
     </section>
   );
 }

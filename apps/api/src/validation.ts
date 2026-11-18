@@ -5,7 +5,7 @@ export const ProfileInput = z
     displayName: z.string().trim().min(2).max(40),
     age: z.number().int().min(18, "Users must be 18 or older").max(100),
     bio: z.string().trim().max(500).default(""),
-    interests: z.array(z.string().trim().min(1).max(30)).max(15).default([]),
+    interests: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
     lookingFor: z.enum(["relationship", "friendship", "casual"]),
     ageMin: z.number().int().min(18).max(100),
     ageMax: z.number().int().min(18).max(100),

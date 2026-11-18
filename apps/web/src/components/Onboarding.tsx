@@ -1,43 +1,118 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { personFromOwnRow } from "../api";
 import {
-  BIO_PROMPTS,
-  draftFromRow,
-  LOOKING_FOR_LABELS,
-  STEP_FIELDS,
-  stepErrors,
-  validateProfile,
-  type DraftErrors,
-  type LookingFor,
-  type ProfileDraft,
-  type ProfileRow,
-} from "../profile";
+  CHILDREN_LABELS,
+  EDUCATION_LABELS,
+  EXERCISE_LABELS,
+  GENDER_LABELS,
+  SMOKING_LABELS,
+  validateDetails,
+  type DetailErrors,
+} from "../details";
+import { stepErrors, validateProfile, type DraftErrors, type ProfileRow } from "../profile";
+import { isMissingColumn, saveErrorMessage, type ProfilePatch } from "../profileApi";
 import { supabase } from "../supabase";
-import { InterestPicker } from "./InterestPicker";
-import { ProfileExtras } from "./ProfileExtras";
+import { ChoiceChips, HeightField } from "./Editors";
+import { PersonDetails } from "./PersonDetails";
+import { PhotoManager } from "./PhotoManager";
+import { ProfileCardPreview } from "./ProfileCardPreview";
+import { editorStateFrom, SectionFields, type EditorState } from "./ProfileEditor";
+import { NotificationSettings, PrivacySettings } from "./Settings";
 
-const STEPS = ["basics", "goals", "interests", "about", "photo"] as const;
-type Step = (typeof STEPS)[number];
+export const STEPS = [
+  "basics",
+  "identity",
+  "goals",
+  "work",
+  "lifestyle",
+  "interests",
+  "about",
+  "places",
+  "photos",
+  "privacy",
+  "notifications",
+  "preview",
+] as const;
+export type Step = (typeof STEPS)[number];
+
+/** The profile is saved after this step; later steps change the saved profile directly. */
+const SAVE_AFTER: Step = "places";
+const OPTIONAL: Step[] = [
+  "identity",
+  "work",
+  "lifestyle",
+  "interests",
+  "about",
+  "places",
+  "photos",
+  "privacy",
+  "notifications",
+];
 
 const TITLES: Record<Step, { title: string; subtitle: string }> = {
   basics: { title: "Let's start with you", subtitle: "Your first name and age appear on your profile." },
+  identity: {
+    title: "A little about you",
+    subtitle: "Both are optional. Share only what you're comfortable with.",
+  },
   goals: {
     title: "What are you looking for?",
     subtitle: "We only show you people whose ages fit both ways.",
   },
-  interests: { title: "What do you love?", subtitle: "Shared interests decide who you see first." },
+  work: { title: "Work and education", subtitle: "Optional. Shown on your profile if you add them." },
+  lifestyle: { title: "Your lifestyle", subtitle: "Optional. Helps people find things in common." },
+  interests: { title: "What do you love?", subtitle: "Shared interests decide who you see first. Up to 10." },
   about: {
     title: "Say a little about yourself",
-    subtitle: "A couple of sentences gives people something to reply to.",
+    subtitle: "A short bio and a prompt or two give people something to reply to.",
   },
-  photo: {
-    title: "Add a photo and distance",
-    subtitle: "Both are optional, and you can change them any time.",
+  places: {
+    title: "Where do you hang out?",
+    subtitle: "Your city is shown on your profile. Your exact location never is.",
   },
+  photos: { title: "Add your photos", subtitle: "Optional, but profiles with photos get far more likes." },
+  privacy: {
+    title: "Distance and privacy",
+    subtitle: "Optional. You can change this any time in your profile.",
+  },
+  notifications: { title: "Stay in the loop", subtitle: "Choose what you'd like to hear about." },
+  preview: { title: "Here's your profile", subtitle: "This is how other members will see you." },
 };
 
+interface Saved {
+  step: Step;
+  state: EditorState;
+}
+
+const draftKey = (userId: string) => `soulmate-onboarding-${userId}`;
+
+function loadDraft(userId: string): Saved | null {
+  try {
+    const raw = localStorage.getItem(draftKey(userId));
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Saved;
+    return STEPS.includes(d.step) && STEPS.indexOf(d.step) <= STEPS.indexOf(SAVE_AFTER) && d.state?.core
+      ? d
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeDraft(userId: string, d: Saved | null) {
+  try {
+    if (d) localStorage.setItem(draftKey(userId), JSON.stringify(d));
+    else localStorage.removeItem(draftKey(userId));
+  } catch {
+    // Without storage the draft only lasts for this visit.
+  }
+}
+
 /**
- * Step-by-step profile setup for new members. Uses the same validation as the
- * profile form (18+ included) and saves once, before the optional photo step.
+ * Step-by-step profile setup for new members. Progress is kept on this device
+ * between visits, optional steps can be skipped, and the 18+ rule uses the
+ * same validation as the database. The profile is saved once, after the
+ * places step; photos, privacy and notifications then save as you go.
  */
 export function Onboarding({
   userId,
@@ -48,63 +123,145 @@ export function Onboarding({
   onDone: (profile: ProfileRow) => void;
   onSignOut: () => void;
 }) {
-  const [step, setStep] = useState<Step>("basics");
-  const [draft, setDraft] = useState<ProfileDraft>(() => draftFromRow(null));
-  const [errors, setErrors] = useState<DraftErrors>({});
+  const [initial] = useState(() => loadDraft(userId));
+  const [step, setStep] = useState<Step>(initial?.step ?? "basics");
+  const [state, setState] = useState<EditorState>(initial?.state ?? editorStateFrom(null));
+  const [errors, setErrors] = useState<{ core: DraftErrors; details: DetailErrors }>({
+    core: {},
+    details: {},
+  });
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<ProfileRow | null>(null);
   const index = STEPS.indexOf(step);
+  const beforeSave = index <= STEPS.indexOf(SAVE_AFTER);
 
-  const set = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) =>
-    setDraft((d) => ({ ...d, [key]: value }));
+  useEffect(() => {
+    if (!saved) storeDraft(userId, { step, state });
+  }, [userId, step, state, saved]);
+
+  const setDetail = <K extends keyof EditorState["details"]>(k: K, v: EditorState["details"][K]) =>
+    setState((s) => ({ ...s, details: { ...s.details, [k]: v } }));
+
+  function checkStep(): boolean {
+    const core: DraftErrors =
+      step === "basics"
+        ? stepErrors(state.core, ["displayName", "age"])
+        : step === "goals"
+          ? stepErrors(state.core, ["lookingFor", "ageMin", "ageMax"])
+          : step === "interests"
+            ? stepErrors(state.core, ["interests"])
+            : step === "about"
+              ? stepErrors(state.core, ["bio"])
+              : {};
+    const det = validateDetails(state.details);
+    const details: DetailErrors = det.ok ? {} : det.errors;
+    const relevant: Record<Step, (keyof DetailErrors)[]> = {
+      basics: [],
+      identity: ["gender", "height_cm"],
+      goals: ["show_me"],
+      work: ["job", "education"],
+      lifestyle: ["exercise", "smoking", "children"],
+      interests: [],
+      about: ["prompts"],
+      places: ["city", "neighbourhoods", "favourite_places"],
+      photos: [],
+      privacy: [],
+      notifications: [],
+      preview: [],
+    };
+    const detailErrs: DetailErrors = {};
+    for (const k of relevant[step]) if (details[k]) detailErrs[k] = details[k] as string;
+    setErrors({ core, details: detailErrs });
+    return Object.keys(core).length === 0 && Object.keys(detailErrs).length === 0;
+  }
+
+  async function save(): Promise<boolean> {
+    const core = validateProfile(state.core);
+    const det = validateDetails(state.details);
+    if (!core.ok) {
+      setErrors({ core: core.errors, details: {} });
+      setSaveError("Please check your name, age and age range.");
+      setStep("basics");
+      return false;
+    }
+    if (!det.ok) {
+      setErrors({ core: {}, details: det.errors });
+      return false;
+    }
+    setBusy(true);
+    const row = { id: userId, ...core.row, ...det.row };
+    let { error } = await supabase.from("profiles").upsert(row);
+    let partial = false;
+    if (error && isMissingColumn(error)) {
+      // The details columns aren't in the database yet: save the essentials so you can start.
+      ({ error } = await supabase.from("profiles").upsert({ id: userId, ...core.row }));
+      partial = true;
+    }
+    setBusy(false);
+    if (error) {
+      setSaveError(saveErrorMessage(error));
+      return false;
+    }
+    if (partial) {
+      setNotice(
+        "Your profile is saved. Some details (like city and prompts) will be added once an update is finished.",
+      );
+    }
+    setSaved({
+      ...(partial ? { id: userId, ...core.row } : row),
+      photo_path: null,
+      lat: null,
+      lng: null,
+      verified: false,
+    } as ProfileRow);
+    storeDraft(userId, null);
+    return true;
+  }
 
   async function next() {
     setSaveError(null);
-    if (step !== "photo") {
-      const errs = stepErrors(draft, STEP_FIELDS[step]);
-      setErrors(errs);
-      if (Object.keys(errs).length > 0) return;
-    }
-    if (step === "about") {
-      const result = validateProfile(draft);
-      if (!result.ok) {
-        setErrors(result.errors);
-        return;
-      }
-      setBusy(true);
-      const row = { id: userId, ...result.row };
-      const { error } = await supabase.from("profiles").upsert(row);
-      setBusy(false);
-      if (error) {
-        setSaveError(`Could not save your profile: ${error.message}`);
-        return;
-      }
-      setSaved({ ...row, photo_path: null, lat: null, lng: null, verified: false });
-    }
-    if (step === "photo" && saved) {
+    if (busy) return;
+    if (beforeSave && !checkStep()) return;
+    if (step === SAVE_AFTER && !saved && !(await save())) return;
+    if (step === "preview" && saved) {
       onDone(saved);
       return;
     }
-    setStep(STEPS[index + 1]);
+    setStep(STEPS[Math.min(index + 1, STEPS.length - 1)]);
   }
 
   const back = () => {
-    setErrors({});
+    setErrors({ core: {}, details: {} });
+    setSaveError(null);
     setStep(STEPS[Math.max(0, index - 1)]);
   };
 
+  const patchSaved = (patch: ProfilePatch) => setSaved((s) => (s ? ({ ...s, ...patch } as ProfileRow) : s));
   const { title, subtitle } = TITLES[step];
+  const skippable = OPTIONAL.includes(step);
+  const fields = { state, onChange: setState, coreErrors: errors.core, detailErrors: errors.details };
+  // Steps after saving can't go back into the pre-save form (it is already saved).
+  const canGoBack = index > 0 && (beforeSave || index > STEPS.indexOf(SAVE_AFTER) + 1);
 
   return (
     <main className="shell onboarding">
-      <div className="steps" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
+      <div
+        className="steps"
+        role="progressbar"
+        aria-label="Profile setup progress"
+        aria-valuemin={1}
+        aria-valuemax={STEPS.length}
+        aria-valuenow={index + 1}
+      >
         {STEPS.map((s, i) => (
           <span key={s} className={i <= index ? "step on" : "step"} />
         ))}
       </div>
       <p className="muted small center">
         Step {index + 1} of {STEPS.length}
+        {skippable ? " · optional" : ""}
       </p>
 
       <form
@@ -118,112 +275,93 @@ export function Onboarding({
         <h2 className="display-sm">{title}</h2>
         <p className="muted">{subtitle}</p>
 
-        {step === "basics" && (
+        {step === "basics" && <SectionFields section="about" {...fields} part="basics" />}
+
+        {step === "identity" && (
+          <>
+            <ChoiceChips
+              label="Gender"
+              options={GENDER_LABELS}
+              value={state.details.gender}
+              onChange={(v) => setDetail("gender", v)}
+            />
+            <HeightField value={state.details.height_cm} onChange={(v) => setDetail("height_cm", v)} />
+          </>
+        )}
+
+        {step === "goals" && <SectionFields section="preferences" {...fields} />}
+
+        {step === "work" && (
           <>
             <label className="field">
-              <span>First name</span>
+              <span>
+                Work <small className="muted">· optional</small>
+              </span>
               <input
-                value={draft.displayName}
-                maxLength={40}
-                autoComplete="given-name"
-                autoFocus
-                onChange={(e) => set("displayName", e.target.value)}
+                maxLength={60}
+                placeholder="Job title or field"
+                value={state.details.job ?? ""}
+                onChange={(e) => setDetail("job", e.target.value || null)}
               />
-              {errors.displayName && <small className="err">{errors.displayName}</small>}
             </label>
-            <label className="field">
-              <span>Age</span>
-              <input inputMode="numeric" value={draft.age} onChange={(e) => set("age", e.target.value)} />
-              {errors.age && <small className="err">{errors.age}</small>}
-            </label>
-            <p className="fine">You must be 18 or older to use SOULMATE.AI.</p>
+            <ChoiceChips
+              label="Education"
+              options={EDUCATION_LABELS}
+              value={state.details.education}
+              onChange={(v) => setDetail("education", v)}
+            />
           </>
         )}
 
-        {step === "goals" && (
+        {step === "lifestyle" && (
           <>
-            <div className="choice-list" role="radiogroup" aria-label="I'm here for">
-              {(Object.entries(LOOKING_FOR_LABELS) as [LookingFor, string][]).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.lookingFor === value}
-                  className={draft.lookingFor === value ? "choice on" : "choice"}
-                  onClick={() => set("lookingFor", value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <fieldset className="field">
-              <span>Show me people aged</span>
-              <div className="row">
-                <label className="field">
-                  <input
-                    aria-label="Minimum age"
-                    inputMode="numeric"
-                    value={draft.ageMin}
-                    onChange={(e) => set("ageMin", e.target.value)}
-                  />
-                  {errors.ageMin && <small className="err">{errors.ageMin}</small>}
-                </label>
-                <span className="to">to</span>
-                <label className="field">
-                  <input
-                    aria-label="Maximum age"
-                    inputMode="numeric"
-                    value={draft.ageMax}
-                    onChange={(e) => set("ageMax", e.target.value)}
-                  />
-                  {errors.ageMax && <small className="err">{errors.ageMax}</small>}
-                </label>
-              </div>
-            </fieldset>
+            <ChoiceChips
+              label="Exercise"
+              options={EXERCISE_LABELS}
+              value={state.details.exercise}
+              onChange={(v) => setDetail("exercise", v)}
+            />
+            <ChoiceChips
+              label="Smoking"
+              options={SMOKING_LABELS}
+              value={state.details.smoking}
+              onChange={(v) => setDetail("smoking", v)}
+            />
+            <ChoiceChips
+              label="Children"
+              options={CHILDREN_LABELS}
+              value={state.details.children}
+              onChange={(v) => setDetail("children", v)}
+            />
           </>
         )}
 
-        {step === "interests" && (
-          <InterestPicker
-            value={draft.interests}
-            onChange={(v) => set("interests", v)}
-            error={errors.interests}
-          />
-        )}
+        {step === "interests" && <SectionFields section="interests" {...fields} />}
 
         {step === "about" && (
           <>
-            <div className="chips" aria-label="Ideas to start with">
-              {BIO_PROMPTS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  className="chip toggle"
-                  onClick={() => set("bio", draft.bio.trim() ? `${draft.bio.trim()} ${p}` : p)}
-                >
-                  {p.trim()}…
-                </button>
-              ))}
-            </div>
-            <label className="field">
-              <span>About you</span>
-              <textarea
-                rows={4}
-                maxLength={500}
-                placeholder="What makes a great weekend for you?"
-                value={draft.bio}
-                onChange={(e) => set("bio", e.target.value)}
-              />
-              <small className="muted">{draft.bio.length}/500</small>
-              {errors.bio && <small className="err">{errors.bio}</small>}
-            </label>
+            <SectionFields section="about" {...fields} part="bio" />
+            <h3 className="section-label">Profile prompts</h3>
+            <SectionFields section="prompts" {...fields} />
           </>
         )}
 
-        {step === "photo" && saved && (
-          <ProfileExtras profile={saved} onChange={(patch) => setSaved({ ...saved, ...patch })} />
+        {step === "places" && <SectionFields section="places" {...fields} />}
+
+        {step === "photos" && saved && <PhotoManager profile={saved} onChange={patchSaved} />}
+        {step === "privacy" && saved && <PrivacySettings profile={saved} onChange={patchSaved} />}
+        {step === "notifications" && saved && <NotificationSettings profile={saved} onChange={patchSaved} />}
+        {step === "preview" && saved && (
+          <ProfileCardPreview person={personFromOwnRow(saved)}>
+            <PersonDetails person={personFromOwnRow(saved)} />
+          </ProfileCardPreview>
         )}
 
+        {notice && (
+          <p className="alert info" role="status">
+            {notice}
+          </p>
+        )}
         {saveError && (
           <p className="alert error" role="alert">
             {saveError}
@@ -231,7 +369,7 @@ export function Onboarding({
         )}
 
         <div className="row step-actions">
-          {index > 0 && step !== "photo" && (
+          {canGoBack && (
             <button type="button" className="btn" onClick={back}>
               Back
             </button>
@@ -239,11 +377,11 @@ export function Onboarding({
           <button className="btn dark grow" disabled={busy}>
             {busy
               ? "Saving…"
-              : step === "about"
+              : step === SAVE_AFTER && !saved
                 ? "Save and continue"
-                : step === "photo"
+                : step === "preview"
                   ? "Start meeting people"
-                  : step === "interests" && draft.interests.trim() === ""
+                  : skippable && isEmptyStep(step, state, saved)
                     ? "Skip for now"
                     : "Continue"}
           </button>
@@ -255,4 +393,29 @@ export function Onboarding({
       </button>
     </main>
   );
+}
+
+/** Whether an optional step has nothing filled in (so the button says "Skip for now"). */
+function isEmptyStep(step: Step, s: EditorState, saved: ProfileRow | null): boolean {
+  const d = s.details;
+  switch (step) {
+    case "identity":
+      return !d.gender && d.height_cm === null;
+    case "work":
+      return !d.job && !d.education;
+    case "lifestyle":
+      return !d.exercise && !d.smoking && !d.children;
+    case "interests":
+      return s.core.interests.trim() === "";
+    case "about":
+      return !s.core.bio.trim() && d.prompts.length === 0;
+    case "places":
+      return !d.city && d.neighbourhoods.length === 0 && d.favourite_places.length === 0;
+    case "photos":
+      return !saved?.photo_path;
+    case "privacy":
+      return saved?.lat == null;
+    default:
+      return false;
+  }
 }

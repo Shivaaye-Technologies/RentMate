@@ -111,6 +111,8 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
           online: c.online ?? isOnline(c.lastSeenAt),
           distanceKm: c.distanceKm !== undefined ? c.distanceKm : displayDistanceKm(me, c),
           joinedAt: c.joinedAt ?? null,
+          details: c.details ?? {},
+          photos: c.photos ?? [],
         };
       });
       res.json({ matches, summary: summarize(me, candidates) });

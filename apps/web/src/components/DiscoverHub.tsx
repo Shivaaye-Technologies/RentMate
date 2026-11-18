@@ -5,6 +5,8 @@ import { isNew, type LookingFor } from "../profile";
 import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
 import { DemoBadge } from "./DemoBadge";
+import { buildVibes, type Vibe } from "../vibes";
+import { Vibes } from "./Vibes";
 
 interface Props {
   people: Person[];
@@ -15,6 +17,11 @@ interface Props {
   likesCount: number;
   onOpenLikes: () => void;
   onOpen: (p: Person) => void;
+  /** Your interests and city, for Vibes (real app only). */
+  me?: { interests: string[]; city: string | null };
+  onOpenMap?: () => void;
+  /** Open a vibe straight away (for example "people in your city" from the map). */
+  initialVibe?: Vibe["key"] | null;
 }
 
 const MOODS: { value: LookingFor | "any"; label: string }[] = [
@@ -33,10 +40,16 @@ export function DiscoverHub({
   likesCount,
   onOpenLikes,
   onOpen,
+  me,
+  onOpenMap,
+  initialVibe = null,
 }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [mood, setMood] = useState<LookingFor | "any">("any");
-  const shown = filterPeople(people, filter, mood);
+  const vibes = me ? buildVibes(people, me) : [];
+  const [vibeKey, setVibeKey] = useState<Vibe["key"] | null>(initialVibe);
+  const vibe = vibes.find((v) => v.key === vibeKey) ?? null;
+  const shown = filterPeople(vibe ? vibe.people : people, filter, mood);
 
   const counts = {
     new: people.filter((p) => isNew(p.joinedAt)).length,
@@ -88,7 +101,35 @@ export function DiscoverHub({
       </div>
 
       <div className="hub-body">
+        {onOpenMap && (
+          <button className="map-cta" onClick={onOpenMap}>
+            <span className="map-cta-art" aria-hidden="true" />
+            <span className="btn dark">
+              <Icon name="map" size={18} /> Explore the Map
+            </span>
+          </button>
+        )}
+        {vibes.length > 0 && people.length > 0 && (
+          <Vibes
+            vibes={vibes}
+            onOpen={(v) => {
+              setVibeKey(v.key);
+              setFilter("all");
+            }}
+          />
+        )}
         <h3 className="display-sm">Meet</h3>
+        {vibe && (
+          <div className="chips">
+            <button
+              className="chip toggle on"
+              onClick={() => setVibeKey(null)}
+              aria-label={`Stop showing ${vibe.title}`}
+            >
+              Showing: {vibe.title} ×
+            </button>
+          </div>
+        )}
         <div className="mood-row" role="group" aria-label="I'm here for">
           {MOODS.map((m) => (
             <button

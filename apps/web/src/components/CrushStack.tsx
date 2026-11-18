@@ -2,7 +2,7 @@ import type { DiscoverSummary, Person } from "../api";
 import { EmptyDiscover, type EmptyExtras } from "./EmptyDiscover";
 import { Icon, VerifiedBadge } from "./Icon";
 import { PersonDetails } from "./PersonDetails";
-import { Photo } from "./Photo";
+import { PhotoCarousel } from "./ProfileCardPreview";
 import { DemoBadge } from "./DemoBadge";
 
 interface Props {
@@ -66,11 +66,14 @@ export function CrushStack({
         </div>
 
         <div className="crush-photo">
-          <Photo id={p.id} name={p.displayName} path={p.photoPath} textSize={72} />
+          <PhotoCarousel person={p} />
           <div className="photo-tags">
-            {p.distanceKm != null && (
+            {(p.details.city || p.distanceKm != null) && (
               <span className="pill glass">
-                <Icon name="pin" size={14} /> {p.distanceKm} km away
+                <Icon name="pin" size={14} />{" "}
+                {[p.details.city, p.distanceKm != null ? `${p.distanceKm} km away` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
             )}
             {p.score > 0 && <span className="pill glass">{p.score}% match</span>}

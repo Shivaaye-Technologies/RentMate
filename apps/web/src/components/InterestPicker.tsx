@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { canonicalInterest, interestKey, STANDARD_INTERESTS } from "../interests";
+import { canonicalInterest, INTEREST_CATEGORIES, interestKey, STANDARD_INTERESTS } from "../interests";
 import { dedupeInterests, MAX_INTERESTS, parseInterests } from "../profile";
 
 /**
- * Tap-to-pick interests from the standard list, plus your own. The value is the
- * same comma-separated text the profile form already uses.
+ * Tap-to-pick interests grouped by category, with search, plus your own. The
+ * value is the same comma-separated text the profile form already uses.
  */
 export function InterestPicker({
   value,
@@ -16,6 +16,7 @@ export function InterestPicker({
   error?: string;
 }) {
   const [custom, setCustom] = useState("");
+  const [query, setQuery] = useState("");
   const selected = dedupeInterests(parseInterests(value).map(canonicalInterest));
   const keys = new Set(selected.map(interestKey));
   const write = (list: string[]) => onChange(list.join(", "));
@@ -27,6 +28,11 @@ export function InterestPicker({
     );
   const own = selected.filter((s) => !(STANDARD_INTERESTS as readonly string[]).includes(s));
   const full = selected.length >= MAX_INTERESTS;
+  const q = query.trim().toLowerCase();
+  const groups = INTEREST_CATEGORIES.map((c) => ({
+    ...c,
+    items: c.items.filter((i) => !q || i.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)),
+  })).filter((c) => c.items.length > 0);
 
   const addCustom = () => {
     const item = canonicalInterest(custom).slice(0, 30);
@@ -36,32 +42,62 @@ export function InterestPicker({
 
   return (
     <div className="interest-picker">
-      <p className="muted small">
+      <p className="muted small" aria-live="polite">
         {selected.length} of {MAX_INTERESTS} picked
         {selected.length < 3 ? " · pick at least 3 for better matches" : ""}
+        {full ? " · that's the maximum" : ""}
       </p>
-      <div className="chips pick" role="group" aria-label="Interests">
-        {STANDARD_INTERESTS.map((i) => {
-          const on = keys.has(interestKey(i));
-          return (
+      {selected.length > 0 && (
+        <div className="chips" aria-label="Your interests">
+          {selected.map((i) => (
             <button
               key={i}
               type="button"
-              className={on ? "chip toggle on" : "chip toggle"}
-              aria-pressed={on}
-              disabled={!on && full}
+              className="chip toggle on"
+              aria-label={`Remove ${i}`}
               onClick={() => toggle(i)}
             >
-              {i}
+              {i} ×
             </button>
-          );
-        })}
-        {own.map((i) => (
-          <button key={i} type="button" className="chip toggle on" aria-pressed onClick={() => toggle(i)}>
-            {i} ×
-          </button>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+      <input
+        type="search"
+        aria-label="Search interests"
+        placeholder="Search interests"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {groups.map((c, idx) => (
+        <details key={c.name} className="interest-group" open={!!q || idx < 2}>
+          <summary>
+            {c.name}
+            <small className="muted">
+              {" "}
+              · {c.items.filter((i) => keys.has(interestKey(i))).length} picked
+            </small>
+          </summary>
+          <div className="chips pick" role="group" aria-label={c.name}>
+            {c.items.map((i) => {
+              const on = keys.has(interestKey(i));
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={on ? "chip toggle on" : "chip toggle"}
+                  aria-pressed={on}
+                  disabled={!on && full}
+                  onClick={() => toggle(i)}
+                >
+                  {i}
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      ))}
+      {own.length > 0 && <p className="muted small">Your own: {own.join(", ")}</p>}
       <div className="row add-own">
         <input
           aria-label="Add your own interest"

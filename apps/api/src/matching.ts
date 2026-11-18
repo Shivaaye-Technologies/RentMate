@@ -14,6 +14,10 @@ export interface MatchProfile {
   distanceKm?: number | null;
   /** Precomputed by the database for other people. */
   online?: boolean;
+  /** Optional public profile details, passed through unchanged (never used for eligibility). */
+  details?: Record<string, unknown> | null;
+  /** Extra photo paths, passed through unchanged. */
+  photos?: string[];
   age: number;
   interests: string[];
   lookingFor: "relationship" | "friendship" | "casual";

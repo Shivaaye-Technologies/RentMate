@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Person } from "../api";
+import { dayLabel, markRead, startsNewDay } from "../inbox";
 import { storyDate } from "../profile";
 import { supabase } from "../supabase";
 import { Icon, VerifiedBadge } from "./Icon";
@@ -11,6 +12,8 @@ interface Message {
   sender_id: string;
   body: string;
   created_at: string;
+  /** Local only: a message that didn't send, kept so it can be retried. */
+  failed?: boolean;
 }
 
 interface MatchRow {
@@ -37,14 +40,7 @@ function addUnique(list: Message[], m: Message): Message[] {
   return list.some((x) => x.id === m.id) ? list : [...list, m];
 }
 
-const dayLabel = (iso: string) =>
-  new Date(iso).toLocaleString([], {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafety }: Props) {
   const [match, setMatch] = useState<MatchRow | null>(null);
@@ -75,7 +71,10 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) setError(error.message);
-        else setMessages(data ?? []);
+        else {
+          setMessages(data ?? []);
+          void markRead(matchId, me);
+        }
       });
 
     const channel = supabase
@@ -83,7 +82,10 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `match_id=eq.${matchId}` },
-        (payload) => setMessages((list) => addUnique(list, payload.new as Message)),
+        (payload) => {
+          setMessages((list) => addUnique(list, payload.new as Message));
+          if ((payload.new as Message).sender_id !== me) void markRead(matchId, me);
+        },
       )
       .on(
         "postgres_changes",
@@ -96,7 +98,7 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [matchId]);
+  }, [matchId, me]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -118,10 +120,7 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
     }
   }
 
-  async function send(e: FormEvent) {
-    e.preventDefault();
-    const body = draft.trim();
-    if (!body || sending) return;
+  async function deliver(body: string, localId: string) {
     setSending(true);
     setError(null);
     const { data, error } = await supabase
@@ -131,11 +130,32 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
       .single();
     setSending(false);
     if (error) {
-      setError(error.message);
+      // Keep the message on screen, marked as failed, so it can be retried.
+      setMessages((list) =>
+        list.some((m) => m.id === localId)
+          ? list.map((m) => (m.id === localId ? { ...m, failed: true } : m))
+          : [
+              ...list,
+              { id: localId, sender_id: me, body, created_at: new Date().toISOString(), failed: true },
+            ],
+      );
+      setError(/too fast/i.test(error.message) ? error.message : "Message not sent. Tap Retry to try again.");
       return;
     }
+    setMessages((list) =>
+      addUnique(
+        list.filter((m) => m.id !== localId),
+        data as Message,
+      ),
+    );
+  }
+
+  async function send(e: FormEvent) {
+    e.preventDefault();
+    const body = draft.trim();
+    if (!body || sending) return;
     setDraft("");
-    setMessages((list) => addUnique(list, data as Message));
+    await deliver(body, `local-${crypto.randomUUID()}`);
   }
 
   return (
@@ -157,7 +177,7 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
               {person.displayName}, {person.age} {person.verified && <VerifiedBadge size={15} />}{" "}
               <DemoBadge id={person.id} />
             </strong>
-            <small>{person.online ? "Online" : "See profile"}</small>
+            <small>{person.online ? "Online · View profile" : "View profile"}</small>
           </span>
         </button>
         <button
@@ -190,16 +210,26 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
           <p>{match ? `Your story began on ${storyDate(match.created_at)}` : " "}</p>
         </div>
 
-        {messages.map((m, i) => {
-          const showTime =
-            i === 0 || Date.parse(m.created_at) - Date.parse(messages[i - 1].created_at) > 30 * 60 * 1000;
-          return (
-            <div key={m.id} className="msg-wrap">
-              {showTime && <p className="stamp">{dayLabel(m.created_at)}</p>}
-              <div className={m.sender_id === me ? "bubble mine" : "bubble"}>{m.body}</div>
+        {messages.map((m, i) => (
+          <div key={m.id} className="msg-wrap">
+            {startsNewDay(messages, i) && <p className="stamp">{dayLabel(m.created_at)}</p>}
+            <div
+              className={m.sender_id === me ? (m.failed ? "bubble mine failed" : "bubble mine") : "bubble"}
+            >
+              {m.body}
+              <small className="time">{m.failed ? "Not sent" : timeOf(m.created_at)}</small>
             </div>
-          );
-        })}
+            {m.failed && (
+              <button
+                className="btn small retry"
+                disabled={sending}
+                onClick={() => void deliver(m.body, m.id)}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        ))}
 
         {myReady && theirReady && (
           <div className="meet-banner">

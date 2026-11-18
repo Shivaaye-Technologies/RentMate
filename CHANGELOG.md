@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- **Sign-in and sign-up that explain themselves:** separate messages for an unconfirmed email (with a resend button and 60-second cooldown), wrong email or password (with a reset link), email and request rate limits, expired or already-used email links, and existing accounts. Show/hide password, forgot password and choose-a-new-password screens, duplicate-submit guard.
+- **Profile details** (migration `20261024090000_profile_details`, not yet applied): gender, height, work, education, exercise, smoking, children, city, favourite neighbourhoods, up to 10 favourite places, up to 3 prompts, up to 6 photos, pause profile, notification choices. Server-side checks for every limit; photos must be in your own folder; 29 new database checks.
+- **12-step onboarding** with progress kept on the device, optional steps you can skip, profile preview and the 18+ rule.
+- **Profile dashboard:** completion tasks (To do / Done) that open the right editor, photo manager (add, delete, reorder, main photo), prompt editor, categorised interests (max 10), city search with any city allowed, places picker, dating preferences with an age slider, notifications, location and visibility, blocked people with unblock, help and safety, account.
+- **Vibes** in Discover from real profiles, with reasons based only on your real interests or city; **Map** screen that explains crossed paths isn't available instead of inventing encounters; photo carousel, prompts and facts on profile cards.
+- **Likes:** Liked you / You liked / Matches. **Chats:** real unread counts (read markers), official welcome card, day separators, retry for messages that failed to send.
+- **Notifications** screen from real likes, matches and unread messages; optional browser alerts while the site is open, only after you allow them.
+- **Safety introduction:** five short pages shown once; reading it is recorded separately from the legal terms.
+
 - **Honest empty Discover/Crush:** when you've seen everyone, it says how many of your likes are still waiting for a reply and how many people you passed (from your own rows only), with **Review passed profiles** (deletes only your own passes), **Invite friends**, and **Explore Demo Mode (fictional profiles)**.
 - **Step-by-step onboarding** for new members (name and age with the 18+ rule, what you're looking for and age range, tap-to-pick interests, bio with prompts, optional photo and distance) and a **Profile strength** card and Crush nudge for existing members.
 - **Standard interests:** tap-to-pick list and common spellings ("hike" = Hiking, "traveling" = Travel) saved in a standard form and treated as the same when ranking. Ranking only; who is eligible is unchanged.
