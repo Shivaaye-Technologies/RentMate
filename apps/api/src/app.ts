@@ -7,6 +7,7 @@ import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
 import { ProfileInput } from "./validation.js";
+import { liveRouter, type LiveDeps } from "./live/routes.js";
 
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -24,6 +25,45 @@ export const ROUTES = [
   },
   { method: "PUT", path: "/api/v1/profile", auth: true, description: "Create or update your profile" },
   { method: "GET", path: "/api/v1/matches", auth: true, description: "Ranked people for you to discover" },
+  {
+    method: "GET",
+    path: "/api/v1/live/streams",
+    auth: true,
+    description: "Live and upcoming streams you may watch",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/streams/:id/join",
+    auth: true,
+    description: "Short-lived room token after policy checks",
+  },
+  { method: "GET", path: "/api/v1/live/streams/:id/stats", auth: true, description: "Live viewer count" },
+  {
+    method: "POST",
+    path: "/api/v1/live/sessions/:id/join",
+    auth: true,
+    description: "Join a private session",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/streams/:id/terminate",
+    auth: true,
+    description: "Moderators: end a stream now",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/sessions/:id/terminate",
+    auth: true,
+    description: "Moderators: end a session now",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/emergency-stop",
+    auth: true,
+    description: "Moderators: stop all live",
+  },
+  { method: "GET", path: "/api/v1/live/admin/health", auth: true, description: "Moderators: stream health" },
+  { method: "GET", path: "/api/v1/live/admin/providers", auth: true, description: "Admins: provider setup" },
 ] as const;
 
 /** Data access the routes depend on. */
@@ -39,9 +79,11 @@ export interface AppDeps {
   verifyToken: TokenVerifier | null;
   /** Returns the store for an authenticated request (Supabase uses the caller's token). */
   storeFor: (req: Request) => ProfileStore;
+  /** SOULMATE LIVE (optional: without it the live routes return 503). */
+  live?: LiveDeps;
 }
 
-export function createApp({ config, verifyToken, storeFor }: AppDeps) {
+export function createApp({ config, verifyToken, storeFor, live }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
@@ -120,6 +162,14 @@ export function createApp({ config, verifyToken, storeFor }: AppDeps) {
       next(err);
     }
   });
+
+  if (live) {
+    api.use("/live", liveRouter(live));
+  } else {
+    api.use("/live", (_req, res) => {
+      res.status(503).json({ error: "Live streaming is not configured" });
+    });
+  }
 
   app.use("/api/v1", api);
 

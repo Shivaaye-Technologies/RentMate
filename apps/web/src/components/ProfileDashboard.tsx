@@ -228,6 +228,13 @@ export function ProfileDashboard({
         </nav>
       ))}
 
+      <a className="demo-entry" href="#creator">
+        <Icon name="star" size={18} />
+        <span>
+          <strong>SOULMATE LIVE creator studio</strong>
+          <small>Apply to broadcast, verify, schedule streams and manage consent.</small>
+        </span>
+      </a>
       <a className="demo-entry" href="#demo">
         <Icon name="sparkle" size={18} />
         <span>

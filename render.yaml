@@ -21,6 +21,15 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      # SOULMATE LIVE: set only after the provider's terms are approved.
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVE_COUNTRY_HEADER
+        sync: false
 
   - type: web
     name: soulmate-web

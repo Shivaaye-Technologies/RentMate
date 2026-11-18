@@ -28,9 +28,15 @@ import { alertsFor, buildNotices, loadMatches, type Counts, type Notice } from "
 import { showAlert } from "./notify";
 import { saveProfileFields, type ProfilePatch } from "./profileApi";
 import { DemoMode } from "./demoMode/DemoMode";
+import { CreatorStudio } from "./live/CreatorStudio";
+import { AdminConsole } from "./live/AdminConsole";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
+/** SOULMATE LIVE creator studio (signed-in members only). */
+const isCreatorHash = () => typeof window !== "undefined" && window.location.hash === "#creator";
+/** SOULMATE LIVE admin console (the database checks the admin/moderator role). */
+const isAdminHash = () => typeof window !== "undefined" && window.location.hash === "#admin";
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -54,9 +60,15 @@ export function App() {
   const [demo, setDemo] = useState(isDemoHash);
   const [recovery, setRecovery] = useState(startRedirect.type === "recovery");
   const [linkProblem] = useState<AuthProblem | null>(startRedirect.problem);
+  const [creator, setCreator] = useState(isCreatorHash);
+  const [admin, setAdmin] = useState(isAdminHash);
 
   useEffect(() => {
-    const onHash = () => setDemo(isDemoHash());
+    const onHash = () => {
+      setDemo(isDemoHash());
+      setCreator(isCreatorHash());
+      setAdmin(isAdminHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -106,6 +118,27 @@ export function App() {
   }
   if (recovery && session) return <NewPasswordScreen onDone={() => setRecovery(false)} />;
   if (!session) return <AuthScreen initialProblem={linkProblem} />;
+  if (admin) {
+    return (
+      <AdminConsole
+        onExit={() => {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setAdmin(false);
+        }}
+      />
+    );
+  }
+  if (creator) {
+    return (
+      <CreatorStudio
+        me={session.user.id}
+        onExit={() => {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setCreator(false);
+        }}
+      />
+    );
+  }
   return <Home key={session.user.id} session={session} />;
 }
 
