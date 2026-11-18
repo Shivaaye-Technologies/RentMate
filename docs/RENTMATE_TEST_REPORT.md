@@ -11,7 +11,7 @@ All results below were produced by commands run in this session. Nothing was run
 | Lint                                    | `npm run lint`         | pass                                                                                                                              |
 | Typecheck                               | `npm run typecheck`    | pass                                                                                                                              |
 | API unit/integration (vitest+supertest) | `npm test`             | 79 / 79 passed                                                                                                                    |
-| Web unit (vitest)                       | `npm test`             | 138 / 138 passed (incl. 4 new RentMate brand tests)                                                                               |
+| Web unit (vitest)                       | `npm test`             | 144 / 144 passed (incl. RentMate brand and theme tests)                                                                           |
 | Build                                   | `npm run build`        | pass                                                                                                                              |
 | DB (PGlite, RLS)                        | `npm run test:db`      | rls_flow 53/53 · demo_isolation 21/21 · demo_mode 13/13 · discover_activity 10/10 · profile_details 29/29 · live_foundation 49/49 |
 | Hook guards                             | `npm run test:hooks`   | 21 / 21                                                                                                                           |
