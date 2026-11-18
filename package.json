@@ -23,8 +23,9 @@
     "test:db": "node scripts/test-db.mjs",
     "test:demo": "node --test scripts/demo/generate-demo-profiles.test.mjs",
     "build": "npm run build --workspaces",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "check": "npm run test:policy && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
     "test:hooks": "node scripts/test-hooks.mjs",
+    "test:policy": "node scripts/policy-check.mjs",
     "test:aihub": "bash tools/aihub/test/aihub.test.sh",
     "test:e2e": "node scripts/e2e-smoke.mjs"
   },

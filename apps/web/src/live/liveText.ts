@@ -13,13 +13,13 @@ const PROBLEMS: Record<string, string> = {
   age_not_verified: "Complete age verification.",
   country_not_allowed: "Live streaming isn't available in your country yet.",
   country_unknown: "We couldn't confirm your country.",
-  explicit_not_allowed_in_country: "Adult content isn't available in this country.",
-  explicit_not_allowed_in_creator_country: "Adult content isn't available in this country.",
+  explicit_not_allowed_in_country: "RentMate does not support adult content.",
+  explicit_not_allowed_in_creator_country: "RentMate does not support adult content.",
   category_not_in_application: "This category isn't part of your approved application.",
   provider_not_enabled: "The streaming service isn't enabled yet.",
   category_not_permitted_by_provider: "The streaming service doesn't permit this category.",
   country_not_supported_by_provider: "The streaming service doesn't support your country.",
-  viewer_age_not_verified: "Age verification is required to watch adult content.",
+  viewer_age_not_verified: "Age verification is required.",
   blocked: "This isn't available.",
   session_not_found: "This session doesn't exist.",
   session_not_accepted: "The creator hasn't accepted this session yet.",
@@ -93,9 +93,12 @@ export function validateCreator(d: CreatorDraft): CreatorErrors {
   return e;
 }
 
-/** Adult categories are never offered to creators in India, or before a country is chosen. */
-export function categoryAllowedFor(country: string, explicit: boolean): boolean {
-  return !(explicit && (country === "IN" || !/^[A-Z]{2}$/.test(country)));
+/** RentMate does not support adult or sexually explicit content in any country. */
+export const NO_ADULT_CONTENT = "RentMate does not support adult, pornographic or sexually explicit content.";
+
+/** Adult categories are never offered, in any country. */
+export function categoryAllowedFor(_country: string, explicit: boolean): boolean {
+  return !explicit;
 }
 
 export const WEEKDAYS = [

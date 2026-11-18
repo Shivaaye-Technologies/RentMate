@@ -30,11 +30,29 @@ Compliant set-up:
 3. Transfer the repositories into the organization and install the Claude GitHub App on the organization.
 4. Do not create extra accounts to work around a suspension; appeal through GitHub Support instead.
 
+## Automatic guard (runs in CI)
+
+`npm run test:policy` (`scripts/policy-check.mjs`) runs first in `npm run check` and in GitHub Actions. It fails the build
+if a change adds:
+
+- a real-looking secret (GitHub, Supabase, Stripe, AWS, Anthropic keys, private keys, long JWTs) or any `.env` file;
+- any raster image, video or audio file, or an SVG with an embedded image, script or remote link;
+- any file over 2 MB;
+- adult or pornographic wording, unless the line states a prohibition.
+
+The guard has its own self-test (10 cases) that runs before every scan.
+
+## Product rule: no adult content
+
+RentMate does not support porn or any adult/sexually explicit content (founder decision 2026-11-18). The database
+refuses adult content in every country, creator application, stream and private session
+(`supabase/migrations/20261118090000_no_adult_content.sql`, tested by `supabase/tests/no_adult_content.sql`).
+Nothing was deleted: the old adult category row is kept for history and can never be made available.
+
 ## Rules we follow from now on
 
 - Never commit secrets, `.env` files, real user data, or real people's photos. Test data uses `.test`/`.invalid`.
-- Never commit sexual imagery or sexual text. Adult-content features (if ever approved, F-07) are flags and policy
-  checks only; no explicit media is ever stored in the repository.
+- Never commit sexual imagery or sexual text; RentMate supports no adult content at all.
 - Keep GitHub activity human-scale: few, meaningful PRs; no bulk issues, comments, stars, follows or forks; no
   scripted account creation; respect API rate limits.
 - Use the Claude GitHub App or the owner's own credentials only; never shared logins.

@@ -30,3 +30,13 @@
   The choice is saved on the device and applied before first paint (no flash); legal pages follow it too.
 - RM monogram and favicon invert with the theme.
 - Tests: light/dark token and no-gold checks, theme switch tests (incl. blocked storage); browser check of both themes.
+
+### No adult content + GitHub policy guard
+
+- Founder decision: RentMate supports no porn or adult/sexually explicit content, in any country.
+- Migration `20261118090000_no_adult_content` (additive, deletes nothing): adult category kept but permanently
+  unavailable; no country can enable adult content; creators, streams and private sessions reject adult or unknown
+  categories. New DB test `no_adult_content.sql` (16 checks); live tests updated to the stricter rule.
+- App: the adult category is no longer offered; admin country settings show it as not supported.
+- `scripts/policy-check.mjs` (`npm run test:policy`) added to `npm run check` and CI: blocks secrets, `.env` files,
+  media files, oversized files and adult wording.

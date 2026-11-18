@@ -20,6 +20,7 @@ import {
   WEEKDAYS,
   type CreatorDraft,
   type CreatorErrors,
+  NO_ADULT_CONTENT,
 } from "./liveText";
 
 type Tab = "overview" | "streams" | "consent" | "availability" | "sessions" | "support";
@@ -141,29 +142,26 @@ export function ApplicationForm({
       <fieldset className="field">
         <span>What you'll broadcast</span>
         <div className="chips pick" role="group" aria-label="Categories">
-          {state.categories.map((cat) => {
-            const allowed = categoryAllowedFor(d.countryCode, cat.explicit);
-            const on = d.categories.includes(cat.key);
-            return (
-              <button
-                key={cat.key}
-                type="button"
-                className={on ? "chip toggle on" : "chip toggle"}
-                aria-pressed={on}
-                disabled={!allowed && !on}
-                onClick={() => toggle(cat.key)}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
+          {state.categories
+            .filter((cat) => !cat.explicit)
+            .map((cat) => {
+              const allowed = categoryAllowedFor(d.countryCode, cat.explicit);
+              const on = d.categories.includes(cat.key);
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  className={on ? "chip toggle on" : "chip toggle"}
+                  aria-pressed={on}
+                  disabled={!allowed && !on}
+                  onClick={() => toggle(cat.key)}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
         </div>
-        {state.categories.some((x) => x.explicit) && (
-          <small className="muted">
-            Adult categories are never available in India. Elsewhere they open only in countries where
-            RentMate has written legal clearance, and every viewer must pass an age check.
-          </small>
-        )}
+        <small className="muted">{NO_ADULT_CONTENT}</small>
         {errors.categories && <small className="err">{errors.categories}</small>}
       </fieldset>
       {!c && (

@@ -19,6 +19,7 @@ Dating app: users create a profile, get ranked matches, like each other, and cha
 | Format check      | `npm run format:check`                                                          |
 | Typecheck         | `npm run typecheck`                                                             |
 | Unit tests        | `npm test`                                                                      |
+| Policy guard      | `npm run test:policy` (secrets, media, adult content; part of `check`)          |
 | Hook guard tests  | `npm run test:hooks`                                                            |
 | DB tests (local)  | `npm run test:db`                                                               |
 | aihub tests       | `npm run test:aihub`                                                            |
@@ -44,6 +45,7 @@ INSPECT → PLAN → IMPLEMENT → TEST → ANALYZE FAILURES → FIX → RETEST 
 ## Security rules (non-negotiable)
 
 - Never read, print, or commit `.env` files or secrets. Use `.env.example` for documentation.
+- RentMate supports no adult, pornographic or sexually explicit content (enforced in the database).
 - Users must be 18+. Enforced in `ProfileInput` and the `profiles.age` check constraint; do not relax either.
 - Never disable auth, RLS, rate limiting, or helmet to make something work. Auth fails closed (503) when unconfigured.
 - Migrations are append-only. Add a new timestamped file in `supabase/migrations/`; never edit an applied one.

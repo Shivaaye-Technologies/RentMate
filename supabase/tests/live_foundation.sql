@@ -1,4 +1,4 @@
--- SOULMATE LIVE foundation test: roles, provider terms, country and explicit
+-- Live foundation test: roles, provider terms, country policy (RentMate: no adult content)
 -- rules (India locked), creator approval, verification, consent, watching,
 -- emergency stop, reports, appeals and the audit log.
 -- Always rolls back. Every result must start with "ok".
@@ -48,13 +48,13 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
   begin
     perform public.admin_upsert_provider('livekit', 'LiveKit', 'webrtc_sfu', 'wss://example.livekit.cloud', 'LIVEKIT',
-      '{}', '{talk,adult}', true, true, 'negotiating', null, false, false, 'enabled', null);
+      '{}', '{talk}', true, true, 'negotiating', null, false, false, 'enabled', null);
     r := r || 'FAIL enabled provider without signed terms; ';
   exception when check_violation then r := r || 'ok provider needs signed, reviewed terms; ';
   end;
   begin
     perform public.admin_upsert_provider('livekit', 'LiveKit', 'webrtc_sfu', 'wss://example.livekit.cloud', 'LIVEKIT',
-      '{}', '{talk,adult}', false, true, 'signed', 'C-1', true, true, 'enabled', null);
+      '{}', '{talk}', false, true, 'signed', 'C-1', true, true, 'enabled', null);
     r := r || 'FAIL enabled provider without commercial use; ';
   exception when check_violation then r := r || 'ok provider needs commercial-use permission; ';
   end;
@@ -65,7 +65,7 @@ begin
   exception when check_violation then r := r || 'ok https/wss endpoints only; ';
   end;
   perform public.admin_upsert_provider('livekit', 'LiveKit', 'webrtc_sfu', 'wss://example.livekit.cloud', 'LIVEKIT',
-    '{}', '{talk,adult}', true, true, 'signed', 'Contract C-1 (2026-10-30)', true, true, 'enabled', null);
+    '{}', '{talk}', true, true, 'signed', 'Contract C-1 (2026-10-30)', true, true, 'enabled', null);
   select count(*) into n from public.admin_list_providers() where integration_status = 'enabled';
   r := r || case when n = 1 then 'ok provider enabled with signed terms; ' else 'FAIL provider not enabled; ' end;
 
@@ -80,12 +80,17 @@ begin
     r := r || 'FAIL explicit without clearance; ';
   exception when check_violation then r := r || 'ok explicit needs recorded legal clearance; ';
   end;
-  perform public.admin_set_country_policy('US', true, true, true, 'Written legal opinion LO-7', 'test');
+  begin
+    perform public.admin_set_country_policy('US', true, true, true, 'Written legal opinion LO-7', 'test');
+    r := r || 'FAIL adult content enabled with clearance; ';
+  exception when check_violation then r := r || 'ok adult content cannot be enabled even with clearance; ';
+  end;
+  perform public.admin_set_country_policy('US', true, true, false, null, 'test');
   perform public.admin_set_agreement('2026.1', 'Creator agreement', 'https://example.com/creator-agreement', true);
 
   -- ---- Creators apply; cannot approve or pay themselves ----
   perform set_config('request.jwt.claims', json_build_object('sub', cr, 'role', 'authenticated')::text, true);
-  insert into public.creators (user_id, stage_name, country_code, categories) values (cr, 'Riya Live', 'US', '{talk,adult}');
+  insert into public.creators (user_id, stage_name, country_code, categories) values (cr, 'Riya Live', 'US', '{talk}');
   begin
     update public.creators set status = 'approved' where user_id = cr;
     r := r || 'FAIL creator approved themselves; ';
@@ -104,10 +109,10 @@ begin
   perform public.live_accept_agreement('2026.1');
 
   perform set_config('request.jwt.claims', json_build_object('sub', ind, 'role', 'authenticated')::text, true);
-  insert into public.creators (user_id, stage_name, country_code, categories) values (ind, 'Delhi Live', 'IN', '{talk,adult}');
+  insert into public.creators (user_id, stage_name, country_code, categories) values (ind, 'Delhi Live', 'IN', '{talk}');
   perform public.live_accept_agreement('2026.1');
   perform set_config('request.jwt.claims', json_build_object('sub', co, 'role', 'authenticated')::text, true);
-  insert into public.creators (user_id, stage_name, country_code, categories) values (co, 'Co Star', 'US', '{talk,adult}');
+  insert into public.creators (user_id, stage_name, country_code, categories) values (co, 'Co Star', 'US', '{talk}');
   perform public.live_accept_agreement('2026.1');
 
   -- ---- Approval needs verification ----
@@ -140,9 +145,9 @@ begin
   arr := public.live_start_stream(s_safe);
   r := r || case when cardinality(arr) = 0 then 'ok verified creator goes live; ' else 'FAIL start ' || array_to_string(arr, ',') || '; ' end;
 
-  -- Explicit stream with a co-performer who hasn't consented.
+  -- Co-performed stream with a co-performer who hasn't consented.
   insert into public.live_streams (creator_id, provider_key, title, category, participants)
-    values (cr, 'livekit', 'Late show', 'adult', array[co]) returning id into s_x;
+    values (cr, 'livekit', 'Late show', 'talk', array[co]) returning id into s_x;
   arr := public.live_broadcast_check(s_x);
   r := r || case when exists (select 1 from unnest(arr) x where x like 'participant_consent_missing:%')
               then 'ok co-performer consent required; ' else 'FAIL no consent check ' || array_to_string(arr, ',') || '; ' end;
@@ -155,15 +160,17 @@ begin
   perform public.live_give_consent(s_x, 'I agree to appear in this stream', 'esign-2');
   perform set_config('request.jwt.claims', json_build_object('sub', cr, 'role', 'authenticated')::text, true);
   arr := public.live_start_stream(s_x);
-  r := r || case when cardinality(arr) = 0 then 'ok explicit stream live where cleared; ' else 'FAIL x start ' || array_to_string(arr, ',') || '; ' end;
+  r := r || case when cardinality(arr) = 0 then 'ok co-performed stream live after consent; ' else 'FAIL x start ' || array_to_string(arr, ',') || '; ' end;
 
-  -- India creator cannot go live with explicit content.
+  -- Adult streams cannot be created at all.
   perform set_config('request.jwt.claims', json_build_object('sub', ind, 'role', 'authenticated')::text, true);
-  insert into public.live_streams (creator_id, provider_key, title, category) values (ind, 'livekit', 'Nope', 'adult')
+  begin
+    insert into public.live_streams (creator_id, provider_key, title, category) values (ind, 'livekit', 'Nope', 'adult');
+    r := r || 'FAIL adult stream created; ';
+  exception when check_violation then r := r || 'ok adult streams cannot be created; ';
+  end;
+  insert into public.live_streams (creator_id, provider_key, title, category) values (ind, 'livekit', 'Chai talk', 'talk')
     returning id into s_in;
-  arr := public.live_start_stream(s_in);
-  r := r || case when 'explicit_not_allowed_in_country' = any (arr) then 'ok explicit blocked for creators in India; '
-              else 'FAIL india ' || array_to_string(arr, ',') || '; ' end;
   begin
     update public.live_streams set status = 'live' where id = s_in;
     r := r || 'FAIL creator set status directly; ';
@@ -174,16 +181,12 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', vw, 'role', 'authenticated')::text, true);
   arr := public.live_watch_check(s_safe, 'IN');
   r := r || case when cardinality(arr) = 0 then 'ok safe stream watchable in India; ' else 'FAIL safe ' || array_to_string(arr, ',') || '; ' end;
-  arr := public.live_watch_check(s_x, 'US');
-  r := r || case when 'viewer_age_not_verified' = any (arr) then 'ok explicit needs viewer age check; ' else 'FAIL viewer age; ' end;
-  arr := public.live_watch_check(s_x, 'IN');
-  r := r || case when 'explicit_not_allowed_in_country' = any (arr) then 'ok explicit blocked for viewers in India; ' else 'FAIL viewer IN; ' end;
+  select count(*) into n from public.live_list_streams('US') where explicit;
+  r := r || case when n = 0 then 'ok no adult streams listed; ' else 'FAIL adult listed ' || n || '; ' end;
   arr := public.live_watch_check(s_x, null);
   r := r || case when 'country_unknown' = any (arr) then 'ok unknown country fails closed; ' else 'FAIL unknown country; ' end;
   arr := public.live_watch_check(s_safe, 'FR');
   r := r || case when 'country_not_allowed' = any (arr) then 'ok countries without a policy get nothing; ' else 'FAIL FR; ' end;
-  select count(*) into n from public.live_streams where id = s_x;
-  r := r || case when n = 0 then 'ok explicit stream not readable directly; ' else 'FAIL explicit readable; ' end;
   select count(*) into n from public.live_list_streams('IN') where explicit;
   r := r || case when n = 0 then 'ok India list has no explicit streams; ' else 'FAIL India list explicit ' || n || '; ' end;
 
@@ -191,12 +194,9 @@ begin
   perform public.admin_record_viewer_age(vw, 'VerifyCo', 'case-v1', 'passed', 'US', true);
   perform set_config('request.jwt.claims', json_build_object('sub', vw, 'role', 'authenticated')::text, true);
   arr := public.live_watch_check(s_x, 'US');
-  r := r || case when cardinality(arr) = 0 then 'ok verified adult in cleared country can watch; ' else 'FAIL vw ' || array_to_string(arr, ',') || '; ' end;
+  r := r || case when cardinality(arr) = 0 then 'ok age-verified viewer can watch; ' else 'FAIL vw ' || array_to_string(arr, ',') || '; ' end;
   select count(*) into n from public.live_list_streams('US') where explicit;
-  r := r || case when n = 1 then 'ok cleared viewer sees explicit listing; ' else 'FAIL cleared list ' || n || '; ' end;
-  arr := public.live_watch_check(s_in, 'US');
-  r := r || case when 'explicit_not_allowed_in_creator_country' = any (arr)
-              then 'ok explicit from creators in India is never shown; ' else 'FAIL india creator watch; ' end;
+  r := r || case when n = 0 then 'ok no adult listings even for age-verified viewers; ' else 'FAIL adult list ' || n || '; ' end;
 
   -- Blocks apply to live.
   insert into public.blocks (blocker_id, blocked_id) values (vw, cr);

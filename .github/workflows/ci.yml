@@ -23,6 +23,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Repository policy (GitHub terms, no secrets, no media, no adult content)
+        run: npm run test:policy
       - name: Format
         run: npm run format:check
       - name: Lint

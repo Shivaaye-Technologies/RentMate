@@ -288,10 +288,7 @@ export function providerBlockers(p: ProviderRow, termsReviewed: boolean): string
 export function policyBlockers(p: CountryPolicy): string[] {
   const out: string[] = [];
   if (!/^[A-Z]{2}$/.test(p.country_code)) out.push("Use a two-letter country code.");
-  if (p.explicit_allowed && p.country_code === "IN") out.push("Adult content can't be enabled for India.");
-  if (p.explicit_allowed && !p.legal_clearance_ref?.trim()) {
-    out.push("Adult content needs a reference to the written legal clearance for this country.");
-  }
+  if (p.explicit_allowed) out.push("RentMate does not support adult content.");
   return out;
 }
 

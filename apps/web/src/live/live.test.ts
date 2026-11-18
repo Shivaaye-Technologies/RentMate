@@ -44,11 +44,11 @@ describe("creator rules", () => {
     );
   });
 
-  it("never offers adult categories to creators in India", () => {
-    expect(categoryAllowedFor("IN", true)).toBe(false);
-    expect(categoryAllowedFor("IN", false)).toBe(true);
-    expect(categoryAllowedFor("US", true)).toBe(true);
-    expect(categoryAllowedFor("", true)).toBe(false);
+  it("never offers adult categories in any country", () => {
+    for (const country of ["IN", "US", "GB", "DE", ""]) {
+      expect(categoryAllowedFor(country, true)).toBe(false);
+      expect(categoryAllowedFor(country, false)).toBe(true);
+    }
   });
 
   it("explains what's missing before going live", () => {
@@ -79,13 +79,14 @@ describe("creator rules", () => {
 });
 
 describe("creator studio screens", () => {
-  it("shows the application with adult categories disabled until a country allows them", () => {
+  it("shows the application without any adult category and states the rule", () => {
     const html = renderToStaticMarkup(createElement(ApplicationForm, { me: "u", state: base, reload: noop }));
     expect(html).toContain("Apply to broadcast");
     expect(html).toContain("18 or older");
-    expect(html).toContain("Adult categories are never available in India");
+    expect(html).toContain("RentMate does not support adult, pornographic or sexually explicit content.");
     expect(html).toMatch(/disabled=""[^>]*>Send application/);
-    expect(html).toMatch(/aria-pressed="false" disabled=""[^>]*>Adult/);
+    expect(html).toContain(">Talk and chat<");
+    expect(html).not.toContain("Adult (18+ explicit)");
   });
 
   it("lists every step to approval honestly", () => {

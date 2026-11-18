@@ -74,16 +74,16 @@ Not applied yet (waiting for owner approval): `20261024090000_profile_details` (
 
 ## 4. Key decisions
 
-| #   | Decision                                                                                    | Reason                                                                                                      |
-| --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| D1  | Base RentMate on the Soulmate-AI monorepo; the RentMate starter repo is empty (README only) | Nothing in the starter repo to reuse; Soulmate has auth, dating, chat, safety, live and tests.              |
-| D2  | `rentmate-migration` = `main` + PR #9 + SOULMATE LIVE 1–3                                   | Preserves all unmerged, tested work in one branch instead of rebuilding it.                                 |
-| D3  | Keep service id `soulmate-api`, Render service names and Supabase project                   | Renaming infrastructure risks downtime; user-facing name is RentMate.                                       |
-| D4  | Brand via `brand.ts` + design tokens; legacy token names aliased                            | Rename once; every existing screen adopts the light/dark system without rewrites.                           |
-| D5  | Calls bill from LiveKit server webhooks (participant joined/left), never client timers      | Spec: charge only verified connected time.                                                                  |
-| D6  | Bookings use `tstzrange` + `EXCLUDE USING gist` on confirmed/held rows                      | Database-level guarantee against double booking, incl. concurrent requests.                                 |
-| D7  | Explicit/adult live category stays off everywhere until the founder decides (see approvals) | RentMate rules forbid sexual services; mixing adult streams with paid in-person companionship is high risk. |
-| D8  | Phone OTP via Supabase Auth phone provider + an SMS vendor                                  | Reuses the one auth system; needs an SMS account (cost → founder approval).                                 |
+| #   | Decision                                                                                    | Reason                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| D1  | Base RentMate on the Soulmate-AI monorepo; the RentMate starter repo is empty (README only) | Nothing in the starter repo to reuse; Soulmate has auth, dating, chat, safety, live and tests.                 |
+| D2  | `rentmate-migration` = `main` + PR #9 + SOULMATE LIVE 1–3                                   | Preserves all unmerged, tested work in one branch instead of rebuilding it.                                    |
+| D3  | Keep service id `soulmate-api`, Render service names and Supabase project                   | Renaming infrastructure risks downtime; user-facing name is RentMate.                                          |
+| D4  | Brand via `brand.ts` + design tokens; legacy token names aliased                            | Rename once; every existing screen adopts the light/dark system without rewrites.                              |
+| D5  | Calls bill from LiveKit server webhooks (participant joined/left), never client timers      | Spec: charge only verified connected time.                                                                     |
+| D6  | Bookings use `tstzrange` + `EXCLUDE USING gist` on confirmed/held rows                      | Database-level guarantee against double booking, incl. concurrent requests.                                    |
+| D7  | No adult or sexually explicit content anywhere (founder decision 2026-11-18)                | Enforced by migration `20261118090000_no_adult_content`; the adult category row is kept but can never be used. |
+| D8  | Phone OTP via Supabase Auth phone provider + an SMS vendor                                  | Reuses the one auth system; needs an SMS account (cost → founder approval).                                    |
 
 ## 5. Hosting
 

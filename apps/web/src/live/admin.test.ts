@@ -64,16 +64,18 @@ describe("country policy rules", () => {
     legal_clearance_ref: null,
     notes: null,
   };
-  it("never allows adult content in India and needs clearance elsewhere", () => {
-    expect(
-      policyBlockers({ ...base, country_code: "IN", explicit_allowed: true, legal_clearance_ref: "x" }),
-    ).toContain("Adult content can't be enabled for India.");
-    expect(policyBlockers({ ...base, explicit_allowed: true })).toContain(
-      "Adult content needs a reference to the written legal clearance for this country.",
-    );
-    expect(policyBlockers({ ...base, explicit_allowed: true, legal_clearance_ref: "Opinion LO-7" })).toEqual(
-      [],
-    );
+  it("never allows adult content in any country, even with a legal reference", () => {
+    for (const country_code of ["IN", "GB", "US"]) {
+      expect(
+        policyBlockers({
+          ...base,
+          country_code,
+          explicit_allowed: true,
+          legal_clearance_ref: "Opinion LO-7",
+        }),
+      ).toContain("RentMate does not support adult content.");
+    }
+    expect(policyBlockers(base)).toEqual([]);
     expect(policyBlockers({ ...base, country_code: "GBR" })).toContain("Use a two-letter country code.");
   });
 

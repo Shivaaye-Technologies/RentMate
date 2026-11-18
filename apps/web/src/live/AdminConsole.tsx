@@ -226,15 +226,10 @@ function PolicyEditor({ p, onSaved }: { p: CountryPolicy; onSaved: () => Promise
         <span>Private video/audio sessions allowed</span>
       </label>
       <label className="check-row">
-        <input
-          type="checkbox"
-          checked={d.explicit_allowed}
-          disabled={d.country_code === "IN"}
-          onChange={(e) => setD({ ...d, explicit_allowed: e.target.checked })}
-        />
+        <input type="checkbox" checked={false} disabled readOnly />
         <span>
-          Adult (explicit) content allowed
-          {d.country_code === "IN" && <small className="muted"> · never available in India</small>}
+          Adult (explicit) content
+          <small className="muted"> · not supported on RentMate</small>
         </span>
       </label>
       {d.explicit_allowed && (
@@ -297,8 +292,8 @@ function CountryPolicies() {
     <div className="panel">
       <h3>Country policies</h3>
       <p className="muted small">
-        Countries not listed allow nothing. Adult content is off until you record written legal clearance, and
-        can never be enabled for India. Every change is logged.
+        Countries not listed allow nothing. RentMate does not support adult or sexually explicit content in
+        any country. Every change is logged.
       </p>
       <ul className="admin-list">
         {data.map((p) => (
@@ -351,7 +346,7 @@ function AuditLog() {
   );
 }
 
-/** Results from the verification partner for people who want to watch adult content. */
+/** Age results from the verification partner (RentMate is 18+). */
 function ViewerAgeCheck() {
   const [d, setD] = useState({
     user: "",
@@ -366,8 +361,7 @@ function ViewerAgeCheck() {
     <div className="panel">
       <h3>Viewer age checks</h3>
       <p className="muted small">
-        Record a verification partner's result for a viewer. Adult streams need a passed check from a country
-        that allows them; India is never allowed.
+        Record a verification partner's age result for a viewer. RentMate is for adults (18+) only.
       </p>
       <div className="row-wrap">
         <input
