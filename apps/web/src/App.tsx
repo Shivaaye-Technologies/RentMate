@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { Monogram } from "./components/Monogram";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { DiscoverError, fetchDiscover, personFromOwnRow, type DiscoverSummary, type Person } from "./api";
 import { AuthScreen, NewPasswordScreen } from "./components/AuthScreen";
 import { hasAuthParams, parseAuthRedirect, type AuthProblem } from "./auth";
@@ -34,12 +34,16 @@ import { AdminConsole } from "./live/AdminConsole";
 import { Marketplace } from "./market/Marketplace";
 import { CompanionDashboard } from "./market/CompanionDashboard";
 import { MarketAdmin } from "./market/MarketAdmin";
-import { BroadcastStudio } from "./rtc/BroadcastStudio";
-import { CallScreen } from "./rtc/CallScreen";
 import { IncomingCall } from "./rtc/IncomingCall";
-import { LiveDiscover } from "./rtc/LiveDiscover";
-import { LiveViewer } from "./rtc/LiveViewer";
 import { AdminGate, MfaSettings } from "./security/AdminGate";
+
+// Calls and live rooms load the media SDK only when someone opens one.
+const CallScreen = lazy(() => import("./rtc/CallScreen").then((m) => ({ default: m.CallScreen })));
+const LiveDiscover = lazy(() => import("./rtc/LiveDiscover").then((m) => ({ default: m.LiveDiscover })));
+const LiveViewer = lazy(() => import("./rtc/LiveViewer").then((m) => ({ default: m.LiveViewer })));
+const BroadcastStudio = lazy(() =>
+  import("./rtc/BroadcastStudio").then((m) => ({ default: m.BroadcastStudio })),
+);
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
@@ -169,7 +173,13 @@ export function App() {
   const incoming = rtc?.kind === "call" ? null : <IncomingCall me={me} />;
   if (rtc) {
     return (
-      <>
+      <Suspense
+        fallback={
+          <main className="empty full">
+            <div className="spinner" aria-hidden="true" />
+          </main>
+        }
+      >
         {incoming}
         {rtc.kind === "call" && <CallScreen key={rtc.id} me={me} callId={rtc.id} onExit={() => leaveRtc()} />}
         {rtc.kind === "live" && <LiveDiscover me={me} onExit={() => leaveRtc()} />}
@@ -179,7 +189,7 @@ export function App() {
         {rtc.kind === "broadcast" && (
           <BroadcastStudio key={rtc.id} me={me} streamId={rtc.id} onExit={() => leaveRtc("#creator")} />
         )}
-      </>
+      </Suspense>
     );
   }
   if (market) {
