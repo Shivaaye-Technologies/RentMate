@@ -22,12 +22,14 @@ export function decideGate(s: SecurityStatus | null): Gate {
   return s.has_factor ? "challenge" : "enroll";
 }
 
-/** Recovery codes look like ABCD-1234-EF56 (case and spaces do not matter). */
+/**
+ * Recovery codes look like ABCD-1234-EF56-7890-ABCD (case, spaces and dashes do not matter). Older 12-digit codes
+ * (ABCD-1234-EF56) are still accepted. The server normalises the same way.
+ */
 export function normaliseRecoveryCode(input: string): string {
   const compact = input.toUpperCase().replace(/[^0-9A-F]/g, "");
-  return compact.length === 12
-    ? `${compact.slice(0, 4)}-${compact.slice(4, 8)}-${compact.slice(8)}`
-    : input.trim();
+  if (compact.length !== 20 && compact.length !== 12) return input.trim();
+  return compact.match(/.{4}/g)!.join("-");
 }
 
 export const SIX_DIGITS = /^\d{6}$/;

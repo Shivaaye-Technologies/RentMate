@@ -69,6 +69,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Browser smoke tests
         run: npm run test:e2e
+      - name: Admin MFA screens (enrolment, challenge, recovery)
+        run: npm run test:e2e:mfa
 
   db-concurrency:
     # Real PostgreSQL with two simultaneous sessions: double-booking, idempotent retries, cancel-vs-accept.

@@ -157,7 +157,9 @@ function Challenge({ onDone }: { onDone: () => Promise<void> }) {
           aria-label={recovery ? "Recovery code" : "6-digit code"}
           inputMode={recovery ? "text" : "numeric"}
           autoComplete="one-time-code"
-          maxLength={recovery ? 20 : 6}
+          // A recovery code is 20 digits; leave room for the dashes or spaces people paste with it.
+          maxLength={recovery ? 40 : 6}
+          placeholder={recovery ? "XXXX-XXXX-XXXX-XXXX-XXXX" : undefined}
           value={code}
           onChange={(e) => setCode(recovery ? e.target.value : e.target.value.replace(/\D/g, ""))}
         />

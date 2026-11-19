@@ -30,6 +30,9 @@ describe("recovery codes", () => {
     expect(normaliseRecoveryCode("ABCD1234EF56")).toBe("ABCD-1234-EF56");
     expect(normaliseRecoveryCode("abcd-1234-ef56")).toBe("ABCD-1234-EF56");
     expect(normaliseRecoveryCode("short")).toBe("short");
+    expect(normaliseRecoveryCode("abcd 1234 ef56 7890 abcd")).toBe("ABCD-1234-EF56-7890-ABCD");
+    expect(normaliseRecoveryCode("ABCD1234EF567890ABCD")).toBe("ABCD-1234-EF56-7890-ABCD");
+    expect(normaliseRecoveryCode("abcd-1234-ef56-7890-abc")).toBe("abcd-1234-ef56-7890-abc");
   });
   it("authenticator codes are exactly six digits", () => {
     expect(SIX_DIGITS.test("123456")).toBe(true);
