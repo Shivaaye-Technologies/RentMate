@@ -284,7 +284,18 @@ function migrationBatches(all) {
       ],
       { encoding: "utf8" },
     );
-    return migrationBatchesFromLog(log, all);
+    // Renames staged but not yet committed (`git mv`) keep their original position too.
+    let pending = "";
+    try {
+      pending = execFileSync(
+        "git",
+        ["diff", "HEAD", "--find-renames", "--diff-filter=R", "--name-status", "--", "supabase/migrations"],
+        { encoding: "utf8" },
+      );
+    } catch {
+      // no HEAD yet
+    }
+    return migrationBatchesFromLog(pending ? `${log}@@\n${pending}` : log, all);
   } catch {
     return [];
   }
