@@ -16,6 +16,7 @@ import { PhotoManager } from "./PhotoManager";
 import { ProfileEditor, SECTION_TITLES, type EditSection } from "./ProfileEditor";
 import { BlockedList, HelpSafety, NotificationSettings, PrivacySettings } from "./Settings";
 import { ThemeToggle } from "./ThemeToggle";
+import { WalletPanel } from "./WalletPanel";
 
 export type DashboardPage =
   EditSection | "photos" | "notifications" | "privacy" | "blocked" | "help" | "account";
@@ -273,6 +274,7 @@ export function ProfileDashboard({
         </p>
         <InviteButton className="btn dark" />
       </div>
+      <WalletPanel me={profile.id} />
       <div className="panel appearance-panel">
         <h2 className="display-sm">Appearance</h2>
         <ThemeToggle />
