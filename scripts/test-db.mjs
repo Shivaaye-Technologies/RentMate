@@ -47,6 +47,7 @@ for (const test of [
   "admin_mfa.sql",
   "recovery_codes_and_retention.sql",
   "guest_host_mutes.sql",
+  "integration_secret_strength.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
