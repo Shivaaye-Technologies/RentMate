@@ -13,6 +13,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { extname, join, normalize } from "node:path";
+import { headersForTest, inlineScriptProblems } from "./lib/render-headers.mjs";
 import { randomUUID } from "node:crypto";
 
 const require = createRequire(import.meta.url);
@@ -414,7 +415,9 @@ const api = await new Promise((r) => {
   const s = app.listen(API_PORT, "127.0.0.1", () => r(s));
 });
 
-// ---------- Static web server (SPA fallback) ----------
+// ---------- Static web server (SPA fallback), with render.yaml's security headers ----------
+// Only the local API, fake Supabase and LiveKit test server are added to the production policy.
+const SECURITY_HEADERS = headersForTest(root, ["http://127.0.0.1:*", "ws://127.0.0.1:*"]);
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -430,7 +433,10 @@ const web = createServer((req, res) => {
   );
   let file = join(webDir, path);
   if (!file.startsWith(webDir) || !existsSync(file) || path === "/") file = join(webDir, "index.html");
-  res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
+  res.writeHead(200, {
+    ...SECURITY_HEADERS,
+    "content-type": types[extname(file)] ?? "application/octet-stream",
+  });
   res.end(readFileSync(file));
 });
 await new Promise((r) => web.listen(WEB_PORT, "127.0.0.1", r));
@@ -444,6 +450,7 @@ const browser = await chromium.launch({
   ],
 });
 const pageErrors = [];
+const cspViolations = [];
 function fakeJwt(sub) {
   const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
   return `${b({ alg: "none", typ: "JWT" })}.${b({ sub, role: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 })}.x`;
@@ -476,6 +483,9 @@ async function personPage(who, { media = true, viewport } = {}) {
   );
   const page = await context.newPage();
   page.on("pageerror", (e) => pageErrors.push(`${who}: ${e.message}`));
+  page.on("console", (m) => {
+    if (/Content Security Policy/i.test(m.text())) cspViolations.push(`${who}: ${m.text()}`);
+  });
   return { context, page };
 }
 const base = `http://127.0.0.1:${WEB_PORT}/`;
@@ -885,6 +895,20 @@ try {
   check("unexpected error", false, e instanceof Error ? e.stack : String(e));
 } finally {
   check("no uncaught JavaScript errors on any page", pageErrors.length === 0, pageErrors.join(" | "));
+  check(
+    "calls, viewing and broadcasting work under the production Content-Security-Policy (no violations)",
+    cspViolations.length === 0,
+    cspViolations.slice(0, 5).join(" | "),
+  );
+  const inline = inlineScriptProblems(
+    readFileSync(join(webDir, "index.html"), "utf8"),
+    SECURITY_HEADERS["Content-Security-Policy"],
+  );
+  check(
+    "render.yaml's CSP allows the built page's inline theme script (hash matches)",
+    inline.length === 0,
+    inline.join(" | "),
+  );
   console.log(results.join("\n"));
   console.log(failures ? `\n${failures} check(s) failed` : `\nall ${results.length} real-time checks passed`);
   await browser.close().catch(() => undefined);

@@ -11,6 +11,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { extname, join, normalize } from "node:path";
+import { headersForTest, inlineScriptProblems } from "./lib/render-headers.mjs";
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -24,6 +25,13 @@ try {
 }
 
 const root = new URL("..", import.meta.url).pathname;
+// Served with render.yaml's security headers; local test servers are the only extra origins.
+const SECURITY_HEADERS = headersForTest(root, [
+  "http://127.0.0.1:*",
+  "ws://127.0.0.1:*",
+  // The unconfigured build falls back to the local development API.
+  "http://localhost:*",
+]);
 const work = mkdtempSync(join(tmpdir(), "soulmate-e2e-"));
 const types = {
   ".html": "text/html",
@@ -55,7 +63,10 @@ function serve(dir) {
     );
     let file = join(dir, path);
     if (!file.startsWith(dir) || !existsSync(file) || path === "/") file = join(dir, "index.html");
-    res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      ...SECURITY_HEADERS,
+      "content-type": types[extname(file)] ?? "application/octet-stream",
+    });
     res.end(readFileSync(file));
   });
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
@@ -75,6 +86,9 @@ async function open(browser, base, viewport) {
   const errors = [];
   const external = new Set();
   page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => {
+    if (/Content Security Policy/i.test(m.text())) errors.push(`CSP: ${m.text()}`);
+  });
   await page.route("**/*", (route) => {
     const url = route.request().url();
     if (url.startsWith(base)) return route.continue();
@@ -91,13 +105,21 @@ const servers = [];
 try {
   // 1. Configured build, signed out: the sign-in screen must render.
   //    The Supabase URL is a placeholder host; any request to it is blocked and recorded.
-  const configured = await serve(
-    build("configured", {
-      VITE_SUPABASE_URL: "https://e2e-placeholder.supabase.co",
-      VITE_SUPABASE_ANON_KEY: "e2e-placeholder-anon-key",
-      VITE_API_URL: "https://e2e-placeholder-api.invalid",
-    }),
+  const configuredDir = build("configured", {
+    VITE_SUPABASE_URL: "https://e2e-placeholder.supabase.co",
+    VITE_SUPABASE_ANON_KEY: "e2e-placeholder-anon-key",
+    VITE_API_URL: "https://e2e-placeholder-api.onrender.com",
+  });
+  const inline = inlineScriptProblems(
+    readFileSync(join(configuredDir, "index.html"), "utf8"),
+    SECURITY_HEADERS["Content-Security-Policy"],
   );
+  check(
+    "render.yaml's CSP allows the built page's inline theme script (hash matches)",
+    inline.length === 0,
+    inline.join(" | "),
+  );
+  const configured = await serve(configuredDir);
   servers.push(configured);
   const base = `http://127.0.0.1:${configured.address().port}`;
 
@@ -122,7 +144,11 @@ try {
       overflow <= 1,
       `page is ${overflow}px wider than the viewport`,
     );
-    check(`${label}: no uncaught JavaScript errors`, errors.length === 0, errors.join(" | "));
+    check(
+      `${label}: no uncaught JavaScript errors or Content-Security-Policy violations`,
+      errors.length === 0,
+      errors.join(" | "),
+    );
     await context.close();
   }
 

@@ -53,3 +53,26 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    # Browser security headers (OPS-01). Tested: scripts/e2e-smoke.mjs and scripts/e2e-rtc.mjs serve the app with
+    # exactly these headers (adding only their local test origins) and fail on any Content-Security-Policy violation;
+    # scripts/lib/render-headers.mjs checks the inline theme script's hash. If the API, Supabase or LiveKit moves to a
+    # custom domain, add it to connect-src.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'sha256-cCSMcpX7ZBezEErTPKWaJqDfIBGipTaIqcD2BywMsHU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: mediastream:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onrender.com https://*.livekit.cloud wss://*.livekit.cloud; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(self), microphone=(self), display-capture=(), geolocation=(), payment=(), usb=()"
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
