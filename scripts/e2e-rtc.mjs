@@ -364,6 +364,25 @@ const liveStore = (me) => ({
   },
   viewerCap: async () => 300,
   hostCheck: async (id) => db.live_streams.some((s) => s.id === id && s.creator_id === me),
+  // Mirrors live_my_publish_sources / live_set_guest_mute (proven in supabase/tests/guest_host_mutes.sql).
+  publishSources: async (id) => {
+    if (db.live_streams.some((s) => s.id === id && s.creator_id === me)) return ["camera", "microphone"];
+    const i = db.live_guest_invites.find(
+      (x) => x.stream_id === id && x.guest_id === me && x.status === "accepted",
+    );
+    if (!i) return [];
+    return [...(i.host_muted_video ? [] : ["camera"]), ...(i.host_muted_audio ? [] : ["microphone"])];
+  },
+  setGuestMute: async (id, guest, kind, muted) => {
+    if (!db.live_streams.some((s) => s.id === id && s.creator_id === me)) throw new Error("Not allowed.");
+    const i = db.live_guest_invites.find(
+      (x) => x.stream_id === id && x.guest_id === guest && x.status === "accepted",
+    );
+    if (!i) throw new Error("That person is not a guest on this stream.");
+    if (kind === "video") i.host_muted_video = muted;
+    else i.host_muted_audio = muted;
+    return [...(i.host_muted_video ? [] : ["camera"]), ...(i.host_muted_audio ? [] : ["microphone"])];
+  },
   removeGuest: async (id, guest) => {
     const s = db.live_streams.find((x) => x.id === id);
     if (!s || s.creator_id !== me) throw new Error("Not allowed.");
@@ -834,20 +853,159 @@ try {
     ),
     String(await vik.page.locator("[data-testid=live-video]").count()),
   );
-  // Host mutes the guest's camera through the API → LiveKit MutePublishedTrack.
-  const muteRes = await fetch(
-    `http://127.0.0.1:${API_PORT}/api/v1/live/streams/${stream.id}/guests/${U.gia}/mute`,
-    {
+  // ---- Host controls, checked against the media server's own state (Twirp GetParticipant) ----
+  const lkParticipant = async (room, identity) => {
+    const t = signJwt(
+      {
+        iss: LK_KEY,
+        nbf: Math.floor(Date.now() / 1000) - 5,
+        exp: Math.floor(Date.now() / 1000) + 60,
+        video: { room, roomAdmin: true },
+      },
+      LK_SECRET,
+    );
+    const r = await fetch(`${LK_URL.replace(/^ws/, "http")}/twirp/livekit.RoomService/GetParticipant`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${fakeJwt(U.cara)}` },
-      body: JSON.stringify({ kind: "video" }),
-    },
-  ).then((r) => r.json());
+      headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
+      body: JSON.stringify({ room, identity }),
+    });
+    return r.ok ? r.json() : null;
+  };
+  const SRC = { camera: ["CAMERA", 1], microphone: ["MICROPHONE", 2] };
+  const liveTrack = (p, source) => (p?.tracks ?? []).some((t) => SRC[source].includes(t.source) && !t.muted);
+  const mayPublish = (p, source) =>
+    Boolean(p?.permission?.canPublish ?? p?.permission?.can_publish) &&
+    (() => {
+      const list = p?.permission?.canPublishSources ?? p?.permission?.can_publish_sources ?? [];
+      return list.length === 0 || list.some((x) => SRC[source].includes(x));
+    })();
+  const guestNow = () => lkParticipant(stream.room_name, U.gia);
+  const mute = (user, kind, muted, as = U.cara) =>
+    fetch(`http://127.0.0.1:${API_PORT}/api/v1/live/streams/${stream.id}/guests/${user}/mute`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${fakeJwt(as)}` },
+      body: JSON.stringify(muted === undefined ? { kind } : { kind, muted }),
+    });
+  // The viewer shows a guest tile as soon as any guest track exists (the microphone is published first), so wait
+  // until the media server itself has the guest's live camera before muting it.
+  check(
+    "guest: the media server has the guest's live camera and microphone",
+    Boolean(
+      await until(async () => {
+        const p = await guestNow();
+        return liveTrack(p, "camera") && liveTrack(p, "microphone");
+      }, 20000),
+    ),
+    JSON.stringify((await guestNow())?.tracks?.map((t) => ({ source: t.source, muted: t.muted }))),
+  );
+  // Host mutes the guest's camera through the API → MutePublishedTrack + UpdateParticipant (source removed).
+  const muteRes = await mute(U.gia, "video").then((r) => r.json());
   check(
     "host controls: muting a guest's camera mutes it on the media server",
     muteRes.muted === 1,
     JSON.stringify(muteRes),
   );
+  check(
+    "host controls: after a camera mute the server has no live guest camera and no longer allows one",
+    Boolean(
+      await until(async () => {
+        const p = await guestNow();
+        return (
+          p &&
+          !liveTrack(p, "camera") &&
+          !mayPublish(p, "camera") &&
+          mayPublish(p, "microphone") &&
+          liveTrack(p, "microphone")
+        );
+      }, 10000),
+    ),
+    JSON.stringify(await guestNow()),
+  );
+  check(
+    "guest: is told the host turned off their camera",
+    Boolean(
+      await until(
+        async () => /turned off your camera/.test(await text(gia.page, "[data-testid=host-notice]")),
+        10000,
+      ),
+    ),
+  );
+  await gia.page.getByRole("button", { name: "Camera on" }).click();
+  await gia.page.waitForTimeout(1500);
+  check(
+    "host controls: while muted, the guest's Camera on is refused and the server still has no live camera",
+    /turned off your camera for now/.test(await text(gia.page, ".alert.error")) &&
+      !liveTrack(await guestNow(), "camera"),
+  );
+  // Host allows the camera again: permission back, nothing switched on remotely; the guest turns it on.
+  const unmuteRes = await mute(U.gia, "video", false).then((r) => r.json());
+  check(
+    "host controls: allowing the camera again restores the permission without turning it on remotely",
+    unmuteRes.hostMuted === false &&
+      Boolean(await until(async () => mayPublish(await guestNow(), "camera"), 10000)) &&
+      !liveTrack(await guestNow(), "camera"),
+    JSON.stringify(unmuteRes),
+  );
+  check(
+    "guest: is told the camera is allowed again",
+    Boolean(
+      await until(
+        async () => /allowed your camera again/.test(await text(gia.page, "[data-testid=host-notice]")),
+        10000,
+      ),
+    ),
+  );
+  await gia.page.getByRole("button", { name: "Camera on" }).click();
+  check(
+    "host controls: after unmuting, the guest's own 'Camera on' publishes a live camera on the server again",
+    Boolean(await until(async () => liveTrack(await guestNow(), "camera"), 15000)),
+    JSON.stringify((await guestNow())?.tracks?.map((t) => ({ source: t.source, muted: t.muted }))),
+  );
+  // Same for the microphone.
+  const micRes = await mute(U.gia, "audio").then((r) => r.json());
+  check(
+    "host controls: muting a guest's microphone mutes it on the media server and removes the permission",
+    micRes.muted === 1 &&
+      Boolean(
+        await until(async () => {
+          const p = await guestNow();
+          return !liveTrack(p, "microphone") && !mayPublish(p, "microphone") && liveTrack(p, "camera");
+        }, 10000),
+      ),
+    JSON.stringify(micRes),
+  );
+  await mute(U.gia, "audio", false);
+  check(
+    "host controls: allowing the microphone again restores the permission; the guest unmutes it themselves",
+    Boolean(await until(async () => mayPublish(await guestNow(), "microphone"), 10000)) &&
+      !liveTrack(await guestNow(), "microphone"),
+  );
+  await gia.page.getByRole("button", { name: "Unmute" }).click();
+  check(
+    "host controls: the guest's microphone is live on the server again after they unmute",
+    Boolean(await until(async () => liveTrack(await guestNow(), "microphone"), 15000)),
+  );
+  // A mute must survive a reconnect: the guest reloads and rejoins while their camera is muted.
+  await mute(U.gia, "video");
+  await until(async () => !mayPublish(await guestNow(), "camera"), 10000);
+  await gia.page.reload();
+  await until(async () => (await mediaState(gia.page, "[data-testid=preview-video]")).width > 0, 20000);
+  await gia.page.getByRole("button", { name: "Join as guest" }).click();
+  check(
+    "host controls: a muted guest who reloads and rejoins is still muted (mic live, no camera, camera not allowed)",
+    Boolean(
+      await until(async () => {
+        const p = await guestNow();
+        return p && liveTrack(p, "microphone") && !liveTrack(p, "camera") && !mayPublish(p, "camera");
+      }, 20000),
+    ),
+    JSON.stringify(await guestNow()),
+  );
+  check(
+    "guest: after rejoining, is told the camera is off",
+    /turned off your camera/.test(await text(gia.page, "[data-testid=host-notice]")),
+  );
+  await mute(U.gia, "video", false);
   const notHost = await fetch(
     `http://127.0.0.1:${API_PORT}/api/v1/live/streams/${stream.id}/guests/${U.cara}/mute`,
     {

@@ -91,14 +91,18 @@ export function liveRouter({ liveStoreFor, providers, countryHeader }: LiveDeps)
           return;
         }
       }
+      // Broadcasters publish only the sources the database allows (a host may have muted a guest's camera or mic).
+      const sources = broadcaster ? await store.publishSources(id.data) : [];
+      const canPublish = broadcaster && sources.length > 0;
       const token = await provider.issueToken({
         room: room.roomName,
         identity: req.user!.id,
-        canPublish: broadcaster,
+        canPublish,
+        ...(canPublish ? { publishSources: sources } : {}),
         ttlSeconds: TOKEN_TTL_SECONDS,
       });
       res.set("Cache-Control", "no-store");
-      res.json({ ...token, room: room.roomName, canPublish: broadcaster });
+      res.json({ ...token, room: room.roomName, canPublish, publishSources: sources });
     }),
   );
 
@@ -192,7 +196,7 @@ export function liveRouter({ liveStoreFor, providers, countryHeader }: LiveDeps)
   // ---- Host controls (creator of the stream, or a moderator) ----
 
   const GuestParams = z.object({ id: uuid, user: uuid });
-  const MuteBody = z.object({ kind: z.enum(["audio", "video"]) }).strict();
+  const MuteBody = z.object({ kind: z.enum(["audio", "video"]), muted: z.boolean().default(true) }).strict();
 
   r.post(
     "/streams/:id/guests/:user/mute",
@@ -213,12 +217,21 @@ export function liveRouter({ liveStoreFor, providers, countryHeader }: LiveDeps)
         refuse(res, ["stream_not_found"]);
         return;
       }
-      const muted = await providerFor(room.providerKey).muteParticipant(
-        room.roomName,
+      // The database records the mute (it survives reconnects and new tokens); the media server then enforces it.
+      const sources = await store.setGuestMute(
+        params.data.id,
         params.data.user,
         body.data.kind,
+        body.data.muted,
       );
-      res.json({ muted });
+      const provider = providerFor(room.providerKey);
+      // Mute what is live now, then take the source away so a camera published a moment later, a reconnect or the
+      // guest's own unmute cannot bring it back. Unmuting only gives the permission back: the guest turns the device on.
+      const muted = body.data.muted
+        ? await provider.muteParticipant(room.roomName, params.data.user, body.data.kind)
+        : 0;
+      const inRoom = await provider.setPublishSources(room.roomName, params.data.user, sources);
+      res.json({ muted, hostMuted: body.data.muted, sources, inRoom });
     }),
   );
 

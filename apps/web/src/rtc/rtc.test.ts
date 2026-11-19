@@ -114,3 +114,36 @@ describe("call and live routes", () => {
     expect(rtcHash("#companions")).toBeNull();
   });
 });
+
+describe("host mute permissions", () => {
+  it("reads LiveKit permissions (empty source list means every source)", async () => {
+    const { allowedFrom } = await import("./publishPermission");
+    expect(allowedFrom(undefined)).toEqual({ camera: false, microphone: false });
+    expect(allowedFrom({ canPublish: false, canPublishSources: [1, 2] })).toEqual({
+      camera: false,
+      microphone: false,
+    });
+    expect(allowedFrom({ canPublish: true, canPublishSources: [] })).toEqual({
+      camera: true,
+      microphone: true,
+    });
+    expect(allowedFrom({ canPublish: true, canPublishSources: [2] })).toEqual({
+      camera: false,
+      microphone: true,
+    });
+    expect(allowedFrom({ canPublish: true, canPublishSources: [1] })).toEqual({
+      camera: true,
+      microphone: false,
+    });
+  });
+  it("reads the join response and explains each change to the guest", async () => {
+    const { allowedFromSources, hostNotice } = await import("./publishPermission");
+    const both = allowedFromSources(["camera", "microphone"]);
+    const micOnly = allowedFromSources(["microphone"]);
+    expect(micOnly).toEqual({ camera: false, microphone: true });
+    expect(hostNotice(both, micOnly)).toBe("The host turned off your camera.");
+    expect(hostNotice(micOnly, both)).toMatch(/allowed your camera again/);
+    expect(hostNotice(both, allowedFromSources([]))).toMatch(/turned off your camera.*muted your microphone/);
+    expect(hostNotice(both, both)).toBeNull();
+  });
+});

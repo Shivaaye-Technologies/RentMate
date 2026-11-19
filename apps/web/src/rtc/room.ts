@@ -27,6 +27,8 @@ export interface MediaRoomEvents {
   onRemoteChange?: () => void;
   /** Local tracks changed (camera turned on, device switched): re-attach the preview. */
   onLocalChange?: () => void;
+  /** The server changed what I may publish (a host muted or allowed my camera or microphone). */
+  onPermissions?: (p: { canPublish?: boolean; canPublishSources?: number[] } | undefined) => void;
 }
 
 /** LiveKit's reason for a disconnect, in the screen's words. */
@@ -65,6 +67,9 @@ export async function joinMediaRoom(
     .on(RoomEvent.TrackUnsubscribed, () => events.onRemoteChange?.())
     .on(RoomEvent.TrackMuted, () => events.onRemoteChange?.())
     .on(RoomEvent.TrackUnmuted, () => events.onRemoteChange?.())
+    .on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant) => {
+      if (participant === room.localParticipant) events.onPermissions?.(participant.permissions);
+    })
     .on(RoomEvent.LocalTrackPublished, () => events.onLocalChange?.())
     .on(RoomEvent.LocalTrackUnpublished, () => events.onLocalChange?.())
     .on(RoomEvent.ActiveDeviceChanged, () => events.onLocalChange?.());

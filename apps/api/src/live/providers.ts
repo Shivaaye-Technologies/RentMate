@@ -9,8 +9,12 @@ export interface JoinGrant {
   canPublish: boolean;
   /** Audio-only rooms (private audio sessions) publish the microphone only. */
   audioOnly?: boolean;
+  /** When set, the only sources this person may publish (live guests a host has muted lose that source). */
+  publishSources?: PublishSource[];
   ttlSeconds: number;
 }
+
+export type PublishSource = "camera" | "microphone";
 
 export interface JoinToken {
   /** Where the browser connects (never a secret). */
@@ -40,6 +44,11 @@ export interface StreamingProvider {
   removeParticipant(room: string, identity: string): Promise<void>;
   /** Mutes every published track of one kind for one person (host controls). Returns how many were muted. */
   muteParticipant(room: string, identity: string, kind: "audio" | "video"): Promise<number>;
+  /**
+   * Sets which sources a connected person may publish, enforced by the media server (host mutes). Tracks of a removed
+   * source are taken down by the server and cannot be republished. Returns false when the person is not in the room.
+   */
+  setPublishSources(room: string, identity: string, sources: PublishSource[]): Promise<boolean>;
 }
 
 // ---------- JWT (HS256) ----------
@@ -150,6 +159,9 @@ export class LiveKitProvider implements StreamingProvider {
           canPublishData: false,
           canUpdateOwnMetadata: false,
           ...(g.canPublish && g.audioOnly ? { canPublishSources: ["microphone"] } : {}),
+          ...(g.canPublish && !g.audioOnly && g.publishSources
+            ? { canPublishSources: g.publishSources }
+            : {}),
         },
       },
       apiSecret,
@@ -209,6 +221,26 @@ export class LiveKitProvider implements StreamingProvider {
       muted++;
     }
     return muted;
+  }
+
+  async setPublishSources(room: string, identity: string, sources: PublishSource[]): Promise<boolean> {
+    const res = await this.rpc(
+      "UpdateParticipant",
+      {
+        room,
+        identity,
+        permission: {
+          can_subscribe: true,
+          can_publish: sources.length > 0,
+          can_publish_data: false,
+          can_publish_sources: sources.map((x) => (x === "camera" ? "CAMERA" : "MICROPHONE")),
+        },
+      },
+      room,
+    );
+    if (res.status === 404) return false;
+    if (!res.ok) throw new Error(`LiveKit UpdateParticipant failed (${res.status})`);
+    return true;
   }
 
   /**
@@ -286,6 +318,13 @@ export class MemoryProvider implements StreamingProvider {
   async muteParticipant(room: string, identity: string, kind: "audio" | "video"): Promise<number> {
     this.muted.push({ room, identity, kind });
     return 1;
+  }
+
+  readonly sources: { room: string; identity: string; sources: PublishSource[] }[] = [];
+
+  async setPublishSources(room: string, identity: string, sources: PublishSource[]): Promise<boolean> {
+    this.sources.push({ room, identity, sources });
+    return true;
   }
 }
 

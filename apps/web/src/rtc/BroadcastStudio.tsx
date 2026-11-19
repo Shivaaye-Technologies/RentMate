@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
+  createLocalAudioTrack,
   createLocalTracks,
+  createLocalVideoTrack,
   Room,
   Track,
   type LocalAudioTrack,
@@ -10,6 +12,7 @@ import {
 import { FAILURE_TEXT, mediaFailure } from "./callState";
 import { LiveChat } from "./LiveChat";
 import { liveApi, type GuestInvite, type StreamInfo } from "./liveData";
+import { allowedFrom, allowedFromSources, hostNotice, type Allowed } from "./publishPermission";
 import { attach, joinMediaRoom, trackOf, type MediaRoom } from "./room";
 
 type Phase = "loading" | "preview" | "starting" | "live" | "reconnecting" | "ended" | "error";
@@ -37,6 +40,9 @@ export function BroadcastStudio({
   });
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  // What the server lets me publish (a host may mute a guest); kept in a ref too for event handlers.
+  const allowedRef = useRef<Allowed>({ camera: true, microphone: true });
+  const [notice, setNotice] = useState<string | null>(null);
   const [viewers, setViewers] = useState<number | null>(null);
   const [cohosts, setCohosts] = useState<RemoteParticipant[]>([]);
   const media = useRef<MediaRoom | null>(null);
@@ -129,7 +135,18 @@ export function BroadcastStudio({
         }
       }
       const t = await liveApi.join(streamId, "broadcaster");
+      const allowed = allowedFromSources(t.publishSources ?? []);
+      allowedRef.current = allowed;
+      setNotice(hostNotice({ camera: true, microphone: true }, allowed));
       const m = await joinMediaRoom(t.url, t.token, {
+        onPermissions: (p) => {
+          const next = allowedFrom(p);
+          const msg = hostNotice(allowedRef.current, next);
+          allowedRef.current = next;
+          if (!next.camera) setCamOn(false);
+          if (!next.microphone) setMicOn(false);
+          if (msg) setNotice(msg);
+        },
         onConnection: (c) => {
           if (c === "reconnecting") setPhase("reconnecting");
           if (c === "reconnected") setPhase("live");
@@ -146,8 +163,12 @@ export function BroadcastStudio({
         },
       });
       media.current = m;
-      if (preview.audio) await m.room.localParticipant.publishTrack(preview.audio);
-      if (preview.video) await m.room.localParticipant.publishTrack(preview.video, { simulcast: true });
+      // Publish only what the server allows; a muted guest who rejoins stays muted.
+      if (preview.audio && allowed.microphone) await m.room.localParticipant.publishTrack(preview.audio);
+      else setMicOn(false);
+      if (preview.video && allowed.camera)
+        await m.room.localParticipant.publishTrack(preview.video, { simulcast: true });
+      else setCamOn(false);
       setPhase("live");
       await loadInfo();
     } catch (e) {
@@ -170,13 +191,45 @@ export function BroadcastStudio({
   }
 
   async function toggle(kind: "mic" | "cam") {
-    const track = kind === "mic" ? preview.audio : preview.video;
     const on = kind === "mic" ? !micOn : !camOn;
-    if (!track) return;
-    if (on) await track.unmute();
-    else await track.mute();
-    if (kind === "mic") setMicOn(on);
-    else setCamOn(on);
+    const room = media.current?.room;
+    if (on && room && !(kind === "mic" ? allowedRef.current.microphone : allowedRef.current.camera)) {
+      setError(
+        kind === "mic"
+          ? "The host has muted your microphone for now."
+          : "The host has turned off your camera for now.",
+      );
+      return;
+    }
+    setError(null);
+    try {
+      const source = kind === "mic" ? Track.Source.Microphone : Track.Source.Camera;
+      const published = room?.localParticipant.getTrackPublication(source)?.track;
+      const current = kind === "mic" ? preview.audio : preview.video;
+      if (on && room && !published) {
+        // The server took the track down (host mute); publish a fresh one now that it is allowed again.
+        const fresh =
+          kind === "mic"
+            ? await createLocalAudioTrack(micId ? { deviceId: micId } : undefined)
+            : await createLocalVideoTrack({
+                resolution: { width: 1280, height: 720 },
+                ...(camId ? { deviceId: camId } : {}),
+              });
+        await room.localParticipant.publishTrack(fresh, kind === "cam" ? { simulcast: true } : undefined);
+        setPreview((p) =>
+          kind === "mic"
+            ? { ...p, audio: fresh as LocalAudioTrack }
+            : { ...p, video: fresh as LocalVideoTrack },
+        );
+      } else if (current) {
+        if (on) await current.unmute();
+        else await current.mute();
+      }
+      if (kind === "mic") setMicOn(on);
+      else setCamOn(on);
+    } catch (e) {
+      setError(FAILURE_TEXT[mediaFailure(e)]);
+    }
   }
 
   // Viewer count while live.
@@ -240,6 +293,11 @@ export function BroadcastStudio({
           ))}
         </div>
       </section>
+      {notice && (
+        <p className="alert" role="status" data-testid="host-notice">
+          {notice}
+        </p>
+      )}
       {error && (
         <p className="alert error" role="alert">
           {error}
@@ -382,15 +440,19 @@ function GuestPanel({
                 <>
                   <button
                     className="btn small"
-                    onClick={() => void act(() => liveApi.muteGuest(streamId, i.guest_id, "audio"))}
+                    onClick={() =>
+                      void act(() => liveApi.muteGuest(streamId, i.guest_id, "audio", !i.host_muted_audio))
+                    }
                   >
-                    Mute mic
+                    {i.host_muted_audio ? "Allow mic" : "Mute mic"}
                   </button>
                   <button
                     className="btn small"
-                    onClick={() => void act(() => liveApi.muteGuest(streamId, i.guest_id, "video"))}
+                    onClick={() =>
+                      void act(() => liveApi.muteGuest(streamId, i.guest_id, "video", !i.host_muted_video))
+                    }
                   >
-                    Stop camera
+                    {i.host_muted_video ? "Allow camera" : "Stop camera"}
                   </button>
                 </>
               )}

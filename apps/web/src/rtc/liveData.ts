@@ -33,6 +33,9 @@ export interface GuestInvite {
   stream_id: string;
   guest_id: string;
   status: string;
+  /** Host mutes (stored in the database, enforced by the media server). */
+  host_muted_audio?: boolean;
+  host_muted_video?: boolean;
 }
 
 export const REACTIONS = [
@@ -73,7 +76,9 @@ export const liveApi = {
     return (data as StreamInfo | null) ?? null;
   },
   join: (id: string, as: "viewer" | "broadcaster") =>
-    serverApi<RoomToken & { canPublish: boolean }>(`/live/streams/${id}/join`, { as }),
+    serverApi<RoomToken & { canPublish: boolean; publishSources: string[] }>(`/live/streams/${id}/join`, {
+      as,
+    }),
   stats: (id: string) => serverGet<{ status: string; viewers: number | null }>(`/live/streams/${id}/stats`),
   start: (id: string) => rpc<string[]>("live_start_stream", { p_stream: id }),
   end: (id: string) => serverApi<{ ended: boolean }>(`/live/streams/${id}/end`),
@@ -121,7 +126,7 @@ export const liveApi = {
   async invites(id: string): Promise<GuestInvite[]> {
     const { data, error } = await supabase
       .from("live_guest_invites")
-      .select("id,stream_id,guest_id,status")
+      .select("id,stream_id,guest_id,status,host_muted_audio,host_muted_video")
       .eq("stream_id", id);
     if (error) throw new Error(rtcError(error));
     return (data as GuestInvite[] | null) ?? [];
@@ -157,8 +162,15 @@ export const liveApi = {
   },
   declineInvite: (invite: GuestInvite) =>
     rpc<void>("live_answer_guest_invite", { p_invite: invite.id, p_accept: false }),
-  muteGuest: (id: string, guest: string, kind: "audio" | "video") =>
-    serverApi<{ muted: number }>(`/live/streams/${id}/guests/${guest}/mute`, { kind }),
+  /** Host mute (muted = true) or allow again (muted = false). Persistent and enforced by the media server. */
+  muteGuest: (id: string, guest: string, kind: "audio" | "video", muted = true) =>
+    serverApi<{ muted: number; hostMuted: boolean; sources: string[] }>(
+      `/live/streams/${id}/guests/${guest}/mute`,
+      {
+        kind,
+        muted,
+      },
+    ),
   removeGuest: (id: string, guest: string) =>
     serverApi<{ removed: boolean }>(`/live/streams/${id}/guests/${guest}/remove`),
   async stageNames(ids: string[]): Promise<Record<string, string>> {

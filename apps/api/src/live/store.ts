@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { PublishSource } from "./providers.js";
 
 export interface StreamRoom {
   roomName: string;
@@ -62,6 +63,15 @@ export interface LiveStore {
   /** May the caller control this stream's room (creator or moderator)? */
   hostCheck(streamId: string): Promise<boolean>;
   removeGuest(streamId: string, guestId: string): Promise<void>;
+  /** Sources the caller may publish in this stream (creator: both; guest: minus host mutes; others: none). */
+  publishSources(streamId: string): Promise<PublishSource[]>;
+  /** Host or moderator mutes/unmutes a guest's camera or microphone; returns the guest's allowed sources. */
+  setGuestMute(
+    streamId: string,
+    guestId: string,
+    kind: "audio" | "video",
+    muted: boolean,
+  ): Promise<PublishSource[]>;
   /** Creator ends their own stream (database first; the API then closes the room). */
   endStream(streamId: string): Promise<void>;
 }
@@ -104,6 +114,9 @@ export class LiveStoreError extends Error {
 }
 
 /** Maps database errors: missing role = 403, bad input = 400, anything else = 500. */
+const asSources = (data: unknown): PublishSource[] =>
+  Array.isArray(data) ? data.filter((x): x is PublishSource => x === "camera" || x === "microphone") : [];
+
 function fail(error: { code?: string; message: string }): never {
   if (error.code === "42501") throw new LiveStoreError("You don't have permission to do that.", 403);
   if (error.code === "22023" || error.code === "23514" || error.code === "22P02") {
@@ -259,6 +272,26 @@ export class SupabaseLiveStore implements LiveStore {
     const { data, error } = await this.db.rpc("live_host_check", { p_stream: streamId });
     if (error) fail(error);
     return data === true;
+  }
+
+  async publishSources(streamId: string) {
+    const { data, error } = await this.db.rpc("live_my_publish_sources", { p_stream: streamId });
+    if (error) fail(error);
+    return asSources(data);
+  }
+
+  async setGuestMute(streamId: string, guestId: string, kind: "audio" | "video", muted: boolean) {
+    const { data, error } = await this.db.rpc("live_set_guest_mute", {
+      p_stream: streamId,
+      p_guest: guestId,
+      p_kind: kind,
+      p_muted: muted,
+    });
+    if (error) {
+      if (error.code === "P0001") throw new LiveStoreError(error.message, 409);
+      fail(error);
+    }
+    return asSources(data);
   }
 
   async removeGuest(streamId: string, guestId: string) {

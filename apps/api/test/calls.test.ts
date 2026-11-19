@@ -60,6 +60,8 @@ class CallStore implements LiveStore {
   viewerCap = async () => this.no();
   hostCheck = async () => this.no();
   removeGuest = async () => this.no();
+  publishSources = async () => this.no();
+  setGuestMute = async () => this.no();
   endStream = async () => this.no();
 }
 

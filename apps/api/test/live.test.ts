@@ -4,7 +4,14 @@ import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { classifyHealth, explainProblems, refusalStatus, viewerCountry } from "../src/live/policy.js";
-import { buildRegistry, LiveKitProvider, MemoryProvider, signJwt, verifyJwt } from "../src/live/providers.js";
+import {
+  buildRegistry,
+  LiveKitProvider,
+  MemoryProvider,
+  signJwt,
+  verifyJwt,
+  type PublishSource,
+} from "../src/live/providers.js";
 import { LiveStoreError, type AdminStream, type LiveStore, type StreamRoom } from "../src/live/store.js";
 import { MemoryProfileStore } from "../src/store.js";
 
@@ -312,6 +319,26 @@ class FakeLiveStore implements LiveStore {
     if (!this.host) throw new LiveStoreError("You don't have permission to do that.", 403);
     this.guestsRemoved.push(guest);
   }
+  /** Mirrors live_set_guest_mute / live_my_publish_sources (proven in supabase/tests/guest_host_mutes.sql). */
+  guestMutes = { audio: false, video: false };
+  isGuest = true;
+  creator = false;
+  private allowed(): PublishSource[] {
+    const s: PublishSource[] = [];
+    if (!this.guestMutes.video) s.push("camera");
+    if (!this.guestMutes.audio) s.push("microphone");
+    return s;
+  }
+  async publishSources() {
+    if (this.creator) return ["camera", "microphone"] as PublishSource[];
+    return this.isGuest ? this.allowed() : [];
+  }
+  async setGuestMute(_stream: string, _guest: string, kind: "audio" | "video", muted: boolean) {
+    if (!this.host) throw new LiveStoreError("You don't have permission to do that.", 403);
+    if (!this.isGuest) throw new LiveStoreError("That person is not a guest on this stream.", 409);
+    this.guestMutes[kind] = muted;
+    return this.allowed();
+  }
 }
 
 function setup(opts: { countryHeader?: string | null; provider?: MemoryProvider | null } = {}) {
@@ -465,6 +492,73 @@ describe("live routes", () => {
       .set(auth)
       .send({ kind: "audio" });
     expect(bad.status).toBe(400);
+  });
+
+  it("host mutes persist and are enforced by the media server: camera and microphone, mute and unmute", async () => {
+    const { app, store, provider } = setup();
+    const GUEST = "33333333-3333-4333-8333-333333333333";
+    store.host = true;
+    const post = (kind: "audio" | "video", muted?: boolean) =>
+      request(app)
+        .post(`/api/v1/live/streams/${STREAM}/guests/${GUEST}/mute`)
+        .set(auth)
+        .send(muted === undefined ? { kind } : { kind, muted });
+    // Mute camera: live camera tracks muted now, and the camera source taken away on the server.
+    let r = await post("video");
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ muted: 1, hostMuted: true, sources: ["microphone"], inRoom: true });
+    expect(provider!.muted.at(-1)).toEqual({ room: "sm-room", identity: GUEST, kind: "video" });
+    expect(provider!.sources.at(-1)).toEqual({ room: "sm-room", identity: GUEST, sources: ["microphone"] });
+    // Mute microphone too: nothing left to publish.
+    r = await post("audio", true);
+    expect(r.body).toMatchObject({ muted: 1, sources: [] });
+    expect(provider!.sources.at(-1)!.sources).toEqual([]);
+    // A rejoin while muted gets a token that cannot publish anything.
+    store.broadcast = [];
+    const rejoin = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "broadcaster" });
+    expect(rejoin.status).toBe(200);
+    expect(rejoin.body).toMatchObject({ canPublish: false, publishSources: [] });
+    expect(provider!.issued.at(-1)).toMatchObject({ canPublish: false });
+    // Unmute camera: the permission comes back; nothing is switched on remotely (no new mute calls, no unmute call).
+    const mutesBefore = provider!.muted.length;
+    r = await post("video", false);
+    expect(r.body).toMatchObject({ muted: 0, hostMuted: false, sources: ["camera"] });
+    expect(provider!.muted).toHaveLength(mutesBefore);
+    expect(provider!.sources.at(-1)!.sources).toEqual(["camera"]);
+    const rejoinCamera = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "broadcaster" });
+    expect(rejoinCamera.body).toMatchObject({ canPublish: true, publishSources: ["camera"] });
+    expect(provider!.issued.at(-1)).toMatchObject({ canPublish: true, publishSources: ["camera"] });
+    // Unmute microphone: both sources back.
+    r = await post("audio", false);
+    expect(r.body.sources).toEqual(["camera", "microphone"]);
+    // Muting someone who is not a guest is refused without touching the media server.
+    store.isGuest = false;
+    const sourcesBefore = provider!.sources.length;
+    r = await post("video");
+    expect(r.status).toBe(409);
+    expect(provider!.sources).toHaveLength(sourcesBefore);
+    // Invalid body.
+    expect((await post("screen" as "video")).status).toBe(400);
+  });
+
+  it("a creator's broadcaster token can publish camera and microphone; viewers publish nothing", async () => {
+    const { app, store, provider } = setup();
+    store.creator = true;
+    store.broadcast = [];
+    const b = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "broadcaster" });
+    expect(b.body).toMatchObject({ canPublish: true, publishSources: ["camera", "microphone"] });
+    const v = await request(app).post(`/api/v1/live/streams/${STREAM}/join`).set(auth).send({ as: "viewer" });
+    expect(v.body).toMatchObject({ canPublish: false, publishSources: [] });
+    expect(provider!.issued.at(-1)).toMatchObject({ canPublish: false });
   });
 
   it("treats a missing country header as unknown (fails closed)", async () => {
