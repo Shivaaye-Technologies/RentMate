@@ -21,6 +21,8 @@
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces && npm run test:demo && npm run test:db",
     "test:db": "node scripts/test-db.mjs",
+    "test:rollback": "node scripts/test-rollback.mjs",
+    "test:db:concurrency": "bash scripts/test-db-concurrency.sh",
     "test:demo": "node --test scripts/demo/generate-demo-profiles.test.mjs",
     "build": "npm run build --workspaces",
     "check": "npm run test:policy && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",

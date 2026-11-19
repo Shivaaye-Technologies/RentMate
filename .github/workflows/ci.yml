@@ -34,6 +34,8 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+      - name: Migration rollback rehearsal
+        run: npm run test:rollback
       - name: Hook guard tests
         run: npm run test:hooks
       - name: aihub tests
@@ -67,3 +69,31 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Browser smoke tests
         run: npm run test:e2e
+
+  db-concurrency:
+    # Real PostgreSQL with two simultaneous sessions: double-booking, idempotent retries, cancel-vs-accept.
+    # PGlite (npm run test:db, in the check job) has one connection and cannot test these races.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Throwaway container that exists only for this job; not a real credential.
+          POSTGRES_PASSWORD: ci-throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Booking concurrency tests
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: ci-throwaway
+        run: scripts/test-db-concurrency.sh
