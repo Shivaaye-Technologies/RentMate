@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 /** What a joining person is allowed to do in a room. */
 export interface JoinGrant {
@@ -39,24 +39,53 @@ export interface StreamingProvider {
 }
 
 // ---------- JWT (HS256) ----------
+//
+// LiveKit access tokens are JWTs signed with HMAC-SHA256 (HS256) using the project's API secret; that is the format
+// the LiveKit server verifies, so the algorithm cannot change without breaking every join. HMAC here is a message
+// authentication code keyed with a server-side secret. It is not a password hash: no user password is ever passed
+// to these functions, so slow password hashes (bcrypt, scrypt, Argon2) do not apply. See docs/SECURITY_NOTES_LIVEKIT_JWT.md.
+
+const HS256_HEADER = JSON.stringify({ alg: "HS256", typ: "JWT" });
 
 const b64url = (data: Buffer | string) =>
   Buffer.from(data).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
 
+const fromB64url = (s: string) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+
+/** HMAC-SHA256 message authentication code over `header.body`, keyed with the API secret. */
+const hs256Mac = (signingInput: string, apiSecret: string): Buffer =>
+  createHmac("sha256", apiSecret).update(signingInput).digest();
+
 export function signJwt(payload: Record<string, unknown>, secret: string): string {
-  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const header = b64url(HS256_HEADER);
   const body = b64url(JSON.stringify(payload));
-  const sig = b64url(createHmac("sha256", secret).update(`${header}.${body}`).digest());
+  const sig = b64url(hs256Mac(`${header}.${body}`, secret));
   return `${header}.${body}.${sig}`;
 }
 
-/** Verifies and decodes an HS256 JWT (used by tests and for defence in depth). */
+/**
+ * Verifies and decodes an HS256 JWT (used by tests and for defence in depth). Returns null unless the token has three
+ * parts, its header declares HS256 (so "alg: none" and algorithm-confusion tokens are refused), and the signature
+ * matches in constant time.
+ */
 export function verifyJwt(token: string, secret: string): Record<string, unknown> | null {
-  const [h, b, s] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [h, b, s] = parts;
   if (!h || !b || !s) return null;
-  const expected = b64url(createHmac("sha256", secret).update(`${h}.${b}`).digest());
-  if (expected.length !== s.length || expected !== s) return null;
-  return JSON.parse(Buffer.from(b.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+  try {
+    const header = JSON.parse(fromB64url(h).toString("utf8")) as { alg?: unknown };
+    if (header.alg !== "HS256") return null;
+    const expected = hs256Mac(`${h}.${b}`, secret);
+    const given = fromB64url(s);
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+    const payload: unknown = JSON.parse(fromB64url(b).toString("utf8"));
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------- LiveKit ----------

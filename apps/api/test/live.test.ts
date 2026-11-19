@@ -4,7 +4,7 @@ import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { classifyHealth, explainProblems, refusalStatus, viewerCountry } from "../src/live/policy.js";
-import { buildRegistry, LiveKitProvider, MemoryProvider, verifyJwt } from "../src/live/providers.js";
+import { buildRegistry, LiveKitProvider, MemoryProvider, signJwt, verifyJwt } from "../src/live/providers.js";
 import { LiveStoreError, type AdminStream, type LiveStore, type StreamRoom } from "../src/live/store.js";
 import { MemoryProfileStore } from "../src/store.js";
 
@@ -47,6 +47,39 @@ describe("LiveKit provider", () => {
       canPublish: true,
       canPublishSources: ["microphone"],
     });
+  });
+
+  it("produces standard HS256 JWTs (known-answer vector, LiveKit-compatible format)", () => {
+    // The published jwt.io HS256 example (secret "your-256-bit-secret"). The expected signature is an HMAC over the
+    // exact header and body bytes, so any change to the token format breaks this test. The vector is checked in parts so
+    // the repository never holds a complete JWT literal (the policy guard treats those as possible credentials).
+    const claims = { sub: "1234567890", name: "John Doe", iat: 1516239022 };
+    const token = signJwt(claims, "your-256-bit-secret");
+    const [h, b, s] = token.split(".");
+    expect(h).toBe("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+    expect(Buffer.from(b, "base64url").toString("utf8")).toBe(JSON.stringify(claims));
+    expect(s).toBe("SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
+    expect(verifyJwt(token, "your-256-bit-secret")).toEqual(claims);
+  });
+
+  it("rejects tampered, unsigned and malformed tokens", () => {
+    const good = signJwt({ sub: "u1", video: { roomJoin: true } }, SECRET);
+    const [h, b, s] = good.split(".");
+    const forgedBody = Buffer.from(JSON.stringify({ sub: "admin", video: { roomAdmin: true } })).toString(
+      "base64url",
+    );
+    expect(verifyJwt(`${h}.${forgedBody}.${s}`, SECRET)).toBeNull();
+    const flipped = (s[0] === "A" ? "B" : "A") + s.slice(1);
+    expect(verifyJwt(`${h}.${b}.${flipped}`, SECRET)).toBeNull();
+    expect(verifyJwt(`${h}.${b}.${s.slice(0, -2)}`, SECRET)).toBeNull();
+    const none = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+    const noneSig = signJwt({ sub: "u1" }, SECRET).split(".")[2];
+    expect(verifyJwt(`${none}.${b}.`, SECRET)).toBeNull();
+    expect(verifyJwt(`${none}.${b}.${noneSig}`, SECRET)).toBeNull();
+    expect(verifyJwt("not-a-jwt", SECRET)).toBeNull();
+    expect(verifyJwt(`${h}.${b}.${s}.extra`, SECRET)).toBeNull();
+    expect(verifyJwt("%%%.%%%.%%%", SECRET)).toBeNull();
+    expect(verifyJwt(good, SECRET)).toMatchObject({ sub: "u1" });
   });
 
   it("refuses to issue tokens without credentials", async () => {
