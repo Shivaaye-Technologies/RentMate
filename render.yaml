@@ -31,6 +31,9 @@ services:
         sync: false
       - key: LIVEKIT_API_SECRET
         sync: false
+      # Webhooks and room removal; same value stored once with private.set_integration_secret (see .env.example).
+      - key: LIVE_WEBHOOK_DB_SECRET
+        sync: false
       - key: LIVE_COUNTRY_HEADER
         sync: false
 
