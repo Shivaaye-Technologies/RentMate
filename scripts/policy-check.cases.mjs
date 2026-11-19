@@ -209,4 +209,74 @@ export const CASES = [
     fail: false,
     note: "unique migrations",
   },
+  // Migration order (batches = files added per commit, oldest first)
+  {
+    order: [
+      ["supabase/migrations/20261123100000_integration_secret_strength.sql"],
+      ["supabase/migrations/20261121120000_made_today.sql"],
+    ],
+    fail: true,
+    note: "migration added later but dated before an existing one",
+  },
+  {
+    order: [["supabase/migrations/20261123100000_a.sql"], ["supabase/migrations/20261123100000_b.sql"]],
+    fail: true,
+    note: "migration added later with the same version",
+  },
+  {
+    order: [
+      ["supabase/migrations/20261121090000_a.sql", "supabase/migrations/20261121100000_b.sql"],
+      ["supabase/migrations/20261123090000_c.sql"],
+    ],
+    fail: false,
+    note: "migrations added in version order (several in one commit)",
+  },
+  {
+    order: [
+      ["supabase/migrations/20261121100000_b.sql", "supabase/migrations/20261121090000_a.sql"],
+      ["supabase/migrations/20261124000000_d.sql"],
+    ],
+    fail: false,
+    note: "one commit may add several migrations in any listing order",
+  },
+  // Order derived from `git log --name-status` (renames keep the position of the original addition)
+  {
+    log: "@@\n\nA\tsupabase/migrations/20261023000000_init.sql\n@@\n\nA\tsupabase/migrations/20261023095502_x.sql\n@@\n\nR100\tsupabase/migrations/20261023000000_init.sql\tsupabase/migrations/20261022210236_init.sql\n",
+    all: ["supabase/migrations/20261022210236_init.sql", "supabase/migrations/20261023095502_x.sql"],
+    fail: false,
+    note: "renamed migration keeps its original position",
+  },
+  {
+    log: "@@\n\nA\tsupabase/migrations/20261123100000_a.sql\n",
+    all: ["supabase/migrations/20261123100000_a.sql", "supabase/migrations/20261121000000_new.sql"],
+    fail: true,
+    note: "uncommitted migration dated before the newest committed one",
+  },
+  {
+    log: "@@\n\nA\tsupabase/migrations/20261123100000_a.sql\n",
+    all: ["supabase/migrations/20261123100000_a.sql", "supabase/migrations/20261124000000_new.sql"],
+    fail: false,
+    note: "uncommitted migration dated after the newest committed one",
+  },
+  // Dependency floors
+  {
+    lock: { packages: { "node_modules/vite": { version: "6.4.5" } } },
+    fail: true,
+    note: "vite 6.4.5 (GHSA-p4f5-76q4-ffq7)",
+  },
+  {
+    lock: { packages: { "node_modules/vitest/node_modules/vite": { version: "6.2.0" } } },
+    fail: true,
+    note: "nested vulnerable vite copy",
+  },
+  {
+    lock: { packages: { "node_modules/vite": { version: "6.4.6" } } },
+    fail: false,
+    note: "vite 6.4.6",
+  },
+  {
+    lock: { packages: { "node_modules/@vitejs/plugin-react": { version: "4.7.0" } } },
+    fail: false,
+    note: "different package whose path contains vite",
+  },
 ];

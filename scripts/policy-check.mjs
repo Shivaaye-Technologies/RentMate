@@ -8,7 +8,8 @@
 //   3. No file larger than 2 MB.
 //   4. No pornographic / adult / sexual-solicitation wording, except in lines that state a prohibition.
 //   5. Migration safety: well-formed, unique names; new migrations cannot delete or truncate data, drop tables
-//      or columns, or switch off the no-adult-content protections.
+//      or columns, or switch off the no-adult-content protections. Versions must grow in the order files are added.
+//   6. Dependency floors: no installed copy of a package below a version with a known advisory (package-lock.json).
 //
 // Usage: node scripts/policy-check.mjs              (self-test, then scan tracked + new files)
 //        node scripts/policy-check.mjs --self-test  (self-test only)
@@ -184,6 +185,112 @@ export function checkMigrationSet(paths) {
 }
 
 /**
+ * Migration versions must grow in the order the files were added. `batches` lists the migration paths added by each
+ * commit, oldest commit first (uncommitted new files last). A migration whose version sorts at or before one added
+ * earlier would be applied out of order (or refused by `supabase db push`) on a database that already has the newer
+ * one. Example: `supabase migration new` on 2026-11-21 produces 20261121…, which sorts before 20261123100000.
+ */
+export function checkMigrationOrder(batches) {
+  const problems = [];
+  let latest = "";
+  let latestPath = "";
+  for (const batch of batches) {
+    let batchMax = latest;
+    let batchMaxPath = latestPath;
+    for (const p of batch) {
+      const m = /^supabase\/migrations\/(\d{14})_[a-z0-9_]+\.sql$/.exec(p);
+      if (!m) continue;
+      if (m[1] <= latest)
+        problems.push(
+          `${p} was added after ${latestPath} but sorts before it; rename it to a version after ${latest}`,
+        );
+      if (m[1] > batchMax) {
+        batchMax = m[1];
+        batchMaxPath = p;
+      }
+    }
+    latest = batchMax;
+    latestPath = batchMaxPath;
+  }
+  return problems;
+}
+
+/** Packages with a known advisory below a version. Checked against package-lock.json. */
+export const DEPENDENCY_FLOORS = [
+  // GHSA-p4f5-76q4-ffq7: dev-server remote code execution in vite <= 6.4.5 (fixed in 6.4.6).
+  ["vite", "6.4.6", "GHSA-p4f5-76q4-ffq7"],
+];
+
+const semverParts = (v) => v.split(/[.+-]/).slice(0, 3).map(Number);
+export function versionBelow(v, floor) {
+  const a = semverParts(v);
+  const b = semverParts(floor);
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
+
+/** Every installed copy (any path in the lockfile) must be at or above its floor, on the same major line. */
+export function checkDependencyFloors(lock) {
+  const problems = [];
+  for (const [path, info] of Object.entries(lock.packages ?? {})) {
+    for (const [name, floor, why] of DEPENDENCY_FLOORS) {
+      if (!path.endsWith(`node_modules/${name}`) || !info.version) continue;
+      if (semverParts(info.version)[0] === semverParts(floor)[0] && versionBelow(info.version, floor))
+        problems.push(`${path} is ${info.version}; ${why} needs ${floor} or later`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Current migration paths grouped by the commit that first added them, oldest first, then uncommitted ones. A renamed
+ * file keeps the position of its original addition (renames that align a file with the version already recorded in
+ * the database are history, not new migrations); only the current name's version is compared.
+ */
+export function migrationBatchesFromLog(log, all) {
+  const addedIn = new Map(); // path -> commit index
+  let commit = -1;
+  for (const line of log.split("\n")) {
+    if (line === "@@") commit++;
+    const [status, from, to] = line.split("\t");
+    if (status === "A") addedIn.set(from, commit);
+    else if (status?.startsWith("R") && to) {
+      addedIn.set(to, addedIn.has(from) ? addedIn.get(from) : commit);
+      addedIn.delete(from);
+    }
+  }
+  const current = all.filter((p) => /^supabase\/migrations\/[^/]+\.sql$/.test(p));
+  const batches = [];
+  for (const p of current) {
+    const i = addedIn.has(p) ? addedIn.get(p) : commit + 1;
+    (batches[i] ??= []).push(p);
+  }
+  return batches.filter(Boolean);
+}
+
+function migrationBatches(all) {
+  try {
+    const log = execFileSync(
+      "git",
+      [
+        "log",
+        "--reverse",
+        "--find-renames",
+        "--diff-filter=AR",
+        "--format=%x40%x40",
+        "--name-status",
+        "--",
+        "supabase/migrations",
+      ],
+      { encoding: "utf8" },
+    );
+    return migrationBatchesFromLog(log, all);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Reads size, the first bytes and (for small text files) the text through one open file handle, so all three describe
  * the same file even if it changes while the guard runs. Returns null for files deleted in the working tree.
  */
@@ -211,9 +318,15 @@ export function selfTest() {
   let bad = 0;
   for (const c of CASES) {
     const failed =
-      c.set !== undefined
-        ? checkMigrationSet(c.set).length > 0
-        : checkFile(c.path, c.content ?? "", c.bytes ? Buffer.from(c.bytes) : undefined).length > 0;
+      c.log !== undefined
+        ? checkMigrationOrder(migrationBatchesFromLog(c.log, c.all)).length > 0
+        : c.order !== undefined
+          ? checkMigrationOrder(c.order).length > 0
+          : c.lock !== undefined
+            ? checkDependencyFloors(c.lock).length > 0
+            : c.set !== undefined
+              ? checkMigrationSet(c.set).length > 0
+              : checkFile(c.path, c.content ?? "", c.bytes ? Buffer.from(c.bytes) : undefined).length > 0;
     if (failed !== c.fail) {
       bad++;
       console.log(`FAIL self-test (${c.fail ? "missed" : "false alarm"}): ${c.note}`);
@@ -240,6 +353,15 @@ function main() {
     console.log(`POLICY  ${f}: ${p}`);
   };
   for (const p of checkMigrationSet(all)) report("supabase/migrations", p);
+  const batches = migrationBatches(all);
+  for (const p of checkMigrationOrder(batches)) report("supabase/migrations", p);
+  if (batches.length < 2) console.log("note: migration order not checked (no git history; shallow clone?)");
+  try {
+    for (const p of checkDependencyFloors(JSON.parse(readFileSync("package-lock.json", "utf8"))))
+      report("package-lock.json", p);
+  } catch (e) {
+    report("package-lock.json", `cannot read: ${e.message}`);
+  }
   for (const f of list) {
     const info = inspect(f, TEXT.test(f));
     if (!info) continue; // deleted in the working tree
