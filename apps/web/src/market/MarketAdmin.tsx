@@ -546,6 +546,90 @@ function Accounts() {
           </ul>
         )}
       </div>
+      <ReturningAccounts />
     </section>
+  );
+}
+
+/**
+ * F-20: sign-ups whose email matches an account deleted while suspended. Shown for review only: nobody is suspended
+ * automatically, and no email or hash is ever shown.
+ */
+function ReturningAccounts() {
+  const [flags, setFlags] = useState<
+    | {
+        match_id: number;
+        user_id: string;
+        display_name: string | null;
+        matched_at: string;
+        previous_suspension_at: string;
+        previous_account_deleted_at: string;
+        reviewed_at: string | null;
+      }[]
+    | null
+  >(null);
+  const reload = useCallback(async () => {
+    setFlags(await rpc("admin_list_retention_matches"));
+  }, []);
+  const { busy, run, messages } = useAction(reload);
+  useEffect(() => {
+    void reload().catch(() => setFlags([]));
+  }, [reload]);
+  const day = (iso: string) => new Date(iso).toLocaleDateString();
+  return (
+    <div className="panel">
+      <h3>Returning accounts</h3>
+      <p className="muted small">
+        New sign-ups whose email matches an account that was deleted while suspended. Review the person&apos;s
+        activity; suspend only if there is new cause. Records expire after the retention period.
+      </p>
+      {messages}
+      {!flags ? (
+        <div className="spinner" aria-hidden="true" />
+      ) : flags.length === 0 ? (
+        <p className="muted">No returning accounts.</p>
+      ) : (
+        <ul className="admin-list">
+          {flags.map((f) => (
+            <li key={f.match_id}>
+              <div className="row between">
+                <strong className="small">{f.display_name ?? "Deleted account"}</strong>
+                <span className="pill">{f.reviewed_at ? "reviewed" : "needs review"}</span>
+              </div>
+              <p className="small">
+                User id {f.user_id} · signed up {day(f.matched_at)} · earlier account suspended{" "}
+                {day(f.previous_suspension_at)}, deleted {day(f.previous_account_deleted_at)}
+              </p>
+              {!f.reviewed_at && (
+                <button
+                  className="btn small"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => rpc("admin_review_retention_match", { p_match: f.match_id }),
+                      "Marked as reviewed.",
+                    )
+                  }
+                >
+                  Mark reviewed
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        className="btn small"
+        disabled={busy}
+        onClick={() =>
+          void run(
+            () => rpc<number>("admin_purge_expired_retention"),
+            "Expired records purged (their identifying hashes were erased).",
+          )
+        }
+      >
+        Purge expired records
+      </button>
+    </div>
   );
 }
