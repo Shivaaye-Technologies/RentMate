@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { liveApi } from "../rtc/liveData";
 import { useAction } from "./useAction";
 import {
   creatorApi,
@@ -293,25 +294,27 @@ function StreamCard({ s, reload }: { s: StreamRow; reload: () => Promise<void> }
               >
                 Check readiness
               </button>
-              <button
-                className="btn small dark"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    const p = await creatorApi.start(s.id);
-                    setProblems(p);
-                    if (p.length > 0) throw new Error("Not ready to go live yet.");
-                  }, "You're live.")
-                }
-              >
-                Go live
-              </button>
+              {/* Going live happens in the broadcast studio: preview, then start and publish camera and mic. */}
+              <a className="btn small dark" href={`#broadcast/${s.id}`}>
+                Open broadcast studio
+              </a>
             </>
+          )}
+          {s.status === "live" && (
+            <a className="btn small dark" href={`#broadcast/${s.id}`}>
+              Return to broadcast
+            </a>
           )}
           <button
             className="btn small"
             disabled={busy}
-            onClick={() => void run(() => creatorApi.end(s.id), "Stream ended.")}
+            onClick={() =>
+              // A live stream ends through the server so the room closes for every viewer.
+              void run(
+                () => (s.status === "live" ? liveApi.end(s.id).then(() => undefined) : creatorApi.end(s.id)),
+                "Stream ended.",
+              )
+            }
           >
             {s.status === "live" ? "End stream" : "Cancel"}
           </button>

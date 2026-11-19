@@ -34,6 +34,11 @@ import { AdminConsole } from "./live/AdminConsole";
 import { Marketplace } from "./market/Marketplace";
 import { CompanionDashboard } from "./market/CompanionDashboard";
 import { MarketAdmin } from "./market/MarketAdmin";
+import { BroadcastStudio } from "./rtc/BroadcastStudio";
+import { CallScreen } from "./rtc/CallScreen";
+import { IncomingCall } from "./rtc/IncomingCall";
+import { LiveDiscover } from "./rtc/LiveDiscover";
+import { LiveViewer } from "./rtc/LiveViewer";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
@@ -54,6 +59,17 @@ const marketHash = (): MarketView => {
         ? "market-admin"
         : null;
 };
+
+/** Calls and live rooms: #call/<id>, #live, #live/<id>, #broadcast/<id>. */
+type RtcView = { kind: "call" | "watch" | "broadcast"; id: string } | { kind: "live" } | null;
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+export function rtcHash(hash: string): RtcView {
+  if (hash === "#live") return { kind: "live" };
+  const m = new RegExp(`^#(call|live|broadcast)/(${UUID})$`, "i").exec(hash);
+  if (!m) return null;
+  return { kind: m[1] === "live" ? "watch" : (m[1] as "call" | "broadcast"), id: m[2].toLowerCase() };
+}
+const currentRtc = (): RtcView => (typeof window === "undefined" ? null : rtcHash(window.location.hash));
 
 type Tab = "crush" | "discover" | "likes" | "chats" | "profile";
 type Status = "loading" | "ready" | "error";
@@ -80,6 +96,7 @@ export function App() {
   const [creator, setCreator] = useState(isCreatorHash);
   const [admin, setAdmin] = useState(isAdminHash);
   const [market, setMarket] = useState<MarketView>(marketHash);
+  const [rtc, setRtc] = useState<RtcView>(currentRtc);
 
   useEffect(() => {
     const onHash = () => {
@@ -87,6 +104,7 @@ export function App() {
       setCreator(isCreatorHash());
       setAdmin(isAdminHash());
       setMarket(marketHash());
+      setRtc(currentRtc());
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -137,6 +155,32 @@ export function App() {
   }
   if (recovery && session) return <NewPasswordScreen onDone={() => setRecovery(false)} />;
   if (!session) return <AuthScreen initialProblem={linkProblem} />;
+  const me = session.user.id;
+  const leaveRtc = (to = "") => {
+    if (to) {
+      window.location.hash = to; // fires hashchange, which updates every view flag
+      return;
+    }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    setRtc(null);
+  };
+  // The incoming-call banner shows on every screen except an active call.
+  const incoming = rtc?.kind === "call" ? null : <IncomingCall me={me} />;
+  if (rtc) {
+    return (
+      <>
+        {incoming}
+        {rtc.kind === "call" && <CallScreen key={rtc.id} me={me} callId={rtc.id} onExit={() => leaveRtc()} />}
+        {rtc.kind === "live" && <LiveDiscover me={me} onExit={() => leaveRtc()} />}
+        {rtc.kind === "watch" && (
+          <LiveViewer key={rtc.id} me={me} streamId={rtc.id} onExit={() => leaveRtc("#live")} />
+        )}
+        {rtc.kind === "broadcast" && (
+          <BroadcastStudio key={rtc.id} me={me} streamId={rtc.id} onExit={() => leaveRtc("#creator")} />
+        )}
+      </>
+    );
+  }
   if (market) {
     const exit = () => {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -167,7 +211,12 @@ export function App() {
       />
     );
   }
-  return <Home key={session.user.id} session={session} />;
+  return (
+    <>
+      {incoming}
+      <Home key={session.user.id} session={session} />
+    </>
+  );
 }
 
 function Home({ session }: { session: Session }) {

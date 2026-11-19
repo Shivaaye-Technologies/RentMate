@@ -245,6 +245,13 @@ export function ProfileDashboard({
           <small>Offer friendly company for public activities, set your prices and availability.</small>
         </span>
       </a>
+      <a className="demo-entry" href="#live">
+        <Icon name="bolt" size={18} />
+        <span>
+          <strong>Watch live</strong>
+          <small>Streams from approved creators, with chat. Nothing is recorded.</small>
+        </span>
+      </a>
       <a className="demo-entry" href="#creator">
         <Icon name="star" size={18} />
         <span>

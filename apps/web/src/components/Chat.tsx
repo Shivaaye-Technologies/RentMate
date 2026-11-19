@@ -7,6 +7,7 @@ import { Icon, VerifiedBadge } from "./Icon";
 import { Photo } from "./Photo";
 import { DemoBadge } from "./DemoBadge";
 import { POLICY_TEXT_BLOCKED } from "../safety";
+import { CallButtons } from "../rtc/CallButtons";
 
 interface Message {
   id: string;
@@ -187,6 +188,7 @@ export function Chat({ me, myProfile, matchId, person, onBack, onProfile, onSafe
             <small>{person.online ? "Online · View profile" : "View profile"}</small>
           </span>
         </button>
+        <CallButtons personId={person.id} name={person.displayName} />
         <button
           className="icon-btn more"
           aria-label={`Safety options for ${person.displayName}`}
