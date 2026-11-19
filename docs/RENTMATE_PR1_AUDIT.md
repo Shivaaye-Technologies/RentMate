@@ -14,7 +14,7 @@ Nothing here was merged, deployed, migrated in production, or switched on.
 | `main`                                      | `b34bf5b` "Initial commit": **README only**. PR #1 therefore brings the whole application                            |
 | PR head on GitHub at the start of the audit | `0743514` (= `refs/pull/1/head` = `origin/feature/rentmate-conversion`)                                              |
 | Commits / files at that head (main..head)   | 86 commits, 441 files                                                                                                |
-| Audit commits (this report)                 | `6eb1407`, `4d65357`, and the commit adding this file. Delivered as a bundle (push is blocked)                       |
+| Audit commits (this report)                 | `6eb1407`, `4d65357`, `5b2fe41`, `1d5db19`, `c119949` and the report update. Delivered as a bundle (push is blocked) |
 
 ## 2. Scope review of the 441 files
 
@@ -44,7 +44,7 @@ area by area (migrations → API → web) rather than file order.
 | #   | Item                                                   | Result                                      | Evidence                                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | Architecture and code changes                          | PASS                                        | Thin Express handlers; the database decides and the API signs (LiveKit); zod on every body (`apps/api/src/validation.ts`, `live/routes.ts`); typecheck strict                                                                  |
-| 2   | Migrations, constraints, indexes, RLS                  | **FAIL** (deployment) / PASS (schema)       | Schema: catalog audit of the final schema (49 tables, 150 definer functions, all `search_path=''`; RLS or no grants on every table). History: see §5, H-1                                                                      |
+| 2   | Migrations, constraints, indexes, RLS                  | PASS (after the H-1 rename)                 | Schema: catalog audit of the final schema (49 tables, 150 definer functions, all `search_path=''`; RLS or no grants on every table). History: see §5, H-1                                                                      |
 | 3   | Authentication, authorization, server-side enforcement | PASS                                        | `requireAuth` on every `/api/v1` route, 503 when unconfigured; `has_role` needs `aal2` once MFA is enforced; SQL `admin_mfa` 28/28, `policy_audit` 36/36                                                                       |
 | 4   | Booking availability and overlap                       | PASS                                        | `companion_no_overlap` / `member_no_overlap` `exclude using gist (… slot with &&) where status='accepted'` (`20261119090000_marketplace.sql:320`); `marketplace.sql` 80/80; races on real PostgreSQL 16: `test:db:concurrency` |
 | 5   | Token accounting and ledger                            | PASS                                        | `balance >= 0` checks, unique `idempotency_key`, key reuse with other values refused (`20261120100000_token_wallet.sql`); `token_wallet.sql` 27/27; double spend and replay on PostgreSQL 16; wallet-upgrade test              |
@@ -59,10 +59,10 @@ No Critical findings. Fixed items keep their regression tests.
 
 ### High
 
-| ID  | Finding                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                                                                                                                                                                                                                                    |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H-1 | **Migration history mismatch with production.** Production (`soulmate-ai`, read-only `list_migrations`) records `20261023165729 demo_mode_public`; the repository has `20261023170000_demo_mode_public.sql`. The other 11 applied versions match. `supabase db push` refuses to run while a remote version is missing locally; with `--include-all` it would try to run demo_mode_public again. | **BLOCKED.** Fix = rename the file to `20261023165729_demo_mode_public.sql` (as commit `155cbd7` did for another file), but only after confirming its SQL equals the statements production recorded. That comparison is a read query on production, so it awaits approval |
-| H-2 | **CodeQL `js/insufficient-password-hash`, `apps/api/src/live/providers.ts:70`** (open on GitHub).                                                                                                                                                                                                                                                                                               | **False positive; BLOCKED on a manual dismissal.** See below                                                                                                                                                                                                              |
+| ID  | Finding                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H-1 | **Migration history mismatch with production.** Production (`soulmate-ai`, read-only `list_migrations`) records `20261023165729 demo_mode_public`; the repository has `20261023170000_demo_mode_public.sql`. The other 11 applied versions match. `supabase db push` refuses to run while a remote version is missing locally; with `--include-all` it would try to run demo_mode_public again. | **FIXED in the repository (pending review).** One approved read-only SELECT on `supabase_migrations.schema_migrations` returned one statement for `20261023165729` with md5 `422d4833de780b5e58fc895ad8e62862`; the repository file has the same md5 (4,808 bytes, unchanged since `63a0f1a`). The file is renamed to `20261023165729_demo_mode_public.sql` (content untouched, like commit `155cbd7`). Nothing in production was changed |
+| H-2 | **CodeQL `js/insufficient-password-hash`, `apps/api/src/live/providers.ts:70`** (open on GitHub).                                                                                                                                                                                                                                                                                               | **False positive; BLOCKED on a manual dismissal.** See below                                                                                                                                                                                                                                                                                                                                                                              |
 
 **H-2 analysis.** CodeQL 2.27.5 was run locally on this branch; this is its only result. The flagged flow is
 `opts.apiKey` → the JWT `iss` claim → `signingInput` → `createHmac("sha256", apiSecret).update(signingInput)`. The value
@@ -115,7 +115,8 @@ screenshots, dismissing the alert is what turns it green.
 
 - **Order (24 files, oldest → newest):** `20261022210236_init` … `20261123100000_integration_secret_strength`. Versions grow
   in the order the files were added (renames keep their original position); the policy guard checks this now (M-2).
-- **Production history (read-only):** 12 applied; 11 match file names; `demo_mode_public` does not (H-1). The 12 PR
+- **Production history (read-only):** 12 applied; all 12 now match the file names and,
+  for `demo_mode_public`, the recorded SQL byte for byte (H-1). The 12 PR
   migrations from `20261024090000` on are **not applied** to production (founder approval F-03, back up first).
 - **Destructive statements:** none in migrations from `20261118000000` on (policy guard). Earlier ones contain two
   `delete` statements, both inside functions run on demand, never at migration time: `private.delete_my_account` (a member
@@ -140,14 +141,14 @@ screenshots, dismissing the alert is what turns it green.
 | GitHub Dependabot                  | **BLOCKED:** the alert list cannot be read here. If the "moderate" alert names a package other than vite, send its GHSA id and it will be checked the same way                           |
 | Manifests / Actions                | npm only; `actions/checkout@v7`, `actions/setup-node@v7`                                                                                                                                 |
 
-## 7. Verification (head `4d65357`, run in this session)
+## 7. Verification (head `c119949`, run in this session; the same suite also passed on `4d65357`)
 
 Node 22.22.0, npm 10.9.4, clean `npm ci`, working tree clean. All logs were kept for this report.
 
 | Check                                                                       | Command                       | Result                                                                                     |
 | --------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
 | Clean install                                                               | `npm ci`                      | PASS                                                                                       |
-| Policy guard (secrets, media, adult content, migrations, dependency floors) | `npm run test:policy`         | PASS: self-test 67/67, 437 files                                                           |
+| Policy guard (secrets, media, adult content, migrations, dependency floors) | `npm run test:policy`         | PASS: self-test 68/68, 438 files                                                           |
 | Format                                                                      | `npm run format:check`        | PASS                                                                                       |
 | Lint                                                                        | `npm run lint`                | PASS                                                                                       |
 | Type checks (API and web)                                                   | `npm run typecheck`           | PASS                                                                                       |
@@ -174,17 +175,19 @@ bundle is pushed, check each job (`check`, `db-concurrency`, `e2e`, `rtc`) and C
 
 ## 8. Fixes in this audit
 
-| Commit    | Change                                                                                                     | Regression test                                    |
-| --------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `6eb1407` | vite 6.4.5 → 6.4.6, range `^6.4.6` (M-1)                                                                   | Dependency-floor rule + 4 self-test cases          |
-| `4d65357` | Policy guard: migration add order (with rename handling), dependency floors; CI fetches full history (M-2) | 9 order/log self-test cases; mutation runs (below) |
+| Commit    | Change                                                                                                         | Regression test                                            |
+| --------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `6eb1407` | vite 6.4.5 → 6.4.6, range `^6.4.6` (M-1)                                                                       | Dependency-floor rule + 4 self-test cases                  |
+| `4d65357` | Policy guard: migration add order (with rename handling), dependency floors; CI fetches full history (M-2)     | 9 order/log self-test cases; mutation runs (below)         |
+| `1d5db19` | Rename `20261023170000_demo_mode_public.sql` → `20261023165729_demo_mode_public.sql` to match production (H-1) | Self-test case for this exact rename; full suite re-run    |
+| `c119949` | Policy guard: a staged (`git mv`) migration rename is treated as a rename, not a new migration                 | Staged rename passes; staged out-of-order file still fails |
 
 Mutation checks: an untracked `20261120210000_…` migration fails the guard with the message naming `20261123100000`; an
 untracked `20261124000000_…` passes; a lockfile with vite 6.4.5 fails.
 
 ## 9. Remaining blockers
 
-1. **H-1** migration version mismatch with production. Needs approval for a read-only comparison, then a one-file rename.
+1. **H-1** rename is prepared and verified; it needs the founder's review and push.
 2. **H-2** CodeQL alert: dismiss as false positive in GitHub (founder).
 3. Push the audit bundle (the assistant gets 403), then confirm every CI job and CodeQL on the PR.
 4. Dependabot: confirm which alert GitHub shows (§6).
@@ -198,16 +201,17 @@ untracked `20261124000000_…` passes; a lockfile with vite 6.4.5 fails.
 **NOT READY.**
 
 The code itself holds up: no Critical or open code-level security defect was found, and every local check passes
-on `4d65357`. It is not ready to hand over for merge review yet, because three things can't be confirmed from here:
+on the audited head. It is not ready to hand over for merge review yet, because two things can't be confirmed from
+here:
 
 1. The audit commits are not on GitHub yet, and the CI result for the head that will be reviewed is unknown.
 2. The CodeQL alert (H-2) is still open in GitHub.
-3. The migration file names do not match production's history (H-1), so the first deploy would fail.
+
+H-1 (migration history) is fixed in the repository; the SQL matched production exactly.
 
 It becomes **READY FOR HUMAN REVIEW** once:
 
 - the bundle is pushed and every CI job and CodeQL are green on the new head;
-- the CodeQL alert is dismissed with the documented justification;
-- H-1 is resolved: compare, then rename.
+- the CodeQL alert is dismissed with the documented justification.
 
 Production readiness additionally needs the items in §9.5 and §9.6.
