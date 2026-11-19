@@ -271,7 +271,7 @@ begin
   begin
     insert into public.live_chat_messages (stream_id, sender_id, body) values (st, x, 'escort services available'); -- policy-guard: allow (refusal test)
     r := r || 'FAIL prohibited chat accepted; ';
-  exception when check_violation then r := r || 'ok live chat is screened for sexual services; ';
+  exception when check_violation then r := r || 'ok live chat is screened for prohibited content; ';
   end;
   begin
     for n in 1..6 loop
