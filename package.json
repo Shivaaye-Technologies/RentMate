@@ -22,6 +22,7 @@
     "test": "npm run test --workspaces && npm run test:demo && npm run test:db",
     "test:db": "node scripts/test-db.mjs",
     "test:rollback": "node scripts/test-rollback.mjs",
+    "test:wallet-upgrade": "node scripts/test-wallet-backfill.mjs",
     "test:db:concurrency": "bash scripts/test-db-concurrency.sh",
     "test:demo": "node --test scripts/demo/generate-demo-profiles.test.mjs",
     "build": "npm run build --workspaces",

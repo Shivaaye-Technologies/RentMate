@@ -36,6 +36,8 @@ jobs:
         run: npm test
       - name: Migration rollback rehearsal
         run: npm run test:rollback
+      - name: Token wallet upgrade on a database with existing members
+        run: npm run test:wallet-upgrade
       - name: Hook guard tests
         run: npm run test:hooks
       - name: aihub tests
