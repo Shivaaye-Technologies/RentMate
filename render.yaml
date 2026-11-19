@@ -9,6 +9,9 @@ services:
     buildCommand: npm ci --include=dev && npm run build -w apps/api
     startCommand: npm start -w apps/api
     healthCheckPath: /health
+    # Deploy only reviewed code. Without this, Render deploys the repository's default branch, which on GitHub is
+    # currently the feature branch.
+    branch: main
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -36,6 +39,7 @@ services:
     runtime: static
     buildCommand: npm ci --include=dev && npm run build -w apps/web
     staticPublishPath: apps/web/dist
+    branch: main
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
