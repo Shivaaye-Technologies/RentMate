@@ -14,11 +14,12 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned so a runner-image change cannot silently alter the toolchain.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -49,11 +50,13 @@ jobs:
 
   browser:
     # Real Chromium against a production build of apps/web. All non-local requests are blocked.
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-24.04: Playwright's `install --with-deps` only knows the system packages of the Ubuntu
+    # releases it supports, so a moving `ubuntu-latest` can break the browser install.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
