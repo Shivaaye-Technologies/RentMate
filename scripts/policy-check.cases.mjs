@@ -247,6 +247,17 @@ export const CASES = [
     note: "renamed migration keeps its original position",
   },
   {
+    // H-1: demo_mode_public renamed to the version production recorded (20261023165729).
+    log: "@@\n\nA\tsupabase/migrations/20261023121400_demo_profiles_testers.sql\n@@\n\nA\tsupabase/migrations/20261023170000_demo_mode_public.sql\n@@\n\nA\tsupabase/migrations/20261024090000_profile_details.sql\n@@\n\nR100\tsupabase/migrations/20261023170000_demo_mode_public.sql\tsupabase/migrations/20261023165729_demo_mode_public.sql\n",
+    all: [
+      "supabase/migrations/20261023121400_demo_profiles_testers.sql",
+      "supabase/migrations/20261023165729_demo_mode_public.sql",
+      "supabase/migrations/20261024090000_profile_details.sql",
+    ],
+    fail: false,
+    note: "rename to the production version keeps the order valid",
+  },
+  {
     log: "@@\n\nA\tsupabase/migrations/20261123100000_a.sql\n",
     all: ["supabase/migrations/20261123100000_a.sql", "supabase/migrations/20261121000000_new.sql"],
     fail: true,
