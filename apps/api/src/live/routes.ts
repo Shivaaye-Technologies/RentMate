@@ -82,7 +82,16 @@ export function liveRouter({ liveStoreFor, providers, countryHeader }: LiveDeps)
         refuse(res, ["stream_not_found"]);
         return;
       }
-      const token = await providerFor(room.providerKey).issueToken({
+      const provider = providerFor(room.providerKey);
+      if (!broadcaster) {
+        // WebRTC viewers are capped per stream so one SFU room is never pushed past what it can serve.
+        const [cap, stats] = await Promise.all([store.viewerCap(), provider.roomStats(room.roomName)]);
+        if (stats && stats.participants - stats.publishers >= cap) {
+          refuse(res, ["stream_full"]);
+          return;
+        }
+      }
+      const token = await provider.issueToken({
         room: room.roomName,
         identity: req.user!.id,
         canPublish: broadcaster,
@@ -149,6 +158,92 @@ export function liveRouter({ liveStoreFor, providers, countryHeader }: LiveDeps)
         status: room.status,
         viewers: stats ? Math.max(0, stats.participants - stats.publishers) : null,
       });
+    }),
+  );
+
+  // ---- Creator ends their stream: everyone leaves the room ----
+
+  r.post(
+    "/streams/:id/end",
+    wrap(async (req, res) => {
+      const id = uuid.safeParse(req.params.id);
+      if (!id.success) {
+        res.status(400).json({ error: "Invalid request" });
+        return;
+      }
+      const store = liveStoreFor(req);
+      const room = await store.streamRoom(id.data);
+      if (!room || room.creatorId !== req.user!.id) {
+        res.status(403).json({ error: "Only the creator can end this stream." });
+        return;
+      }
+      await store.endStream(id.data);
+      const provider = providers.get(room.providerKey);
+      const roomClosed = provider?.configured
+        ? await provider
+            .closeRoom(room.roomName)
+            .then(() => true)
+            .catch(() => false)
+        : false;
+      res.json({ ended: true, roomClosed });
+    }),
+  );
+
+  // ---- Host controls (creator of the stream, or a moderator) ----
+
+  const GuestParams = z.object({ id: uuid, user: uuid });
+  const MuteBody = z.object({ kind: z.enum(["audio", "video"]) }).strict();
+
+  r.post(
+    "/streams/:id/guests/:user/mute",
+    wrap(async (req, res) => {
+      const params = GuestParams.safeParse(req.params);
+      const body = MuteBody.safeParse(req.body);
+      if (!params.success || !body.success) {
+        res.status(400).json({ error: "Invalid request" });
+        return;
+      }
+      const store = liveStoreFor(req);
+      if (!(await store.hostCheck(params.data.id))) {
+        res.status(403).json({ error: "Only the host or a moderator can do that." });
+        return;
+      }
+      const room = await store.streamRoom(params.data.id);
+      if (!room) {
+        refuse(res, ["stream_not_found"]);
+        return;
+      }
+      const muted = await providerFor(room.providerKey).muteParticipant(
+        room.roomName,
+        params.data.user,
+        body.data.kind,
+      );
+      res.json({ muted });
+    }),
+  );
+
+  r.post(
+    "/streams/:id/guests/:user/remove",
+    wrap(async (req, res) => {
+      const params = GuestParams.safeParse(req.params);
+      if (!params.success) {
+        res.status(400).json({ error: "Invalid request" });
+        return;
+      }
+      const store = liveStoreFor(req);
+      // The database checks the role, removes the guest from the stream and queues the room removal.
+      await store.removeGuest(params.data.id, params.data.user);
+      const room = await store.streamRoom(params.data.id);
+      let disconnected = false;
+      const provider = room ? providers.get(room.providerKey) : undefined;
+      if (room && provider?.configured) {
+        // Also remove them right now; the queue is the safety net if this call fails.
+        disconnected = await provider
+          .removeParticipant(room.roomName, params.data.user)
+          .then(() => true)
+          .catch(() => false);
+      }
+      res.json({ removed: true, disconnected });
     }),
   );
 

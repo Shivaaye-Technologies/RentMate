@@ -5,7 +5,8 @@ import { loadConfig } from "./config.js";
 import { MemoryProfileStore } from "./store.js";
 import { SupabaseProfileStore } from "./supabaseStore.js";
 import { buildRegistry } from "./live/providers.js";
-import { SupabaseLiveStore } from "./live/store.js";
+import { SupabaseIntegrationStore, SupabaseLiveStore } from "./live/store.js";
+import { drainKicks } from "./live/webhook.js";
 
 const config = loadConfig();
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = config;
@@ -37,7 +38,27 @@ const live = supabaseReady
     }
   : undefined;
 
-const app = createApp({ config, verifyToken, storeFor, live });
+// LiveKit webhooks and the room-removal queue: a narrow database capability, never a privileged key.
+const integration =
+  supabaseReady && config.LIVE_WEBHOOK_DB_SECRET
+    ? new SupabaseIntegrationStore(SUPABASE_URL!, SUPABASE_ANON_KEY!, config.LIVE_WEBHOOK_DB_SECRET)
+    : null;
+
+const app = createApp({ config, verifyToken, storeFor, live, webhook: { providers, integration } });
+
+// Remove blocked, suspended or removed people from rooms they are already in (every 3 seconds).
+if (integration && providers.get("livekit")?.configured) {
+  let running = false;
+  setInterval(() => {
+    if (running) return;
+    running = true;
+    drainKicks(providers, integration)
+      .catch((err) => console.error("[api] room removal failed:", err instanceof Error ? err.message : err))
+      .finally(() => {
+        running = false;
+      });
+  }, 3000).unref();
+}
 
 app.listen(config.PORT, () => {
   console.log(`[api] listening on port ${config.PORT} (${config.NODE_ENV})`);

@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 /** What a joining person is allowed to do in a room. */
 export interface JoinGrant {
@@ -36,6 +36,10 @@ export interface StreamingProvider {
   /** Ends a room for everyone (moderation and emergency stop). */
   closeRoom(room: string): Promise<void>;
   roomStats(room: string): Promise<RoomStats | null>;
+  /** Disconnects one person from a room now (blocking, suspension, guest removal). Missing = already gone. */
+  removeParticipant(room: string, identity: string): Promise<void>;
+  /** Mutes every published track of one kind for one person (host controls). Returns how many were muted. */
+  muteParticipant(room: string, identity: string, kind: "audio" | "video"): Promise<number>;
 }
 
 // ---------- JWT (HS256) ----------
@@ -183,6 +187,52 @@ export class LiveKitProvider implements StreamingProvider {
     if (!res.ok && res.status !== 404) throw new Error(`LiveKit DeleteRoom failed (${res.status})`);
   }
 
+  async removeParticipant(room: string, identity: string): Promise<void> {
+    const res = await this.rpc("RemoveParticipant", { room, identity }, room);
+    // 404 = not in the room (or the room is gone): already the desired state.
+    if (!res.ok && res.status !== 404) throw new Error(`LiveKit RemoveParticipant failed (${res.status})`);
+  }
+
+  async muteParticipant(room: string, identity: string, kind: "audio" | "video"): Promise<number> {
+    const res = await this.rpc("GetParticipant", { room, identity }, room);
+    if (res.status === 404) return 0;
+    if (!res.ok) throw new Error(`LiveKit GetParticipant failed (${res.status})`);
+    const info = (await res.json().catch(() => null)) as {
+      tracks?: { sid?: string; type?: string | number; muted?: boolean }[];
+    } | null;
+    const wanted = kind === "audio" ? ["AUDIO", 0] : ["VIDEO", 1];
+    let muted = 0;
+    for (const t of info?.tracks ?? []) {
+      if (!t.sid || !wanted.includes(t.type ?? "") || t.muted) continue;
+      const m = await this.rpc("MutePublishedTrack", { room, identity, track_sid: t.sid, muted: true }, room);
+      if (!m.ok) throw new Error(`LiveKit MutePublishedTrack failed (${m.status})`);
+      muted++;
+    }
+    return muted;
+  }
+
+  /**
+   * Verifies a LiveKit webhook: the Authorization header is a JWT signed with this server's API secret, issued by its
+   * API key, unexpired, whose "sha256" claim is the base64 SHA-256 of the exact request body. Returns the event or null.
+   */
+  webhookEvent(body: Buffer, authorization: string | undefined): Record<string, unknown> | null {
+    if (!this.opts.apiKey || !this.opts.apiSecret || !authorization) return null;
+    const token = authorization.replace(/^Bearer\s+/i, "");
+    const claims = verifyJwt(token, this.opts.apiSecret, { nowSeconds: Math.floor(this.now() / 1000) });
+    if (!claims || claims.iss !== this.opts.apiKey || typeof claims.sha256 !== "string") return null;
+    const digest = createHash("sha256").update(body).digest();
+    const claimed = Buffer.from(claims.sha256, "base64");
+    if (claimed.length !== digest.length || !timingSafeEqual(claimed, digest)) return null;
+    try {
+      const event: unknown = JSON.parse(body.toString("utf8"));
+      return event && typeof event === "object" && !Array.isArray(event)
+        ? (event as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async roomStats(room: string): Promise<RoomStats | null> {
     const res = await this.rpc("ListParticipants", { room }, room);
     if (res.status === 404) return { participants: 0, publishers: 0 };
@@ -224,6 +274,18 @@ export class MemoryProvider implements StreamingProvider {
 
   async roomStats(room: string): Promise<RoomStats | null> {
     return this.stats.get(room) ?? { participants: 0, publishers: 0 };
+  }
+
+  readonly removed: { room: string; identity: string }[] = [];
+  readonly muted: { room: string; identity: string; kind: string }[] = [];
+
+  async removeParticipant(room: string, identity: string): Promise<void> {
+    this.removed.push({ room, identity });
+  }
+
+  async muteParticipant(room: string, identity: string, kind: "audio" | "video"): Promise<number> {
+    this.muted.push({ room, identity, kind });
+    return 1;
   }
 }
 

@@ -286,6 +286,32 @@ class FakeLiveStore implements LiveStore {
     this.requireMod();
     return this.streams;
   }
+  cap = 300;
+  host = false;
+  guestsRemoved: string[] = [];
+  async callCheck() {
+    return ["call_not_found"];
+  }
+  async callRoom() {
+    return null;
+  }
+  async callHangup() {
+    return "";
+  }
+  async viewerCap() {
+    return this.cap;
+  }
+  async hostCheck() {
+    return this.host;
+  }
+  ended: string[] = [];
+  async endStream(id: string) {
+    this.ended.push(id);
+  }
+  async removeGuest(_stream: string, guest: string) {
+    if (!this.host) throw new LiveStoreError("You don't have permission to do that.", 403);
+    this.guestsRemoved.push(guest);
+  }
 }
 
 function setup(opts: { countryHeader?: string | null; provider?: MemoryProvider | null } = {}) {
@@ -367,6 +393,78 @@ describe("live routes", () => {
     expect(session.status).toBe(403);
     expect(session.body.reasons).toEqual(["This session isn't available right now."]);
     expect(provider!.issued).toHaveLength(0);
+  });
+
+  it("lets only the creator end a stream, and closes the room for everyone", async () => {
+    const { app, store, provider } = setup();
+    store.room = { ...store.room!, creatorId: "someone-else" };
+    const denied = await request(app).post(`/api/v1/live/streams/${STREAM}/end`).set(auth).send({});
+    expect(denied.status).toBe(403);
+    expect(store.ended).toHaveLength(0);
+    store.room = { ...store.room!, creatorId: "viewer" };
+    const res = await request(app).post(`/api/v1/live/streams/${STREAM}/end`).set(auth).send({});
+    expect(res.body).toEqual({ ended: true, roomClosed: true });
+    expect(store.ended).toEqual([STREAM]);
+    expect(provider!.closed).toContain("sm-room");
+  });
+
+  it("caps WebRTC viewers per stream but always lets hosts in", async () => {
+    const { app, store, provider } = setup();
+    store.cap = 2;
+    provider!.stats.set("sm-room", { participants: 3, publishers: 1 }); // 2 viewers already
+    const full = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "viewer" });
+    expect(full.status).toBe(503);
+    expect(full.body.reasons[0]).toMatch(/full/);
+    const host = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "broadcaster" });
+    expect(host.status).toBe(200);
+    provider!.stats.set("sm-room", { participants: 2, publishers: 1 }); // 1 viewer: room for one more
+    const ok = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "viewer" });
+    expect(ok.status).toBe(200);
+  });
+
+  it("lets only the host mute or remove a guest, and removes them from the room at once", async () => {
+    const { app, store, provider } = setup();
+    const GUEST = "33333333-3333-4333-8333-333333333333";
+    const denied = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/guests/${GUEST}/mute`)
+      .set(auth)
+      .send({ kind: "audio" });
+    expect(denied.status).toBe(403);
+    const deniedRemove = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/guests/${GUEST}/remove`)
+      .set(auth)
+      .send({});
+    expect(deniedRemove.status).toBe(403);
+    expect(provider!.muted).toHaveLength(0);
+    expect(provider!.removed).toHaveLength(0);
+    store.host = true;
+    const muted = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/guests/${GUEST}/mute`)
+      .set(auth)
+      .send({ kind: "video" });
+    expect(muted.status).toBe(200);
+    expect(provider!.muted).toEqual([{ room: "sm-room", identity: GUEST, kind: "video" }]);
+    const removed = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/guests/${GUEST}/remove`)
+      .set(auth)
+      .send({});
+    expect(removed.body).toEqual({ removed: true, disconnected: true });
+    expect(store.guestsRemoved).toEqual([GUEST]);
+    expect(provider!.removed).toEqual([{ room: "sm-room", identity: GUEST }]);
+    const bad = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/guests/not-a-uuid/mute`)
+      .set(auth)
+      .send({ kind: "audio" });
+    expect(bad.status).toBe(400);
   });
 
   it("treats a missing country header as unknown (fails closed)", async () => {

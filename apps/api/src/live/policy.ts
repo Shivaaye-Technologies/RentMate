@@ -40,6 +40,10 @@ const MESSAGES: Record<string, string> = {
   creator_country_not_allowed: "Private sessions aren't available for this creator.",
   account_suspended: "Your account is suspended. You can appeal from your account settings.",
   participant_suspended: "This session isn't available right now.",
+  stream_full: "This stream is full right now. Please try again in a moment.",
+  call_not_found: "This call doesn't exist.",
+  call_not_active: "This call isn't ringing or connected any more.",
+  not_matched: "You can only call people you've matched with.",
 };
 
 /** Human messages for problem codes, without leaking who blocked whom. */
@@ -57,8 +61,14 @@ export function explainProblems(codes: string[]): string[] {
 
 /** Status code for a refusal: 404 hides streams people shouldn't know about. */
 export function refusalStatus(codes: string[]): number {
-  if (codes.includes("stream_not_found") || codes.includes("session_not_found") || codes.includes("blocked"))
+  if (
+    codes.includes("stream_not_found") ||
+    codes.includes("session_not_found") ||
+    codes.includes("call_not_found") ||
+    codes.includes("blocked")
+  )
     return 404;
+  if (codes.includes("stream_full")) return 503;
   if (codes.includes("explicit_not_allowed_in_creator_country")) return 404;
   if (codes.includes("emergency_stop")) return 503;
   return 403;

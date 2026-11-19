@@ -28,6 +28,11 @@ const EnvSchema = z.object({
   LIVEKIT_API_KEY: z.string().min(1).optional(),
   LIVEKIT_API_SECRET: z.string().min(16).optional(),
   /**
+   * Secret the API presents to the database for LiveKit webhooks and the room-removal queue. Must match the value
+   * stored with private.set_integration_secret('livekit_webhook', ...). Without it the webhook route returns 503.
+   */
+  LIVE_WEBHOOK_DB_SECRET: z.string().min(32).optional(),
+  /**
    * Header a trusted CDN/proxy sets with the visitor's country (e.g. cf-ipcountry).
    * Without it every viewer's country is unknown and country-limited content stays hidden.
    */

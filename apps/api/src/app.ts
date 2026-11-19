@@ -8,6 +8,8 @@ import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
 import { ProfileInput } from "./validation.js";
 import { liveRouter, type LiveDeps } from "./live/routes.js";
+import { callsRouter } from "./live/calls.js";
+import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
 
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -64,6 +66,42 @@ export const ROUTES = [
   },
   { method: "GET", path: "/api/v1/live/admin/health", auth: true, description: "Moderators: stream health" },
   { method: "GET", path: "/api/v1/live/admin/providers", auth: true, description: "Admins: provider setup" },
+  {
+    method: "POST",
+    path: "/api/v1/live/streams/:id/end",
+    auth: true,
+    description: "Creator: end the stream",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/streams/:id/guests/:user/mute",
+    auth: true,
+    description: "Host: mute a guest's microphone or camera",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/streams/:id/guests/:user/remove",
+    auth: true,
+    description: "Host: remove a guest now",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/calls/:id/join",
+    auth: true,
+    description: "Room token for a voice or video call",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/calls/:id/end",
+    auth: true,
+    description: "Hang up and close the call room",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/live/webhook",
+    auth: false,
+    description: "LiveKit signed webhooks (signature checked)",
+  },
 ] as const;
 
 /** Data access the routes depend on. */
@@ -81,14 +119,21 @@ export interface AppDeps {
   storeFor: (req: Request) => ProfileStore;
   /** SOULMATE LIVE (optional: without it the live routes return 503). */
   live?: LiveDeps;
+  /** LiveKit webhooks (optional: without them the webhook route returns 503). */
+  webhook?: WebhookDeps;
 }
 
-export function createApp({ config, verifyToken, storeFor, live }: AppDeps) {
+export function createApp({ config, verifyToken, storeFor, live, webhook }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
   app.use(helmet());
   app.use(cors({ origin: config.CORS_ORIGINS }));
+  // Before the JSON parser: the webhook signature covers the raw body. Not behind requireAuth: LiveKit signs it.
+  app.use(
+    "/api/v1/live/webhook",
+    webhookRouter(webhook ?? { providers: live?.providers ?? new Map(), integration: null }),
+  );
   app.use(express.json({ limit: "100kb" }));
 
   // Root: what this service is and how to use it. Never includes configuration values.
@@ -165,9 +210,13 @@ export function createApp({ config, verifyToken, storeFor, live }: AppDeps) {
 
   if (live) {
     api.use("/live", liveRouter(live));
+    api.use("/calls", callsRouter(live));
   } else {
     api.use("/live", (_req, res) => {
       res.status(503).json({ error: "Live streaming is not configured" });
+    });
+    api.use("/calls", (_req, res) => {
+      res.status(503).json({ error: "Calls are not configured" });
     });
   }
 
