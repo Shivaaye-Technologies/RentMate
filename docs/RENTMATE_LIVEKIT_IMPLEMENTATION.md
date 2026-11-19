@@ -9,25 +9,25 @@ added to it.
 
 ## 1. What exists now
 
-| Feature                                                                                       | State                                               |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| One-to-one voice calls between matched members                                                | Tested                                              |
-| One-to-one video calls (local + remote video, camera on/off, switch camera, mute)             | Tested                                              |
-| Incoming-call banner on every screen (realtime with a polling fallback)                       | Tested                                              |
-| Ringing, connecting, connected (duration), reconnecting, ended (reason)                       | Tested                                              |
-| Decline, cancel, missed after 45 s, one live call per person, 20 call starts per hour         | Tested (SQL)                                        |
-| Permission-denied help for microphone/camera                                                  | Tested                                              |
-| Reconnection after a network drop                                                             | Tested                                              |
-| Live discovery (`#live`), viewer (`#live/<id>`): video, audio, viewer count, ended state      | Tested                                              |
-| Broadcast studio (`#broadcast/<id>`): preview, device pickers, go live, end, viewer count     | Tested                                              |
-| Live chat (screened, 5 per 10 s), reactions (allow-list, 1 per 2 s), hide and mute by hosts   | Tested                                              |
-| Report and block from the viewer                                                              | Tested                                              |
-| Multi-guest: invite (max 4), accept with consent, publish, host mute/remove, removal on block | Tested                                              |
-| Server-side removal of blocked, suspended, unmatched or removed people from rooms             | Tested                                              |
-| Signed LiveKit webhooks (join/leave/room finished) as the only presence source                | Tested                                              |
-| Server-authoritative call billing (recorded, **not charged**: metering switched off)          | Tested (SQL)                                        |
-| Recording                                                                                     | Not built (no egress, no recording grant)           |
-| Large-audience distribution beyond WebRTC (HLS/CDN)                                           | Not built; see `RENTMATE_BROADCAST_ARCHITECTURE.md` |
+| Feature                                                                                                                            | State                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| One-to-one voice calls between matched members                                                                                     | Tested                                              |
+| One-to-one video calls (local + remote video, camera on/off, switch camera, mute)                                                  | Tested                                              |
+| Incoming-call banner on every screen (realtime with a polling fallback)                                                            | Tested                                              |
+| Ringing, connecting, connected (duration), reconnecting, ended (reason)                                                            | Tested                                              |
+| Decline, cancel, missed after 45 s, one live call per person, 20 call starts per hour                                              | Tested (SQL)                                        |
+| Permission-denied help for microphone/camera                                                                                       | Tested                                              |
+| Reconnection after a network drop                                                                                                  | Tested                                              |
+| Live discovery (`#live`), viewer (`#live/<id>`): video, audio, viewer count, ended state                                           | Tested                                              |
+| Broadcast studio (`#broadcast/<id>`): preview, device pickers, go live, end, viewer count                                          | Tested                                              |
+| Live chat (screened, 5 per 10 s), reactions (allow-list, 1 per 2 s), hide and mute by hosts                                        | Tested                                              |
+| Report and block from the viewer                                                                                                   | Tested                                              |
+| Multi-guest: invite (max 4), accept with consent, publish, host mute/allow (persistent, server-enforced), remove, removal on block | Tested                                              |
+| Server-side removal of blocked, suspended, unmatched or removed people from rooms                                                  | Tested                                              |
+| Signed LiveKit webhooks (join/leave/room finished) as the only presence source                                                     | Tested                                              |
+| Server-authoritative call billing (recorded, **not charged**: metering switched off)                                               | Tested (SQL)                                        |
+| Recording                                                                                                                          | Not built (no egress, no recording grant)           |
+| Large-audience distribution beyond WebRTC (HLS/CDN)                                                                                | Not built; see `RENTMATE_BROADCAST_ARCHITECTURE.md` |
 
 ## 2. Architecture
 
@@ -60,15 +60,15 @@ Browser (livekit-client 2.23, lazy-loaded) ──wss──▶ LiveKit SFU ──
 
 ## 3. API changes
 
-| Route                                                   | Auth                | Purpose                                                             |
-| ------------------------------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `POST /api/v1/calls/:id/join`                           | Member JWT          | Token for a call the database allows                                |
-| `POST /api/v1/calls/:id/end`                            | Member JWT          | Hang up in the database, then close the room                        |
-| `POST /api/v1/live/webhook`                             | LiveKit signature   | Presence events; 503 until LiveKit and the DB secret are configured |
-| `POST /api/v1/live/streams/:id/end`                     | Creator             | End the stream and close the room                                   |
-| `POST /api/v1/live/streams/:id/guests/:user/mute`       | Creator / moderator | `MutePublishedTrack` on a guest                                     |
-| `POST /api/v1/live/streams/:id/guests/:user/remove`     | Creator / moderator | Remove a guest (`RemoveParticipant`)                                |
-| Existing join, stats, terminate, emergency-stop, health | unchanged           | Stream join now refuses when the WebRTC viewer cap is reached (503) |
+| Route                                                   | Auth                | Purpose                                                                                                                                                           |
+| ------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/v1/calls/:id/join`                           | Member JWT          | Token for a call the database allows                                                                                                                              |
+| `POST /api/v1/calls/:id/end`                            | Member JWT          | Hang up in the database, then close the room                                                                                                                      |
+| `POST /api/v1/live/webhook`                             | LiveKit signature   | Presence events; 503 until LiveKit and the DB secret are configured                                                                                               |
+| `POST /api/v1/live/streams/:id/end`                     | Creator             | End the stream and close the room                                                                                                                                 |
+| `POST /api/v1/live/streams/:id/guests/:user/mute`       | Creator / moderator | Body `{kind, muted}`. Mute: stored, live tracks muted, source removed from the guest's LiveKit permission (`UpdateParticipant`). Unmute: permission restored only |
+| `POST /api/v1/live/streams/:id/guests/:user/remove`     | Creator / moderator | Remove a guest (`RemoveParticipant`)                                                                                                                              |
+| Existing join, stats, terminate, emergency-stop, health | unchanged           | Stream join now refuses when the WebRTC viewer cap is reached (503)                                                                                               |
 
 ## 4. Database changes (append-only)
 
@@ -80,9 +80,25 @@ Browser (livekit-client 2.23, lazy-loaded) ──wss──▶ LiveKit SFU ──
   - BKG-02: accept re-checks blocks, and blocking cancels open bookings between the two people.
 - `20261121100000_admin_mfa.sql` and `20261122090000_recovery_codes_and_retention.sql`: see `RENTMATE_ADMIN_MFA.md`
   and `RENTMATE_SECURITY_REMEDIATION.md`.
+- `20261123090000_guest_host_mutes.sql` (host mutes) and `20261123100000_integration_secret_strength.sql`
+  (integration secret must be a generated token).
 - Rollback SQL for each: `docs/rollback/`, rehearsed newest-first by `npm run test:rollback`.
 
-## 5. Billing (recorded, not charged)
+## 5. Host mutes (persistent, server-enforced)
+
+A host or moderator can mute a guest's camera or microphone. Fixed after CI run 44601328482 (see
+`RENTMATE_SECURITY_REMEDIATION.md`, RTC-01).
+
+- **The mute is stored** (`live_guest_invites.host_muted_audio/video`, written only by `live_set_guest_mute`, logged).
+- **The media server enforces it:**
+  - live tracks of that kind are muted (`MutePublishedTrack`);
+  - the source is removed from the guest's publish permission (`UpdateParticipant`), so a later publish is refused;
+  - every later broadcaster token carries only the allowed sources (`canPublishSources`), so reconnecting does not
+    escape a mute; a guest with nothing allowed gets `canPublish: false`.
+- **Unmuting gives the permission back.** Nothing is switched on remotely: the guest turns the camera or microphone
+  on themselves. The studio tells the guest about each change and refuses "Camera on" or "Unmute" while muted.
+
+## 6. Billing (recorded, not charged)
 
 `private.call_settle` runs once per call, when `room_finished` arrives or the call is hung up.
 
@@ -102,7 +118,7 @@ switching metering on (founder decision F-08/F-09 plus independent review), deci
   `insufficient`);
 - refunds for calls that fail for technical reasons.
 
-## 6. Environment variables (values never in the repository)
+## 7. Environment variables (values never in the repository)
 
 | Variable                 | Where | Purpose                                                                                                                     |
 | ------------------------ | ----- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -114,13 +130,13 @@ switching metering on (founder decision F-08/F-09 plus independent review), deci
 
 LiveKit project settings: webhook URL `https://<api-host>/api/v1/live/webhook`, signed with the same key.
 
-## 7. Required external services
+## 8. Required external services
 
 - LiveKit Cloud (or self-hosted LiveKit with TURN) under founder approval F-06. Without it every join answers 503 and
   the UI says calls and live are not available.
 - The provider row `live_providers.livekit` must be enabled by an admin.
 
-## 8. Known limitations
+## 9. Known limitations
 
 - Not tested on real Android or iOS devices or on mobile networks (see the test report). The automated tests use
   Chromium with fake camera and microphone.

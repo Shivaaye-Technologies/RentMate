@@ -17,6 +17,8 @@ regression test and residual risk. Evidence labels: **Verified** (run in this se
 | MFA-02      | Recovery codes had 48 bits                                              | **Fixed** (80 bits)                       |
 | MFA-03      | Recovery field cut pasted codes                                         | **Fixed**                                 |
 | CQ-02       | CodeQL `js/insufficient-password-hash` at `providers.ts`                | False positive: dismiss manually          |
+| RTC-01      | Host mute of a live guest did not hold (CI run 44601328482)             | **Fixed**                                 |
+| SEC-05      | Integration secret stored as a fast hash accepted guessable values      | **Fixed**                                 |
 | AUTH-02     | Age is self-declared                                                    | **Open**: provider choice (F-05)          |
 
 ## AUTH-01 · Admin MFA (P1)
@@ -89,7 +91,7 @@ See `RENTMATE_ADMIN_MFA.md`.
 - **Tests:** both browser suites serve the app with exactly these headers (adding only local test origins) and fail on
   any CSP violation:
   - smoke 13/13;
-  - real-media 47/47 (calls, broadcasting and guests all work under the policy);
+  - real-media 59/59 (calls, broadcasting and guests all work under the policy);
   - MFA 17/17 (the QR image decodes);
   - all three also check that the CSP hash matches the built inline script.
 - **Residual risk:**
@@ -113,14 +115,41 @@ See `RENTMATE_ADMIN_MFA.md`.
 - **MFA-03 (Verified):** the recovery input had `maxLength={20}`, so a new-format code pasted with dashes (24
   characters) was cut and always rejected. It is now 40. `test:e2e:mfa` fails with the old limit.
 
+## RTC-01 · Host mute of a live guest did not hold (CI run 44601328482)
+
+- **Reproduced:** CI job `rtc` failed "host controls: muting a guest's camera mutes it on the media server" with
+  `{"muted":0}`. Locally it passed 3/3 (the same LiveKit, Playwright and Node versions as CI), so the cause was timing.
+- **Root cause:**
+  1. The viewer draws a guest tile once _any_ guest track exists, and the studio publishes the microphone before the
+     camera. On a slower runner the mute arrived before the camera, and `GetParticipant` listed no video track.
+  2. The race exposed a product flaw: the mute touched only tracks that existed at that instant. A camera published
+     a moment later, a reconnect or the guest's own unmute escaped it.
+- **Fix:** the mute is stored in the database and enforced by the media server (permission and tokens). Unmuting
+  restores permission only. See `RENTMATE_LIVEKIT_IMPLEMENTATION.md` §5.
+- **Tests (assertion kept):**
+  - the test now waits until LiveKit has the guest's live camera, keeps `muted === 1`, and adds 12 checks of
+    LiveKit's own state (camera and mic, mute and allow, refused re-enable, reconnect while muted): 59/59;
+  - with `UpdateParticipant` and token sources disabled, the new checks fail;
+  - SQL `guest_host_mutes.sql` 18; API +2; web +2.
+
+## SEC-05 · Integration secret strength
+
+- **Reproduced:** `private.set_integration_secret` stored an unsalted SHA-256 and checked only length ≥ 32.
+  `passwordpasswordpasswordpassword`, a spaced phrase and `aaaa…` were all accepted (test run without the fix). A
+  guessable value could be recovered offline from its hash.
+- **Fix:** `20261123100000_integration_secret_strength.sql` requires a generated token (base64/hex/url-safe
+  alphabet, no spaces, ≥ 12 distinct characters), and `.env.example` says how to generate one
+  (`openssl rand -base64 48`).
+- **Test:** `integration_secret_strength.sql` 7/7. Rollback rehearsed.
+
 ## CQ-02 · CodeQL `js/insufficient-password-hash` (false positive)
 
 - **Evidence:** CodeQL (2.27.4 and 2.27.5, `javascript-code-scanning`) reports "Password from an access to apiKey is
-  hashed insecurely" at `providers.ts:61` (the `createHmac` line). The flow shows CodeQL classifying the LiveKit
+  hashed insecurely" at `providers.ts:70` (the `createHmac` line; 2.27.5 on 2026-11-20). The flow shows CodeQL classifying the LiveKit
   **API key id** as a password because of its name. That id is the public `iss` claim LiveKit requires in every HS256
   token. No password is hashed, and HS256 is the format LiveKit verifies.
 - **Action:** dismiss manually in GitHub as "False positive" with the text in `docs/SECURITY_NOTES_LIVEKIT_JWT.md`.
-  Nothing is suppressed in code. The line number moved from 57 to 61 because new LiveKit functions were added above it,
+  Nothing is suppressed in code. The line number moved from 57 to 61 to 70 because new LiveKit functions were added above it,
   so GitHub may show the alert as new.
 
 ## AUTH-02 · Age and identity verification (open, F-05)

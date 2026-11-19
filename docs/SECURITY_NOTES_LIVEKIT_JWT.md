@@ -55,17 +55,67 @@ tokens are verified by the LiveKit server.
   - rejection of tampered payloads, flipped and truncated signatures, `alg: none` tokens (with and without a
     signature), extra segments and malformed base64.
 
+## Re-check on 2026-11-20 (alert now at line 70)
+
+Lines moved as LiveKit functions were added (57 → 61 → 70); the alert is the same. CodeQL CLI 2.27.5,
+`javascript-code-scanning` suite (GitHub's default setup) on the current branch, reports **one** result:
+
+- Rule `js/insufficient-password-hash`, `apps/api/src/live/providers.ts:70`:
+  `createHmac("sha256", apiSecret).update(signingInput).digest()` (the HS256 signer, `hs256Mac`).
+- Source in all four flows: `this.opts.apiKey` (line 139, `requireCreds()`).
+- Path: `apiKey` → `iss` claim of the token payload (`issueToken` line 148, `adminToken` line 178) →
+  `JSON.stringify(payload)` → base64url → `` `${header}.${body}` `` → `signingInput` → `.update(signingInput)`.
+
+**What CodeQL calls a password is the LiveKit API key ID**, and the "hash" is the HMAC-SHA256 over the token body
+that contains it. The API **secret** never appears in a flow: it is only the HMAC key. That is the token format LiveKit
+defines:
+
+- LiveKit's token reference describes `iss` as the "API key used to issue this token" and says tokens are "signed
+  with your API secret to prevent forgery";
+- LiveKit's official Rust SDK sets `iss: api_key` and signs with `Algorithm::HS256` and
+  `EncodingKey::from_secret(api_secret)`.
+
+The key ID is readable (base64) in every token LiveKit clients receive, by design. Nothing stores it, and nothing
+compares it as a credential.
+
+Sources:
+
+- [LiveKit: Tokens & grants](https://docs.livekit.io/frontends/reference/tokens-grants.md)
+- [livekit-api `access_token.rs`](https://docs.rs/livekit-api/0.4.9/src/livekit_api/access_token.rs.html)
+
+**Is any real password or secret hashed insecurely?** Every hashing operation in the code base was checked:
+
+| Where                                | What is hashed                                       | Verdict                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `providers.ts:70` HMAC-SHA256        | Token header and claims (incl. the public key ID)    | Message authentication, required by LiveKit; not a password                                                                                                                                                                                                                                                                                                                  |
+| `providers.ts` webhook SHA-256       | Webhook request body                                 | Integrity check against LiveKit's `sha256` claim; not secret                                                                                                                                                                                                                                                                                                                 |
+| Member passwords                     | Never seen by RentMate code                          | Supabase Auth stores them (bcrypt)                                                                                                                                                                                                                                                                                                                                           |
+| `private.integration_secrets` (SQL)  | LiveKit webhook integration secret, unsalted SHA-256 | Correct for a **generated** high-entropy token, not for a chosen phrase. Until now only length ≥ 32 was enforced, so a guessable value would have been accepted. **Fixed** in `20261123100000_integration_secret_strength.sql`: token alphabet only, no spaces, ≥ 12 distinct characters; test refuses phrases and repeats (3 guessable values were accepted before the fix) |
+| `private.mfa_recovery_codes` (SQL)   | Recovery codes, SHA-256                              | 80 random bits per code: offline brute force out of reach                                                                                                                                                                                                                                                                                                                    |
+| `private.retained_suspensions` (SQL) | Email with a random per-database key                 | Pseudonymous identifier, not a credential                                                                                                                                                                                                                                                                                                                                    |
+
 ## Dismissal guidance
 
-This alert is a **false positive**. No inline suppression has been added and no variable was renamed to avoid the
-heuristic. Dismissal is a reviewer decision in GitHub (Security → Code scanning → the alert → Dismiss alert →
-**False positive**), with this comment:
+**Disposition: false positive.** No code was suppressed and no variable renamed to avoid the heuristic.
 
-> CodeQL treats the LiveKit API key ID as a password because of its name. It flows into the `iss` claim of an HS256
-> JWT, which LiveKit requires (RFC 7518 HS256, keyed with the server-side API secret). The key ID is public by design
-> and is not stored or hashed as a credential. The verifier uses constant-time comparison, enforces alg=HS256 and
-> checks exp/nbf. Reproduced with CodeQL 2.27.4 (javascript-code-scanning); see docs/SECURITY_NOTES_LIVEKIT_JWT.md.
+How to dismiss (this session has no GitHub access, so the founder or a maintainer does it):
 
-Other CodeQL results from the same local run: `js/file-system-race` in `scripts/policy-check.mjs` (security-extended
-suite only) was fixed by reading each file through one handle. The Actions suite reports nothing for
-`.github/workflows/ci.yml`.
+1. GitHub → **Security** → **Code scanning** → the `js/insufficient-password-hash` alert on `providers.ts`.
+2. **Dismiss alert** → reason **False positive**.
+3. Comment (paste):
+
+> CodeQL's name heuristic classifies the LiveKit API key ID as a password. Flow (CodeQL 2.27.5): opts.apiKey →
+> JWT `iss` claim → token body → HMAC-SHA256 signing input. LiveKit defines `iss` as the API key ID and requires
+> HS256 signed with the API secret (LiveKit token docs; official Rust SDK). The key ID is public in every token; it is
+> not stored or hashed as a credential. The API secret is only the HMAC key. Verifier: constant-time comparison,
+> alg=HS256, exp/nbf. Evidence: docs/SECURITY_NOTES_LIVEKIT_JWT.md.
+
+Or with the GitHub CLI (`<n>` = the alert number in the URL):
+
+```bash
+gh api -X PATCH repos/Shivaaye-Technologies/RentMate/code-scanning/alerts/<n> \
+  -f state=dismissed -f dismissed_reason="false positive" \
+  -f dismissed_comment="LiveKit API key ID in the HS256 JWT iss claim, not a password; see docs/SECURITY_NOTES_LIVEKIT_JWT.md"
+```
+
+If CodeQL later reports this rule anywhere else, or a different rule on these lines, treat it as new and investigate.
