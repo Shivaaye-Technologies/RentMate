@@ -4,9 +4,22 @@ Date: 2026-11-19 · Branch: `feature/rentmate-conversion`
 
 ## What was flagged
 
-GitHub code scanning (CodeQL) raised two alerts in `apps/api/src/live/providers.ts`: line 49 (the HMAC computed in
-`signJwt`) and line 57 (the HMAC recomputed in `verifyJwt`). The alert text could not be read from the development
-session (no GitHub API access to the repository), so this note covers both readings that fit hashing code on those lines.
+GitHub code scanning (CodeQL) raised two alerts on the HMAC lines of `apps/api/src/live/providers.ts` (lines 49 and
+57). After commit `c58ee51` those became outdated and one alert remains at **line 57**.
+
+On 2026-11-19 the CodeQL CLI **2.27.4** was run locally on this branch with the `javascript-code-scanning` suite (the
+suite GitHub's default setup uses) and with `javascript-security-extended`. Both report exactly one result there:
+
+- Rule: `js/insufficient-password-hash` ("Use of password hash with insufficient computational effort").
+- Message: "Password from an access to apiKey is hashed insecurely."
+- Data flow: `this.opts.apiKey` → `requireCreds()` → the `iss` claim of the token payload (`issueToken` and
+  `adminToken`) → `JSON.stringify(payload)` → base64url → `` `${header}.${body}` `` → `hs256Mac(signingInput)` →
+  `createHmac("sha256", apiSecret).update(signingInput)` on line 57.
+
+So CodeQL's name heuristic classifies the LiveKit **API key** as a password. The LiveKit API key is the public key
+identifier (for example `APIxxxxxxxx`). LiveKit requires it in the `iss` claim so the server knows which secret to verify
+with. It is readable by anyone holding a token, by design. It is not a password, nothing stores it, and the "hash" is the
+JWT signature over the token body.
 
 ## What the code does
 
@@ -44,7 +57,15 @@ tokens are verified by the LiveKit server.
 
 ## Dismissal guidance
 
-If CodeQL still reports the HMAC lines after re-scanning this branch, dismiss them as **"False positive"** with this
-comment: _"HS256 HMAC keyed with the server-side LiveKit API secret (required token format, RFC 7518); no password is
-hashed. Verifier uses constant-time comparison and enforces alg=HS256. See docs/SECURITY_NOTES_LIVEKIT_JWT.md."_
-No inline suppression comment has been added to the code. Dismissal is a reviewer decision in the GitHub UI.
+This alert is a **false positive**. No inline suppression has been added and no variable was renamed to avoid the
+heuristic. Dismissal is a reviewer decision in GitHub (Security → Code scanning → the alert → Dismiss alert →
+**False positive**), with this comment:
+
+> CodeQL treats the LiveKit API key ID as a password because of its name. It flows into the `iss` claim of an HS256
+> JWT, which LiveKit requires (RFC 7518 HS256, keyed with the server-side API secret). The key ID is public by design
+> and is not stored or hashed as a credential. The verifier uses constant-time comparison, enforces alg=HS256 and
+> checks exp/nbf. Reproduced with CodeQL 2.27.4 (javascript-code-scanning); see docs/SECURITY_NOTES_LIVEKIT_JWT.md.
+
+Other CodeQL results from the same local run: `js/file-system-race` in `scripts/policy-check.mjs` (security-extended
+suite only) was fixed by reading each file through one handle. The Actions suite reports nothing for
+`.github/workflows/ci.yml`.

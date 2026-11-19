@@ -11,21 +11,23 @@ Dating app: users create a profile, get ranked matches, like each other, and cha
 
 ## Commands
 
-| Task              | Command                                                                         |
-| ----------------- | ------------------------------------------------------------------------------- |
-| Install           | `npm ci`                                                                        |
-| Dev API / web     | `npm run dev:api` / `npm run dev:web`                                           |
-| Lint              | `npm run lint`                                                                  |
-| Format check      | `npm run format:check`                                                          |
-| Typecheck         | `npm run typecheck`                                                             |
-| Unit tests        | `npm test`                                                                      |
-| Policy guard      | `npm run test:policy` (secrets, media, adult content; part of `check`)          |
-| Hook guard tests  | `npm run test:hooks`                                                            |
-| DB tests (local)  | `npm run test:db`                                                               |
-| aihub tests       | `npm run test:aihub`                                                            |
-| Browser smoke     | `npm run test:e2e` (needs Playwright)                                           |
-| Build             | `npm run build`                                                                 |
-| Everything (= CI) | `npm run check && npm run test:hooks && npm run test:aihub && npm run test:e2e` |
+| Task               | Command                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| Install            | `npm ci`                                                                        |
+| Dev API / web      | `npm run dev:api` / `npm run dev:web`                                           |
+| Lint               | `npm run lint`                                                                  |
+| Format check       | `npm run format:check`                                                          |
+| Typecheck          | `npm run typecheck`                                                             |
+| Unit tests         | `npm test`                                                                      |
+| Policy guard       | `npm run test:policy` (secrets, media, adult content; part of `check`)          |
+| Hook guard tests   | `npm run test:hooks`                                                            |
+| DB tests (local)   | `npm run test:db`                                                               |
+| Rollback rehearsal | `npm run test:rollback`                                                         |
+| DB concurrency     | `npm run test:db:concurrency` (needs a disposable PostgreSQL; runs in CI)       |
+| aihub tests        | `npm run test:aihub`                                                            |
+| Browser smoke      | `npm run test:e2e` (needs Playwright)                                           |
+| Build              | `npm run build`                                                                 |
+| Everything (= CI)  | `npm run check && npm run test:hooks && npm run test:aihub && npm run test:e2e` |
 
 ## Conventions
 

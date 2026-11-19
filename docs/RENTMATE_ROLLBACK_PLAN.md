@@ -10,12 +10,13 @@
 
 Migrations are additive. Rollback = a new forward migration, never editing applied files.
 
-| Migration                                | Rollback                                                                                                                |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `20261024090000_profile_details` (PR #9) | Drop added columns/tables listed in `docs/MIGRATION_20261024_PROFILE_DETAILS.md` (data in them is lost — back up first) |
-| `20261101090000_live_foundation`         | SQL below (drops live tables and functions; core dating tables are untouched)                                           |
-| `20261119090000_marketplace`             | SQL below (tested)                                                                                                      |
-| Future wallet/booking migrations         | Each ships with its own rollback SQL in its PR; ledgers are exported before any drop                                    |
+| Migration                                                        | Rollback                                                                                                                             |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `20261024090000_profile_details` (PR #9)                         | Drop added columns/tables listed in `docs/MIGRATION_20261024_PROFILE_DETAILS.md` (data in them is lost — back up first)              |
+| `20261101090000_live_foundation`                                 | SQL below (drops live tables and functions; core dating tables are untouched)                                                        |
+| `20261119090000_marketplace`                                     | SQL below (tested)                                                                                                                   |
+| `20261120090000` audit hardening + `20261120100000` token wallet | `docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql` (export `token_ledger` first); rehearsed by `npm run test:rollback` |
+| Future wallet/booking migrations                                 | Each ships with its own rollback SQL in its PR; ledgers are exported before any drop                                                 |
 
 Restore from backup only if data was damaged: Supabase dashboard → Backups → restore (founder action; restores the
 whole database to that point).
