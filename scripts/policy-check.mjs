@@ -13,7 +13,7 @@
 // Usage: node scripts/policy-check.mjs              (self-test, then scan tracked + new files)
 //        node scripts/policy-check.mjs --self-test  (self-test only)
 import { execFileSync } from "node:child_process";
-import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { CASES } from "./policy-check.cases.mjs";
 
@@ -105,7 +105,9 @@ export const ALLOW_MARK = /policy-guard: allow/;
 /** Statements a new migration may not contain (non-destructive, protections stay on). */
 export const MIGRATION_FORBIDDEN = [
   ["deletes data", /^\s*delete\s+from\b/im],
-  ["truncates data", /\btruncate\b/i],
+  // A TRUNCATE statement (at the start of a line, after ";" or inside dynamic EXECUTE). The TRUNCATE privilege named in
+  // GRANT/REVOKE is not a statement and deletes nothing.
+  ["truncates data", /(^|;)\s*truncate\b|\bexecute\s+(format\s*\(\s*)?'\s*truncate\b/im],
   ["drops a table", /\bdrop\s+table\b/i],
   ["drops a column", /\bdrop\s+column\b/i],
   ["drops a schema", /\bdrop\s+schema\b/i],
@@ -181,12 +183,26 @@ export function checkMigrationSet(paths) {
   return problems;
 }
 
-function head(path) {
-  const fd = openSync(path, "r");
-  const buf = Buffer.alloc(16);
-  const n = readSync(fd, buf, 0, 16, 0);
-  closeSync(fd);
-  return buf.subarray(0, n);
+/**
+ * Reads size, the first bytes and (for small text files) the text through one open file handle, so all three describe
+ * the same file even if it changes while the guard runs. Returns null for files deleted in the working tree.
+ */
+function inspect(path, wantText) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch {
+    return null;
+  }
+  try {
+    const { size } = fstatSync(fd);
+    const buf = Buffer.alloc(16);
+    const n = size > 0 ? readSync(fd, buf, 0, 16, 0) : 0;
+    const content = wantText && size <= MAX_BYTES ? readFileSync(fd, "utf8") : "";
+    return { size, head: n > 0 ? buf.subarray(0, n) : undefined, content };
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export function selfTest() {
@@ -223,16 +239,12 @@ function main() {
   };
   for (const p of checkMigrationSet(all)) report("supabase/migrations", p);
   for (const f of list) {
-    let size;
-    try {
-      size = statSync(f).size;
-    } catch {
-      continue; // deleted in the working tree
-    }
+    const info = inspect(f, TEXT.test(f));
+    if (!info) continue; // deleted in the working tree
+    const { size, head, content } = info;
     if (size > MAX_BYTES) report(f, `file is ${(size / 1048576).toFixed(1)} MB (limit 2 MB)`);
-    const content = TEXT.test(f) && size <= MAX_BYTES ? readFileSync(f, "utf8") : "";
     allowed += content.split("\n").filter((l) => ALLOW_MARK.test(l) && ADULT_TERMS.test(l)).length;
-    for (const p of checkFile(f, content, size > 0 ? head(f) : undefined)) report(f, p);
+    for (const p of checkFile(f, content, head)) report(f, p);
   }
   console.log(
     failures

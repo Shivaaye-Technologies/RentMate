@@ -125,6 +125,29 @@ export const CASES = [
     note: "deletes data",
   },
   { ...mig("20261120000000", "truncate public.messages;"), fail: true, note: "truncate" },
+  {
+    ...mig("20261120000000", "select 1;  TRUNCATE TABLE public.likes;"),
+    fail: true,
+    note: "truncate after ;",
+  },
+  {
+    ...mig("20261120000000", "do $$ begin execute 'truncate public.likes'; end $$;"),
+    fail: true,
+    note: "dynamic truncate",
+  },
+  {
+    ...mig("20261120000000", "do $$ begin execute format('truncate %I', 'likes'); end $$;"),
+    fail: true,
+    note: "dynamic truncate via format",
+  },
+  {
+    ...mig(
+      "20261120000000",
+      "revoke truncate, references, trigger on public.likes from anon, authenticated;",
+    ),
+    fail: false,
+    note: "revoking the truncate privilege is allowed",
+  },
   { ...mig("20261120000000", "drop table public.reports;"), fail: true, note: "drop table" },
   {
     ...mig("20261120000000", "alter table public.profiles drop column bio;"),
