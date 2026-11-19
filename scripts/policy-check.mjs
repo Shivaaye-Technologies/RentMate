@@ -195,7 +195,9 @@ function inspect(path, wantText) {
     return null;
   }
   try {
-    const { size } = fstatSync(fd);
+    const st = fstatSync(fd);
+    if (!st.isFile()) return null; // a symlink to a directory, for example
+    const { size } = st;
     const buf = Buffer.alloc(16);
     const n = size > 0 ? readSync(fd, buf, 0, 16, 0) : 0;
     const content = wantText && size <= MAX_BYTES ? readFileSync(fd, "utf8") : "";
