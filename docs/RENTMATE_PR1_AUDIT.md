@@ -8,13 +8,13 @@ Nothing here was merged, deployed, migrated in production, or switched on.
 
 ## 1. Repository and branch status
 
-| Item                                        | Value                                                                                                                |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Repository                                  | `Shivaaye-Technologies/RentMate` (anonymous git read works; the GitHub API and git push answer 403 for this session) |
-| `main`                                      | `b34bf5b` "Initial commit": **README only**. PR #1 therefore brings the whole application                            |
-| PR head on GitHub at the start of the audit | `0743514` (= `refs/pull/1/head` = `origin/feature/rentmate-conversion`)                                              |
-| Commits / files at that head (main..head)   | 86 commits, 441 files                                                                                                |
-| Audit commits (this report)                 | `6eb1407`, `4d65357`, `5b2fe41`, `1d5db19`, `c119949` and the report update. Delivered as a bundle (push is blocked) |
+| Item                                        | Value                                                                                                                            |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Repository                                  | `Shivaaye-Technologies/RentMate` (anonymous git read works; the GitHub API and git push answer 403 for this session)             |
+| `main`                                      | `b34bf5b` "Initial commit": **README only**. PR #1 therefore brings the whole application                                        |
+| PR head on GitHub at the start of the audit | `0743514` (= `refs/pull/1/head` = `origin/feature/rentmate-conversion`)                                                          |
+| Commits / files at that head (main..head)   | 86 commits, 441 files                                                                                                            |
+| Audit commits (this report)                 | `6eb1407`, `4d65357`, `5b2fe41`, `1d5db19`, `c119949`, `b9c8e3b` and the report updates. Delivered as a bundle (push is blocked) |
 
 ## 2. Scope review of the 441 files
 
@@ -80,10 +80,10 @@ screenshots, dismissing the alert is what turns it green.
 
 ### Medium
 
-| ID  | Finding                                                                                                                                                                                                                                                                                                       | Status                                                                                                                                                                                                                                                                              |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M-1 | **vite 6.4.5** (dev dependency of `apps/web`, also used by vitest) is in the affected range of **GHSA-p4f5-76q4-ffq7** (remote code execution through `__vite-browser-external` when the dev server is exposed with `--host`/`server.host`; affected `<= 6.4.5`, fixed 6.4.6). `npm audit` did not report it. | **FIXED `6eb1407`.** Upgraded to 6.4.6 and the floor raised to `^6.4.6`. Exposure was low (no `--host` anywhere; production serves the static build). Regression: the policy guard fails if any copy of vite below 6.4.6 is in `package-lock.json` (`4d65357`)                      |
-| M-2 | **Future-dated migration versions.** `20261123090000` and `20261123100000` are ahead of today (2026-11-20). A migration created before 23 Nov would sort before them and run out of order, or be refused by `supabase db push`.                                                                               | **FIXED `4d65357` (guard).** The files are not renamed (they may already be referenced, and the order is still valid). The policy guard now fails when a migration added later sorts at or before one added earlier, and names the version to use. CI fetches full history for this |
+| ID  | Finding                                                                                                                                                                                                                                                                                                       | Status                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| M-1 | **vite 6.4.5** (dev dependency of `apps/web`, also used by vitest) is in the affected range of **GHSA-p4f5-76q4-ffq7** (remote code execution through `__vite-browser-external` when the dev server is exposed with `--host`/`server.host`; affected `<= 6.4.5`, fixed 6.4.6). `npm audit` did not report it. | **FIXED `6eb1407`.** Upgraded to 6.4.6 and the floor raised to `^6.4.6`. Exposure was low (no `--host` anywhere; production serves the static build). Regression: the policy guard fails if any copy of vite in `package-lock.json` falls in any of the advisory's affected ranges (8.3.0–8.3.6, 8.2.0–8.2.4, 8.0.0–8.1.6, 7.0.0–7.3.7, 4.0.0–6.4.5; vite-plus ≤ 1.5.0) (`4d65357`, made range-aware in `b9c8e3b`) |
+| M-2 | **Future-dated migration versions.** `20261123090000` and `20261123100000` are ahead of today (2026-11-20). A migration created before 23 Nov would sort before them and run out of order, or be refused by `supabase db push`.                                                                               | **FIXED `4d65357` (guard).** The files are not renamed (they may already be referenced, and the order is still valid). The policy guard now fails when a migration added later sorts at or before one added earlier, and names the version to use. CI fetches full history for this                                                                                                                                |
 
 ### Low
 
@@ -141,32 +141,32 @@ screenshots, dismissing the alert is what turns it green.
 | GitHub Dependabot                  | **BLOCKED:** the alert list cannot be read here. If the "moderate" alert names a package other than vite, send its GHSA id and it will be checked the same way                           |
 | Manifests / Actions                | npm only; `actions/checkout@v7`, `actions/setup-node@v7`                                                                                                                                 |
 
-## 7. Verification (head `c119949`, run in this session; the same suite also passed on `4d65357`)
+## 7. Verification (head `b9c8e3b`, run in this session; the same suite also passed on `4d65357` and `c119949`)
 
 Node 22.22.0, npm 10.9.4, clean `npm ci`, working tree clean. All logs were kept for this report.
 
-| Check                                                                       | Command                       | Result                                                                                     |
-| --------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| Clean install                                                               | `npm ci`                      | PASS                                                                                       |
-| Policy guard (secrets, media, adult content, migrations, dependency floors) | `npm run test:policy`         | PASS: self-test 68/68, 438 files                                                           |
-| Format                                                                      | `npm run format:check`        | PASS                                                                                       |
-| Lint                                                                        | `npm run lint`                | PASS                                                                                       |
-| Type checks (API and web)                                                   | `npm run typecheck`           | PASS                                                                                       |
-| API unit tests                                                              | `npm test`                    | PASS 103/103                                                                               |
-| Web unit tests                                                              | `npm test`                    | PASS 175/175                                                                               |
-| Demo generator tests                                                        | `npm test`                    | PASS                                                                                       |
-| Database suites (PGlite)                                                    | `npm test` (`test:db`)        | PASS: 16 suites, 492 checks                                                                |
-| Production builds                                                           | `npm run build`               | PASS                                                                                       |
-| Rollback rehearsal                                                          | `npm run test:rollback`       | PASS: 6 steps, schema restored each time, suites pass after rollback and after re-applying |
-| Wallet upgrade (existing members)                                           | `npm run test:wallet-upgrade` | PASS 6/6                                                                                   |
-| Concurrency on PostgreSQL 16.15 (disposable)                                | `npm run test:db:concurrency` | PASS 5/5 (double accept, retry, cancel/accept, double spend, replayed spend)               |
-| Browser smoke under the production CSP                                      | `npm run test:e2e`            | PASS 13/13                                                                                 |
-| Admin MFA in the browser                                                    | `npm run test:e2e:mfa`        | PASS 17/17                                                                                 |
-| Real-media LiveKit 1.13.11                                                  | `npm run test:e2e:rtc`        | PASS 59/59                                                                                 |
-| Hook guards                                                                 | `npm run test:hooks`          | PASS 21/21                                                                                 |
-| aihub tool                                                                  | `npm run test:aihub`          | PASS 32/32                                                                                 |
-| Dependency audit                                                            | `npm audit`                   | 0 vulnerabilities (see §6 for the advisory npm did not list)                               |
-| Secrets                                                                     | policy guard + `git ls-files` | No secrets; no `.env` file tracked                                                         |
+| Check                                                                           | Command                       | Result                                                                                     |
+| ------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| Clean install                                                                   | `npm ci`                      | PASS                                                                                       |
+| Policy guard (secrets, media, adult content, migrations, dependency advisories) | `npm run test:policy`         | PASS: self-test 96/96, 438 files                                                           |
+| Format                                                                          | `npm run format:check`        | PASS                                                                                       |
+| Lint                                                                            | `npm run lint`                | PASS                                                                                       |
+| Type checks (API and web)                                                       | `npm run typecheck`           | PASS                                                                                       |
+| API unit tests                                                                  | `npm test`                    | PASS 103/103                                                                               |
+| Web unit tests                                                                  | `npm test`                    | PASS 175/175                                                                               |
+| Demo generator tests                                                            | `npm test`                    | PASS                                                                                       |
+| Database suites (PGlite)                                                        | `npm test` (`test:db`)        | PASS: 16 suites, 492 checks                                                                |
+| Production builds                                                               | `npm run build`               | PASS                                                                                       |
+| Rollback rehearsal                                                              | `npm run test:rollback`       | PASS: 6 steps, schema restored each time, suites pass after rollback and after re-applying |
+| Wallet upgrade (existing members)                                               | `npm run test:wallet-upgrade` | PASS 6/6                                                                                   |
+| Concurrency on PostgreSQL 16.15 (disposable)                                    | `npm run test:db:concurrency` | PASS 5/5 (double accept, retry, cancel/accept, double spend, replayed spend)               |
+| Browser smoke under the production CSP                                          | `npm run test:e2e`            | PASS 13/13                                                                                 |
+| Admin MFA in the browser                                                        | `npm run test:e2e:mfa`        | PASS 17/17                                                                                 |
+| Real-media LiveKit 1.13.11                                                      | `npm run test:e2e:rtc`        | PASS 59/59                                                                                 |
+| Hook guards                                                                     | `npm run test:hooks`          | PASS 21/21                                                                                 |
+| aihub tool                                                                      | `npm run test:aihub`          | PASS 32/32                                                                                 |
+| Dependency audit                                                                | `npm audit`                   | 0 vulnerabilities (see §6 for the advisory npm did not list)                               |
+| Secrets                                                                         | policy guard + `git ls-files` | No secrets; no `.env` file tracked                                                         |
 
 **GitHub CI:** BLOCKED. Run results cannot be read from this session. The last run known to this audit,
 [44601328482](https://github.com/Shivaaye-Technologies/RentMate/actions/runs/44601328482), failed the `rtc` job at
@@ -175,12 +175,13 @@ bundle is pushed, check each job (`check`, `db-concurrency`, `e2e`, `rtc`) and C
 
 ## 8. Fixes in this audit
 
-| Commit    | Change                                                                                                         | Regression test                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `6eb1407` | vite 6.4.5 → 6.4.6, range `^6.4.6` (M-1)                                                                       | Dependency-floor rule + 4 self-test cases                  |
-| `4d65357` | Policy guard: migration add order (with rename handling), dependency floors; CI fetches full history (M-2)     | 9 order/log self-test cases; mutation runs (below)         |
-| `1d5db19` | Rename `20261023170000_demo_mode_public.sql` → `20261023165729_demo_mode_public.sql` to match production (H-1) | Self-test case for this exact rename; full suite re-run    |
-| `c119949` | Policy guard: a staged (`git mv`) migration rename is treated as a rename, not a new migration                 | Staged rename passes; staged out-of-order file still fails |
+| Commit    | Change                                                                                                                     | Regression test                                            |
+| --------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `6eb1407` | vite 6.4.5 → 6.4.6, range `^6.4.6` (M-1)                                                                                   | Dependency-advisory rule (see below)                       |
+| `4d65357` | Policy guard: migration add order (with rename handling), dependency floors; CI fetches full history (M-2)                 | 9 order/log self-test cases; mutation runs (below)         |
+| `1d5db19` | Rename `20261023170000_demo_mode_public.sql` → `20261023165729_demo_mode_public.sql` to match production (H-1)             | Self-test case for this exact rename; full suite re-run    |
+| `c119949` | Policy guard: a staged (`git mv`) migration rename is treated as a rename, not a new migration                             | Staged rename passes; staged out-of-order file still fails |
+| `b9c8e3b` | Dependency check covers every affected vite line of GHSA-p4f5-76q4-ffq7 (the first version only checked 6.x) and vite-plus | 32 cases; the previous check was wrong on 16 of them       |
 
 Mutation checks: an untracked `20261120210000_…` migration fails the guard with the message naming `20261123100000`; an
 untracked `20261124000000_…` passes; a lockfile with vite 6.4.5 fails.
