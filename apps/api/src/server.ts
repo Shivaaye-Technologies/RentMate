@@ -60,6 +60,8 @@ if (integration && providers.get("livekit")?.configured) {
   }, 3000).unref();
 }
 
-app.listen(config.PORT, () => {
-  console.log(`[api] listening on port ${config.PORT} (${config.NODE_ENV})`);
+const server = app.listen(config.PORT, () => {
+  // Logs the port the socket actually bound, not values copied from the configuration.
+  const address = server.address();
+  console.log(`[api] listening on port ${typeof address === "object" && address ? address.port : "?"}`);
 });

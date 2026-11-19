@@ -44,6 +44,29 @@ const EnvSchema = z.object({
 
 export type AppConfig = z.infer<typeof EnvSchema>;
 
+/** Settings whose values must never appear in logs, error reports or serialised output. */
+export const SECRET_KEYS = ["SUPABASE_ANON_KEY", "LIVEKIT_API_SECRET", "LIVE_WEBHOOK_DB_SECRET"] as const;
+
+/**
+ * Makes the config safe to log by accident: `JSON.stringify(config)`, `console.log(config)` and `util.inspect` all
+ * show "[redacted]" for secret settings. Property access (config.LIVEKIT_API_SECRET) is unchanged.
+ */
+function redactWhenPrinted(config: AppConfig): AppConfig {
+  const printable = () =>
+    Object.fromEntries(
+      Object.entries(config).map(([k, v]) => [
+        k,
+        (SECRET_KEYS as readonly string[]).includes(k) && v !== undefined ? "[redacted]" : v,
+      ]),
+    );
+  Object.defineProperty(config, "toJSON", { value: printable, enumerable: false });
+  Object.defineProperty(config, Symbol.for("nodejs.util.inspect.custom"), {
+    value: printable,
+    enumerable: false,
+  });
+  return config;
+}
+
 /**
  * Parses and validates environment variables. Throws with a readable list of
  * problems instead of starting the server with a broken configuration.
@@ -61,5 +84,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       "Invalid environment configuration:\n- SUPABASE_URL and SUPABASE_ANON_KEY are required in production",
     );
   }
-  return config;
+  return redactWhenPrinted(config);
 }

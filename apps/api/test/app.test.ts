@@ -168,6 +168,23 @@ describe("loadConfig", () => {
   it("requires Supabase settings in production", () => {
     expect(() => loadConfig({ NODE_ENV: "production" })).toThrow(/SUPABASE_URL/);
   });
+  it("never prints secret settings when the config is logged or serialised", async () => {
+    const { inspect } = await import("node:util");
+    const secrets = {
+      SUPABASE_ANON_KEY: "anon-key-value-should-not-print",
+      LIVEKIT_API_SECRET: "livekit-secret-should-not-print",
+      LIVE_WEBHOOK_DB_SECRET: "webhook-db-secret-should-not-print-0123456789",
+    };
+    const c = loadConfig({ NODE_ENV: "test", LIVEKIT_API_KEY: "APIkey", ...secrets });
+    for (const printed of [JSON.stringify(c), inspect(c), `${JSON.stringify({ c })}`]) {
+      for (const v of Object.values(secrets)) expect(printed).not.toContain(v);
+      expect(printed).toContain("[redacted]");
+      expect(printed).toContain("APIkey"); // non-secret settings stay visible
+    }
+    // Code that needs the values still gets them.
+    expect(c.LIVEKIT_API_SECRET).toBe(secrets.LIVEKIT_API_SECRET);
+    expect(Object.keys(c)).not.toContain("toJSON");
+  });
   it("parses CORS origins", () => {
     expect(loadConfig({ CORS_ORIGINS: "https://a.com, https://b.com" }).CORS_ORIGINS).toEqual([
       "https://a.com",
