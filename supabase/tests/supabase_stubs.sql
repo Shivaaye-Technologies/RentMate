@@ -22,6 +22,19 @@ create table auth.users (
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid;
 $$;
+-- Supabase Auth: the JWT claims (aal = assurance level), MFA factors and sessions.
+create function auth.jwt() returns jsonb language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb;
+$$;
+create table auth.mfa_factors (
+  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id) on delete cascade,
+  friendly_name text, factor_type text not null default 'totp', status text not null default 'unverified',
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz default now(), aal text, not_after timestamptz
+);
 grant usage on schema auth to anon, authenticated, service_role;
 
 create schema storage;

@@ -44,6 +44,7 @@ for (const test of [
   "audit_hardening.sql",
   "token_wallet.sql",
   "calls_and_live_rooms.sql",
+  "admin_mfa.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));

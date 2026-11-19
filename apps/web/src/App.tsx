@@ -39,6 +39,7 @@ import { CallScreen } from "./rtc/CallScreen";
 import { IncomingCall } from "./rtc/IncomingCall";
 import { LiveDiscover } from "./rtc/LiveDiscover";
 import { LiveViewer } from "./rtc/LiveViewer";
+import { AdminGate, MfaSettings } from "./security/AdminGate";
 
 /** Demo Mode lives at #demo so it can be linked from the landing page. */
 const isDemoHash = () => typeof window !== "undefined" && window.location.hash === "#demo";
@@ -188,16 +189,22 @@ export function App() {
     };
     if (market === "companions") return <Marketplace me={session.user.id} onExit={exit} />;
     if (market === "companion") return <CompanionDashboard me={session.user.id} onExit={exit} />;
-    return <MarketAdmin onExit={exit} />;
+    return (
+      <AdminGate onExit={exit}>
+        <MarketAdmin onExit={exit} />
+      </AdminGate>
+    );
   }
   if (admin) {
+    const exitAdmin = () => {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      setAdmin(false);
+    };
     return (
-      <AdminConsole
-        onExit={() => {
-          window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          setAdmin(false);
-        }}
-      />
+      <AdminGate onExit={exitAdmin}>
+        <MfaSettings />
+        <AdminConsole onExit={exitAdmin} />
+      </AdminGate>
     );
   }
   if (creator) {
