@@ -38,6 +38,8 @@ const MESSAGES: Record<string, string> = {
   session_not_accepted: "The creator hasn't accepted this session yet.",
   creator_not_verified: "This creator isn't verified.",
   creator_country_not_allowed: "Private sessions aren't available for this creator.",
+  account_suspended: "Your account is suspended. You can appeal from your account settings.",
+  participant_suspended: "This session isn't available right now.",
 };
 
 /** Human messages for problem codes, without leaking who blocked whom. */

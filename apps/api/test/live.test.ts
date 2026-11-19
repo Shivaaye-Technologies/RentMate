@@ -82,6 +82,51 @@ describe("LiveKit provider", () => {
     expect(verifyJwt(good, SECRET)).toMatchObject({ sub: "u1" });
   });
 
+  it("issues short-lived, room-scoped tokens that expire and carry the API key as issuer", async () => {
+    const lk = new LiveKitProvider({
+      url: "wss://x.livekit.cloud",
+      apiKey: "APIkey",
+      apiSecret: SECRET,
+      now,
+    });
+    const t = await lk.issueToken({ room: "sm-9", identity: "u9", canPublish: false, ttlSeconds: 600 });
+    const nowS = Math.floor(now() / 1000);
+    const claims = verifyJwt(t.token, SECRET, { nowSeconds: nowS })!;
+    expect(claims.iss).toBe("APIkey");
+    expect(claims.sub).toBe("u9");
+    expect((claims.exp as number) - nowS).toBe(600);
+    expect((claims.video as { room: string }).room).toBe("sm-9");
+    expect(claims.video).not.toHaveProperty("roomAdmin");
+    expect(claims.video).not.toHaveProperty("roomRecord");
+    expect(Date.parse(t.expiresAt) / 1000).toBe(claims.exp);
+    // Expired, at and after exp; not yet valid, before nbf.
+    expect(verifyJwt(t.token, SECRET, { nowSeconds: nowS + 600 })).toBeNull();
+    expect(verifyJwt(t.token, SECRET, { nowSeconds: nowS + 3600 })).toBeNull();
+    expect(verifyJwt(t.token, SECRET, { nowSeconds: nowS - 60 })).toBeNull();
+    // Tokens without an expiry are refused when time is checked.
+    expect(verifyJwt(signJwt({ sub: "u9" }, SECRET), SECRET, { nowSeconds: nowS })).toBeNull();
+    // A token signed with another project's secret is refused.
+    const other = new LiveKitProvider({
+      url: "wss://x.livekit.cloud",
+      apiKey: "K2",
+      apiSecret: "another-secret-9876543210",
+      now,
+    });
+    const foreign = await other.issueToken({
+      room: "sm-9",
+      identity: "u9",
+      canPublish: true,
+      ttlSeconds: 600,
+    });
+    expect(verifyJwt(foreign.token, SECRET, { nowSeconds: nowS })).toBeNull();
+    // Header tampering (alg switched to HS512 or none) is refused even with a valid signature over the original header.
+    const [, body, sig] = t.token.split(".");
+    for (const alg of ["HS512", "none", "RS256"]) {
+      const h = Buffer.from(JSON.stringify({ alg, typ: "JWT" })).toString("base64url");
+      expect(verifyJwt(`${h}.${body}.${sig}`, SECRET)).toBeNull();
+    }
+  });
+
   it("refuses to issue tokens without credentials", async () => {
     const lk = new LiveKitProvider({ url: "wss://x.livekit.cloud" });
     expect(lk.configured).toBe(false);
@@ -299,6 +344,28 @@ describe("live routes", () => {
       .set(auth)
       .send({ as: "viewer" });
     expect(hidden.status).toBe(404);
+    expect(provider!.issued).toHaveLength(0);
+  });
+
+  it("refuses suspended accounts everywhere a token is issued, without issuing one", async () => {
+    const { app, store, provider } = setup();
+    store.watch = ["account_suspended"];
+    const watch = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "viewer" });
+    expect(watch.status).toBe(403);
+    expect(watch.body.reasons[0]).toMatch(/suspended/);
+    store.broadcast = ["stream_not_live", "account_suspended"];
+    const broadcast = await request(app)
+      .post(`/api/v1/live/streams/${STREAM}/join`)
+      .set(auth)
+      .send({ as: "broadcaster" });
+    expect(broadcast.status).toBe(403);
+    store.session = ["participant_suspended"];
+    const session = await request(app).post(`/api/v1/live/sessions/${SESSION}/join`).set(auth).send({});
+    expect(session.status).toBe(403);
+    expect(session.body.reasons).toEqual(["This session isn't available right now."]);
     expect(provider!.issued).toHaveLength(0);
   });
 

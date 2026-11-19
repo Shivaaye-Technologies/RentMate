@@ -66,9 +66,13 @@ export function signJwt(payload: Record<string, unknown>, secret: string): strin
 /**
  * Verifies and decodes an HS256 JWT (used by tests and for defence in depth). Returns null unless the token has three
  * parts, its header declares HS256 (so "alg: none" and algorithm-confusion tokens are refused), and the signature
- * matches in constant time.
+ * matches in constant time. With `nowSeconds`, also refuses tokens that are expired (`exp`) or not yet valid (`nbf`).
  */
-export function verifyJwt(token: string, secret: string): Record<string, unknown> | null {
+export function verifyJwt(
+  token: string,
+  secret: string,
+  opts: { nowSeconds?: number } = {},
+): Record<string, unknown> | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [h, b, s] = parts;
@@ -80,9 +84,13 @@ export function verifyJwt(token: string, secret: string): Record<string, unknown
     const given = fromB64url(s);
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
     const payload: unknown = JSON.parse(fromB64url(b).toString("utf8"));
-    return payload && typeof payload === "object" && !Array.isArray(payload)
-      ? (payload as Record<string, unknown>)
-      : null;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    const claims = payload as Record<string, unknown>;
+    if (opts.nowSeconds !== undefined) {
+      if (typeof claims.exp !== "number" || opts.nowSeconds >= claims.exp) return null;
+      if (typeof claims.nbf === "number" && opts.nowSeconds < claims.nbf) return null;
+    }
+    return claims;
   } catch {
     return null;
   }
