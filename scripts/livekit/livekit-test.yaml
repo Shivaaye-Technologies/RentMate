@@ -1,0 +1,18 @@
+# LiveKit server for automated tests only (CI job "rtc" and npm run test:e2e:rtc). Loopback only; the key
+# below is a public test value that grants nothing outside this machine. Never use it for a real deployment.
+port: 7880
+bind_addresses: ["127.0.0.1"]
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false
+  node_ip: 127.0.0.1
+keys:
+  rmtestkey: rm-local-test-secret-0123456789abcdef
+webhook:
+  api_key: rmtestkey
+  urls:
+    - http://127.0.0.1:4555/api/v1/live/webhook
+logging:
+  level: info

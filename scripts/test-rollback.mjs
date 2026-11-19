@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Rehearses docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql on a throwaway PGlite database:
-// apply every migration, roll the two 2026-11-20 migrations back, check the schema matches a database that never had
-// them, run the earlier SQL suites, then re-apply both migrations (forward again). Never touches a real database.
+// Rehearses the rollback SQL in docs/rollback/ on throwaway PGlite databases, newest step first. For each step: apply
+// every migration, run the rollback files from the newest down to this step, check the schema matches a database
+// that never had those migrations, run the earlier SQL suites, then re-apply the migrations and run their own suites.
+// Never touches a real database.
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,8 +11,22 @@ import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
-const NEW = ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"];
 const migrations = readdirSync(join(root, "supabase/migrations")).sort();
+
+/** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
+const STEPS = [
+  {
+    migrations: ["20261121090000_calls_and_live_rooms.sql"],
+    rollback: "docs/rollback/20261121_calls_and_live_rooms.rollback.sql",
+    suites: ["calls_and_live_rooms.sql"],
+  },
+  {
+    migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],
+    rollback: "docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql",
+    suites: ["audit_hardening.sql", "token_wallet.sql"],
+  },
+];
+const EARLIER_SUITES = ["rls_flow.sql", "live_foundation.sql", "marketplace.sql"];
 
 async function fresh(skip) {
   const db = new PGlite({ extensions: { btree_gist } });
@@ -20,7 +35,7 @@ async function fresh(skip) {
   return db;
 }
 
-// Shape of everything a migration can change: functions (with body hash), policies, triggers, tables, columns, grants.
+// Shape of everything a migration can change: functions (with body hash and grants), policies, triggers, tables, columns.
 const SHAPE = `
   select 'fn ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ') '
          || md5(pg_get_functiondef(p.oid)) || ' '
@@ -31,57 +46,60 @@ const SHAPE = `
   union all select 'table ' || schemaname || '.' || tablename from pg_tables where schemaname in ('public', 'private')
   union all select 'column ' || table_schema || '.' || table_name || '.' || column_name
   from information_schema.columns where table_schema in ('public', 'private')
+  union all select 'publication ' || tablename from pg_publication_tables where pubname = 'supabase_realtime'
   order by 1`;
 const shape = async (db) => (await db.query(SHAPE)).rows.map((r) => r.x);
 
-const before = await shape(await fresh(NEW));
-const db = await fresh([]);
-await db.exec(read("docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql"));
-const after = await shape(db);
-
-// SEC-03 privilege revocations are deliberately kept, so grants are compared separately (function ACLs differ only
-// where a function was re-created; table grants are not part of SHAPE).
-const missing = before.filter((x) => !after.includes(x));
-const extra = after.filter((x) => !before.includes(x));
-let failed = false;
-if (missing.length || extra.length) {
-  failed = true;
-  console.log("Rollback does not restore the previous schema:");
-  for (const x of missing) console.log(`  missing: ${x}`);
-  for (const x of extra) console.log(`  left over: ${x}`);
-} else {
-  console.log(`Rollback restores the previous schema (${before.length} objects compared).`);
-}
-
-for (const test of ["rls_flow.sql", "live_foundation.sql", "marketplace.sql"]) {
+async function suite(db, test) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
-    failed = true;
+    return { ok: false, line: `${test}: did not report results` };
   } catch (e) {
     const results = String(e.message)
       .replace(/^.*RESULTS:\s*/s, "")
       .split(/;\s*/)
       .filter(Boolean);
     const bad = results.filter((r) => !r.startsWith("ok"));
-    console.log(`after rollback, ${test}: ${results.length - bad.length}/${results.length} ok`);
-    if (bad.length || !/ROLLED BACK/.test(e.message)) failed = true;
+    return {
+      ok: bad.length === 0 && /ROLLED BACK/.test(e.message),
+      line: `${test}: ${results.length - bad.length}/${results.length} ok${bad.length ? ` (${bad.join("; ")})` : ""}`,
+    };
   }
 }
 
-for (const f of NEW) await db.exec(read(`supabase/migrations/${f}`));
-for (const test of ["audit_hardening.sql", "token_wallet.sql"]) {
-  try {
-    await db.exec(read(`supabase/tests/${test}`));
+let failed = false;
+for (let i = 0; i < STEPS.length; i++) {
+  const undone = STEPS.slice(0, i + 1);
+  const skip = undone.flatMap((s) => s.migrations);
+  const label = undone.map((s) => s.rollback.replace("docs/rollback/", "")).join(" + ");
+  const before = await shape(await fresh(skip));
+  const db = await fresh([]);
+  for (const s of undone) await db.exec(read(s.rollback));
+  const after = await shape(db);
+  // Privilege revocations from 20261120090000 (SEC-03) are deliberately kept; table grants are not part of SHAPE.
+  const missing = before.filter((x) => !after.includes(x));
+  const extra = after.filter((x) => !before.includes(x));
+  if (missing.length || extra.length) {
     failed = true;
-  } catch (e) {
-    const results = String(e.message)
-      .replace(/^.*RESULTS:\s*/s, "")
-      .split(/;\s*/)
-      .filter(Boolean);
-    const bad = results.filter((r) => !r.startsWith("ok"));
-    console.log(`after re-applying, ${test}: ${results.length - bad.length}/${results.length} ok`);
-    for (const b of bad) console.log(`  ${b}`);
-    if (bad.length || !/ROLLED BACK/.test(e.message)) failed = true;
+    console.log(`Rollback ${label} does not restore the previous schema:`);
+    for (const x of missing) console.log(`  missing: ${x}`);
+    for (const x of extra) console.log(`  left over: ${x}`);
+  } else {
+    console.log(`Rollback ${label} restores the previous schema (${before.length} objects compared).`);
+  }
+  for (const test of EARLIER_SUITES) {
+    const r = await suite(db, test);
+    console.log(`  after rollback, ${r.line}`);
+    if (!r.ok) failed = true;
+  }
+  // Forward again, oldest undone step first.
+  for (const s of [...undone].reverse()) {
+    for (const f of s.migrations) await db.exec(read(`supabase/migrations/${f}`));
+    for (const test of s.suites) {
+      const r = await suite(db, test);
+      console.log(`  after re-applying, ${r.line}`);
+      if (!r.ok) failed = true;
+    }
   }
 }
 process.exit(failed ? 1 : 0);
