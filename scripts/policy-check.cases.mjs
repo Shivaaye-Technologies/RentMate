@@ -269,25 +269,66 @@ export const CASES = [
     fail: false,
     note: "uncommitted migration dated after the newest committed one",
   },
-  // Dependency floors
+  // Dependency advisories: GHSA-p4f5-76q4-ffq7, every release line, both edges of every range
+  ...[
+    // affected
+    ["vite", "4.0.0", true, "first affected 4.x"],
+    ["vite", "4.5.14", true, "4.x (no 4.x fix)"],
+    ["vite", "5.4.21", true, "5.x (no 5.x fix)"],
+    ["vite", "6.0.0", true, "first 6.x"],
+    ["vite", "6.4.5", true, "last affected 6.x"],
+    ["vite", "7.0.0", true, "first 7.x"],
+    ["vite", "7.3.7", true, "last affected 7.x"],
+    ["vite", "8.0.0", true, "first 8.x"],
+    ["vite", "8.1.6", true, "last affected 8.0/8.1"],
+    ["vite", "8.2.0", true, "8.2.0 is above 8.1.7 but affected"],
+    ["vite", "8.2.4", true, "last affected 8.2"],
+    ["vite", "8.3.0", true, "first 8.3"],
+    ["vite", "8.3.6", true, "last affected 8.3"],
+    ["vite", "8.3.0-beta.1", true, "prerelease inside a range"],
+    ["vite", "8.3.7-beta.1", true, "prerelease of a fixed release (conservative)"],
+    ["vite", "6.4.5+build.7", true, "build metadata ignored"],
+    ["vite-plus", "1.5.0", true, "vite-plus last affected"],
+    // patched or never affected
+    ["vite", "3.2.11", false, "3.x is outside the advisory"],
+    ["vite", "6.4.6", false, "6.x fix (installed version)"],
+    ["vite", "7.3.8", false, "7.x fix"],
+    ["vite", "8.1.7", false, "8.1 fix"],
+    ["vite", "8.2.5", false, "8.2 fix"],
+    ["vite", "8.3.7", false, "8.3 fix"],
+    ["vite", "8.3.8", false, "after the 8.3 fix"],
+    ["vite", "8.4.0", false, "later 8.x line"],
+    ["vite", "9.0.0", false, "later major"],
+    ["vite-plus", "1.5.1", false, "vite-plus fix"],
+    ["vite", "github:vitejs/vite#main", false, "non-semver version is not parsed"],
+  ].map(([pkg, version, fail, why]) => ({
+    lock: { packages: { [`node_modules/${pkg}`]: { version } } },
+    fail,
+    note: `${pkg} ${version}: ${why}`,
+  })),
   {
-    lock: { packages: { "node_modules/vite": { version: "6.4.5" } } },
-    fail: true,
-    note: "vite 6.4.5 (GHSA-p4f5-76q4-ffq7)",
-  },
-  {
-    lock: { packages: { "node_modules/vitest/node_modules/vite": { version: "6.2.0" } } },
+    lock: { packages: { "node_modules/vitest/node_modules/vite": { version: "7.1.0" } } },
     fail: true,
     note: "nested vulnerable vite copy",
   },
   {
-    lock: { packages: { "node_modules/vite": { version: "6.4.6" } } },
-    fail: false,
-    note: "vite 6.4.6",
+    lock: {
+      packages: {
+        "node_modules/vite": { version: "6.4.6" },
+        "node_modules/vitest/node_modules/vite": { version: "8.2.3" },
+      },
+    },
+    fail: true,
+    note: "one patched copy does not hide a vulnerable nested copy",
   },
   {
     lock: { packages: { "node_modules/@vitejs/plugin-react": { version: "4.7.0" } } },
     fail: false,
     note: "different package whose path contains vite",
+  },
+  {
+    lock: { packages: { "node_modules/not-vite": { version: "6.0.0" } } },
+    fail: false,
+    note: "package name ending in vite",
   },
 ];

@@ -9,7 +9,8 @@
 //   4. No pornographic / adult / sexual-solicitation wording, except in lines that state a prohibition.
 //   5. Migration safety: well-formed, unique names; new migrations cannot delete or truncate data, drop tables
 //      or columns, or switch off the no-adult-content protections. Versions must grow in the order files are added.
-//   6. Dependency floors: no installed copy of a package below a version with a known advisory (package-lock.json).
+//   6. Dependency advisories: no installed copy of a package inside a known advisory's affected ranges
+//      (package-lock.json), checked per release line.
 //
 // Usage: node scripts/policy-check.mjs              (self-test, then scan tracked + new files)
 //        node scripts/policy-check.mjs --self-test  (self-test only)
@@ -215,28 +216,77 @@ export function checkMigrationOrder(batches) {
   return problems;
 }
 
-/** Packages with a known advisory below a version. Checked against package-lock.json. */
-export const DEPENDENCY_FLOORS = [
-  // GHSA-p4f5-76q4-ffq7: dev-server remote code execution in vite <= 6.4.5 (fixed in 6.4.6).
-  ["vite", "6.4.6", "GHSA-p4f5-76q4-ffq7"],
+/**
+ * Known advisories, checked against every copy of the package in package-lock.json. Each range is inclusive
+ * [first affected, last affected] with the release that fixes it, copied from the advisory. A range is per release
+ * line, because a newer line can still be affected (vite 8.2.0 is above 8.1.7 but affected until 8.2.5).
+ */
+export const DEPENDENCY_ADVISORIES = [
+  {
+    // https://github.com/vitejs/vite/security/advisories/GHSA-p4f5-76q4-ffq7 (remote code execution through
+    // __vite-browser-external when the dev server is exposed with --host / server.host).
+    id: "GHSA-p4f5-76q4-ffq7",
+    package: "vite",
+    ranges: [
+      ["8.3.0", "8.3.6", "8.3.7"],
+      ["8.2.0", "8.2.4", "8.2.5"],
+      ["8.0.0", "8.1.6", "8.1.7"],
+      ["7.0.0", "7.3.7", "7.3.8"],
+      ["4.0.0", "6.4.5", "6.4.6"], // no fix on the 4.x or 5.x lines
+    ],
+  },
+  {
+    id: "GHSA-p4f5-76q4-ffq7",
+    package: "vite-plus",
+    ranges: [["0.0.0", "1.5.0", "1.5.1"]],
+  },
 ];
 
-const semverParts = (v) => v.split(/[.+-]/).slice(0, 3).map(Number);
-export function versionBelow(v, floor) {
-  const a = semverParts(v);
-  const b = semverParts(floor);
-  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
-  return false;
+/** Parses x.y.z with an optional -prerelease (build metadata ignored); null for anything else (git URLs, tags). */
+export function parseVersion(v) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(String(v).trim());
+  return m ? { nums: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ?? null } : null;
 }
 
-/** Every installed copy (any path in the lockfile) must be at or above its floor, on the same major line. */
-export function checkDependencyFloors(lock) {
+/** Compares release numbers only (prerelease tags are handled by the caller). */
+export function compareBase(a, b) {
+  for (let i = 0; i < 3; i++) if (a.nums[i] !== b.nums[i]) return a.nums[i] < b.nums[i] ? -1 : 1;
+  return 0;
+}
+
+/**
+ * The advisory range that `version` falls in, or null. Prereleases are judged by their release numbers, and a
+ * prerelease of a fixed release (8.3.7-beta.1) counts as affected because it may predate the fix: conservative on
+ * purpose, a false alarm is cheaper than a missed copy.
+ */
+export function affectedRange(version, ranges) {
+  const v = parseVersion(version);
+  if (!v) return null;
+  for (const [first, last, fixed] of ranges) {
+    const lo = parseVersion(first);
+    const hi = parseVersion(last);
+    const fix = parseVersion(fixed);
+    if (compareBase(v, lo) >= 0 && compareBase(v, hi) <= 0) return [first, last, fixed];
+    if (v.pre && compareBase(v, fix) === 0) return [first, last, fixed];
+  }
+  return null;
+}
+
+/** Every installed copy (any path in the lockfile) must be outside every affected range of its package. */
+export function checkDependencyAdvisories(lock, advisories = DEPENDENCY_ADVISORIES) {
   const problems = [];
   for (const [path, info] of Object.entries(lock.packages ?? {})) {
-    for (const [name, floor, why] of DEPENDENCY_FLOORS) {
-      if (!path.endsWith(`node_modules/${name}`) || !info.version) continue;
-      if (semverParts(info.version)[0] === semverParts(floor)[0] && versionBelow(info.version, floor))
-        problems.push(`${path} is ${info.version}; ${why} needs ${floor} or later`);
+    if (!info.version) continue;
+    for (const adv of advisories) {
+      if (!path.endsWith(`node_modules/${adv.package}`)) continue;
+      const hit = affectedRange(info.version, adv.ranges);
+      if (!hit) continue;
+      const [first, last, fixed] = hit;
+      const sameLine = parseVersion(info.version).nums[0] === parseVersion(fixed).nums[0];
+      problems.push(
+        `${path} is ${info.version}, affected by ${adv.id} (${first}–${last}); upgrade to ${fixed} or later` +
+          (sameLine ? "" : ` (no fix on the ${parseVersion(info.version).nums[0]}.x line)`),
+      );
     }
   }
   return problems;
@@ -334,7 +384,7 @@ export function selfTest() {
         : c.order !== undefined
           ? checkMigrationOrder(c.order).length > 0
           : c.lock !== undefined
-            ? checkDependencyFloors(c.lock).length > 0
+            ? checkDependencyAdvisories(c.lock).length > 0
             : c.set !== undefined
               ? checkMigrationSet(c.set).length > 0
               : checkFile(c.path, c.content ?? "", c.bytes ? Buffer.from(c.bytes) : undefined).length > 0;
@@ -368,7 +418,7 @@ function main() {
   for (const p of checkMigrationOrder(batches)) report("supabase/migrations", p);
   if (batches.length < 2) console.log("note: migration order not checked (no git history; shallow clone?)");
   try {
-    for (const p of checkDependencyFloors(JSON.parse(readFileSync("package-lock.json", "utf8"))))
+    for (const p of checkDependencyAdvisories(JSON.parse(readFileSync("package-lock.json", "utf8"))))
       report("package-lock.json", p);
   } catch (e) {
     report("package-lock.json", `cannot read: ${e.message}`);
