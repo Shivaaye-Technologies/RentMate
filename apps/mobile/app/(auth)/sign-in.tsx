@@ -1,29 +1,26 @@
 import { Link } from "expo-router";
 import { useState } from "react";
-import { supabase } from "../../src/lib/supabase";
-import { classifyAuthError, emailProblem } from "../../src/lib/shared";
+import { signIn, type FieldErrors } from "../../src/lib/auth";
+import { authClient } from "../../src/lib/authClient";
 import { Body, Button, Field, Notice, Screen, Title } from "../../src/ui";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fields, setFields] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
 
-  async function signIn() {
-    const problem = emailProblem(email) ?? (password ? null : "Enter your password.");
-    if (problem) return setError(problem);
-    if (!supabase) return;
+  async function submit() {
+    if (!authClient) return;
     setBusy(true);
     setError(null);
-    try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (authError) setError(classifyAuthError(authError).message);
-      // On success the session listener moves the member into the app.
-    } catch (e) {
-      setError(classifyAuthError(e as Error).message);
-    } finally {
-      setBusy(false);
+    const r = await signIn(authClient, email, password);
+    setBusy(false);
+    // On success the session listener moves the member into the app.
+    if (!r.ok) {
+      setFields(r.fields ?? {});
+      setError(r.message ?? null);
     }
   }
 
@@ -35,6 +32,7 @@ export default function SignIn() {
         label="Email"
         value={email}
         onChangeText={setEmail}
+        error={fields.email}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -44,12 +42,16 @@ export default function SignIn() {
         label="Password"
         value={password}
         onChangeText={setPassword}
+        error={fields.password}
         secureTextEntry
         autoComplete="current-password"
         textContentType="password"
       />
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <Button label="Sign in" onPress={() => void signIn()} busy={busy} />
+      <Button label="Sign in" onPress={() => void submit()} busy={busy} />
+      <Link href="/forgot-password" asChild>
+        <Button label="Forgot your password?" kind="plain" onPress={() => undefined} />
+      </Link>
       <Link href="/sign-up" asChild>
         <Button label="Create an account" kind="plain" onPress={() => undefined} />
       </Link>
