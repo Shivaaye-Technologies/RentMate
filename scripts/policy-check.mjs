@@ -240,6 +240,14 @@ export const DEPENDENCY_ADVISORIES = [
     package: "vite-plus",
     ranges: [["0.0.0", "1.5.0", "1.5.1"]],
   },
+  {
+    // https://github.com/advisories/GHSA-g3hv-75wg-m249 (moderate): denial of service via globparts amplification,
+    // affected >= 7.0.0 < 11.0.1. Installed as 10.2.6 under typescript-eslint until 0e2b324 (the Dependabot alert on
+    // this repository); eslint's own minimatch 3.x is below the range.
+    id: "GHSA-g3hv-75wg-m249",
+    package: "minimatch",
+    ranges: [["7.0.0", "11.0.0", "11.0.1"]],
+  },
 ];
 
 /** Parses x.y.z with an optional -prerelease (build metadata ignored); null for anything else (git URLs, tags). */

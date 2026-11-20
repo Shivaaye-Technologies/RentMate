@@ -301,11 +301,31 @@ export const CASES = [
     ["vite", "9.0.0", false, "later major"],
     ["vite-plus", "1.5.1", false, "vite-plus fix"],
     ["vite", "github:vitejs/vite#main", false, "non-semver version is not parsed"],
+    // GHSA-g3hv-75wg-m249 (the repository's Dependabot alert until 0e2b324)
+    ["minimatch", "7.0.0", true, "first affected minimatch"],
+    ["minimatch", "10.2.6", true, "the version typescript-eslint installed before 0e2b324"],
+    ["minimatch", "11.0.0", true, "last affected minimatch"],
+    ["minimatch", "11.0.1", false, "minimatch fix"],
+    ["minimatch", "11.0.9", false, "installed under typescript-eslint now"],
+    ["minimatch", "3.1.5", false, "eslint's minimatch, below the range"],
   ].map(([pkg, version, fail, why]) => ({
     lock: { packages: { [`node_modules/${pkg}`]: { version } } },
     fail,
     note: `${pkg} ${version}: ${why}`,
   })),
+  {
+    lock: {
+      packages: {
+        "node_modules/minimatch": { version: "3.1.5", dev: true },
+        "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": {
+          version: "10.2.6",
+          dev: true,
+        },
+      },
+    },
+    fail: true,
+    note: "the exact pre-0e2b324 layout: nested vulnerable minimatch beside a safe top-level copy",
+  },
   {
     lock: { packages: { "node_modules/vitest/node_modules/vite": { version: "7.1.0" } } },
     fail: true,

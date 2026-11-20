@@ -28,11 +28,12 @@
     "build": "npm run build --workspaces",
     "check": "npm run test:policy && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
     "test:hooks": "node scripts/test-hooks.mjs",
-    "test:policy": "node scripts/policy-check.mjs",
+    "test:policy": "node scripts/policy-check.mjs && node scripts/advisory-scan.mjs --self-test",
     "test:aihub": "bash tools/aihub/test/aihub.test.sh",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:rtc": "node scripts/e2e-rtc.mjs",
-    "test:e2e:mfa": "node scripts/e2e-mfa.mjs"
+    "test:e2e:mfa": "node scripts/e2e-mfa.mjs",
+    "audit:advisories": "node scripts/advisory-scan.mjs"
   },
   "devDependencies": {
     "@dicebear/core": "^9.4.3",
