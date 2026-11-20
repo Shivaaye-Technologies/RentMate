@@ -7,6 +7,24 @@ database or Render service was read or changed. Labels: **Verified** (executed h
 **Verdict: deployment-preparable, not deployment-ready.** The code, migrations, rollback and checks are in place and
 tested locally and in CI. Approvals and production settings below must be completed first.
 
+## Phase 2 audit (2026-11-20)
+
+**Not deployment-ready.** All repository checks pass on `c5aa208` (see `RENTMATE_FULL_AUDIT_REPORT.md` §4), but the
+Phase 2 audit adds these to the blockers below:
+
+1. **P2-01, P2-02:** prohibited-content and public-place filters are easy to bypass (High; needs founder and legal input
+   on wording and venue rules).
+2. **P2-03:** age is self-declared; add a date of birth and confirmation, and decide on a verification provider
+   (F-04/F-05).
+3. **P2-04, P2-05:** photo privacy: every member can read every folder, and deletion does not remove photos on the
+   server.
+4. **P2-06:** `render.yaml` `Permissions-Policy` must allow `geolocation=(self)`, or location sharing fails in
+   production.
+5. **P2-07:** move the API off Render's free plan (always-on instance) before launch.
+6. **P2-08:** record and verify the Supabase Auth settings (password minimum, email confirmation, redirect allowlist,
+   leaked-password protection).
+7. **P2-14:** confirm Supabase backups for the production plan and rehearse a restore.
+
 ## 1. Blockers (must be resolved before any production deploy)
 
 | #   | Blocker                                                                                                          | Owner   | Ref        |
