@@ -15,7 +15,12 @@ No P0 issue was found. Nothing was tested against production; no production syst
 ## Phase 2 audit (2026-11-20): new findings
 
 Full detail, evidence, reproduction, fixes and required tests: `RENTMATE_FULL_AUDIT_REPORT.md`. Audited at `c5aa208`,
-read-only. Nothing below is fixed yet.
+read-only.
+
+**Phase 3 update (2026-11-20, local commits, not pushed or deployed):** P2-04 **fixed** (`6fbd3d9`); P2-05 **fixed**
+(`923d939` + `ac396b7`); P2-03 **prepared only** (`0369f63`: self-declared date of birth and 18+ confirmation — not
+verification; requirement switch off). P2-01, P2-02, P2-06, P2-07, P2-08: proposals in
+`RENTMATE_PHASE3_PROPOSALS.md`, awaiting approval. Everything else below is still open.
 
 | ID    | Severity | Finding                                                                                                                       | Where                                                                             |
 | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |

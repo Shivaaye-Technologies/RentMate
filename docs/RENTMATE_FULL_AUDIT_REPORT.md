@@ -12,7 +12,27 @@ Date: 2026-11-20 · Repository `Shivaaye-Technologies/RentMate` · Branch `featu
 - **Unverified**: depends on production settings this session cannot see (Supabase dashboard, Render, GitHub).
 
 Companion documents: `RENTMATE_SECURITY_FINDINGS.md` (Phase 2 section), `RENTMATE_DEPLOYMENT_READINESS.md` (Phase 2
-section), `SECURITY_NOTES_LIVEKIT_JWT.md`, `POST_CI_SECURITY_AUDIT.md`.
+section), `SECURITY_NOTES_LIVEKIT_JWT.md`, `POST_CI_SECURITY_AUDIT.md`, `RENTMATE_PHASE3_PROPOSALS.md`.
+
+## Phase 3 status (2026-11-20, approved fixes)
+
+Committed locally on `feature/rentmate-conversion`; **not pushed, not merged, not deployed, no production
+migration applied.** The rest of this report is the original Phase 2 text, unchanged.
+
+| ID                                | Status               | Commit(s)             | What changed                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | -------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-04                             | Fixed                | `6fbd3d9`             | Storage read policy now uses `private.can_view_photo()`: own folder, or a **published** photo of a member who is visible to you and not blocked either way. Unpublished files and hidden/blocked members' photos cannot be listed or downloaded. Signed URLs shortened to 10 min.                                                                              |
+| P2-05                             | Fixed                | `923d939` + `ac396b7` | `DELETE /api/v1/account` removes every photo with the member's session, then deletes the account. A database trigger refuses self-deletion while photos remain, so closing the browser or calling the RPC directly cannot leave orphans. Retry-safe; admins can list orphans. `923d939` alone fails the policy guard; `ac396b7` fixes it (no history rewrite). |
+| P2-03                             | Prepared (not a fix) | `0369f63`             | Date of birth + explicit "I am 18 or older" confirmation at sign-up and onboarding; stored privately as `self_declared`. **This is not age or identity verification.** The `require_age_attestation` switch is off; public launch is not enabled. Provider options in `RENTMATE_PHASE3_PROPOSALS.md`.                                                          |
+| —                                 | Test harness fix     | `42c671a`             | PGlite `auth.uid()` stub now treats empty JWT claims as no user, matching Supabase. Found by the full run after `0369f63`.                                                                                                                                                                                                                                     |
+| P2-01, P2-02, P2-06, P2-07, P2-08 | Proposals only       | —                     | See `RENTMATE_PHASE3_PROPOSALS.md`. Not implemented.                                                                                                                                                                                                                                                                                                           |
+
+**Verification on `42c671a` (run in this session, all PASS):** npm ci; policy guard; Prettier; ESLint; typecheck; API
+118/118 and web 184/184 unit tests; demo generator 13/13; 19 SQL suites 539/539 (new: `photo_privacy` 14,
+`account_deletion_photos` 11, `age_attestation` 22); build; bundle-secrets scan; hook tests; aihub; rollback
+rehearsal (incl. the three new rollbacks); wallet upgrade; browser smoke (16 checks, incl. the 18+ confirmation),
+admin MFA and RTC e2e; concurrency on PostgreSQL 16; `npm audit` 0 vulnerabilities. Mutation checks: removing each
+new guard makes its tests fail.
 
 ## 1. Summary
 
