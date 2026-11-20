@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { deleteAccountViaServer, type ServerDeletion } from "../accountDeletion";
+import { apiBaseUrl } from "../api";
 import { DELETE_CONFIRM_WORD, isDeleteConfirmed } from "../safety";
 import { clearPhotoCache, supabase } from "../supabase";
 
@@ -30,7 +32,29 @@ export function AccountPanel({
     if (!isDeleteConfirmed(typed)) return;
     setBusy(true);
     setError(null);
-    // Photos live in Storage, which the database cannot delete for us.
+    // The server removes the photos and then the account, so closing the browser cannot leave photos behind.
+    const { data: session } = await supabase.auth.getSession();
+    const token = session.session?.access_token;
+    if (!token) {
+      setBusy(false);
+      setError("Please sign in again, then delete your account.");
+      return;
+    }
+    let outcome: ServerDeletion;
+    try {
+      outcome = await deleteAccountViaServer(token, apiBaseUrl());
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error ? e.message : "Couldn't delete your account. Please try again.");
+      return;
+    }
+    if (outcome === "deleted") {
+      clearPhotoCache();
+      await supabase.auth.signOut().catch(() => undefined);
+      window.location.reload();
+      return;
+    }
+    // No API answered: remove the photos from here. The database refuses to delete an account with photos left.
     const files = await ownPhotoFiles(userId, photoPaths).catch(() => photoPaths);
     if (files.length > 0) {
       const { error: removeError } = await supabase.storage.from("photos").remove(files);

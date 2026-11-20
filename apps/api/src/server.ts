@@ -4,6 +4,7 @@ import { supabaseVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { MemoryProfileStore } from "./store.js";
 import { SupabaseProfileStore } from "./supabaseStore.js";
+import { SupabaseAccountDeleter } from "./account.js";
 import { buildRegistry } from "./live/providers.js";
 import { SupabaseIntegrationStore, SupabaseLiveStore } from "./live/store.js";
 import { drainKicks } from "./live/webhook.js";
@@ -44,7 +45,18 @@ const integration =
     ? new SupabaseIntegrationStore(SUPABASE_URL!, SUPABASE_ANON_KEY!, config.LIVE_WEBHOOK_DB_SECRET)
     : null;
 
-const app = createApp({ config, verifyToken, storeFor, live, webhook: { providers, integration } });
+const accountFor = supabaseReady
+  ? (req: Request) => new SupabaseAccountDeleter(SUPABASE_URL!, SUPABASE_ANON_KEY!, req.accessToken!)
+  : undefined;
+
+const app = createApp({
+  config,
+  verifyToken,
+  storeFor,
+  live,
+  webhook: { providers, integration },
+  accountFor,
+});
 
 // Remove blocked, suspended or removed people from rooms they are already in (every 3 seconds).
 if (integration && providers.get("livekit")?.configured) {

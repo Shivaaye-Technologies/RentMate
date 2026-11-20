@@ -6,7 +6,8 @@ import { createRequire } from "node:module";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
-import { ProfileInput } from "./validation.js";
+import { DeleteAccountInput, ProfileInput } from "./validation.js";
+import { AccountDeletionError, type AccountDeleter } from "./account.js";
 import { liveRouter, type LiveDeps } from "./live/routes.js";
 import { callsRouter } from "./live/calls.js";
 import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
@@ -121,9 +122,11 @@ export interface AppDeps {
   live?: LiveDeps;
   /** LiveKit webhooks (optional: without them the webhook route returns 503). */
   webhook?: WebhookDeps;
+  /** Server-side account deletion (optional: without it DELETE /api/v1/account returns 503). */
+  accountFor?: (req: Request) => AccountDeleter;
 }
 
-export function createApp({ config, verifyToken, storeFor, live, webhook }: AppDeps) {
+export function createApp({ config, verifyToken, storeFor, live, webhook, accountFor }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
@@ -169,6 +172,33 @@ export function createApp({ config, verifyToken, storeFor, live, webhook }: AppD
       await storeFor(req).upsertProfile(req.user!.id, parsed.data);
       res.status(204).end();
     } catch (err) {
+      next(err);
+    }
+  });
+
+  // Deletes the caller's photos and then their account, entirely on the server (P2-05). Safe to repeat: a retry
+  // removes whatever is left. The database refuses the account step while any photo remains.
+  api.delete("/account", async (req, res, next) => {
+    if (!accountFor) {
+      res.status(503).json({ error: "Account deletion is not configured" });
+      return;
+    }
+    const parsed = DeleteAccountInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Type "DELETE" to confirm' });
+      return;
+    }
+    try {
+      const { photosRemoved } = await accountFor(req).deleteAccount(req.user!.id);
+      res.status(200).json({ deleted: true, photosRemoved });
+    } catch (err) {
+      if (err instanceof AccountDeletionError) {
+        res.status(502).json({
+          error: `${err.message} Your account was not deleted; please try again.`,
+          stage: err.stage,
+        });
+        return;
+      }
       next(err);
     }
   });

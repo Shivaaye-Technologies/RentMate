@@ -49,6 +49,7 @@ for (const test of [
   "guest_host_mutes.sql",
   "integration_secret_strength.sql",
   "photo_privacy.sql",
+  "account_deletion_photos.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));
