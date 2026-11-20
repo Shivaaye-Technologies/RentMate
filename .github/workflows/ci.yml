@@ -47,6 +47,8 @@ jobs:
         run: npm run test:aihub
       - name: Build
         run: npm run build
+      - name: Server secrets stay out of the browser bundle
+        run: npm run test:bundle-secrets
       - name: Secret scan (committed .env files)
         run: |
           if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
