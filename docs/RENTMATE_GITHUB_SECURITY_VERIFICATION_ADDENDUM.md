@@ -8,19 +8,19 @@ This addendum supersedes earlier statements in `docs/GITHUB_SECURITY_CONFIGURATI
 
 Evidence: founder-provided GitHub screenshots dated 2026-11-20, plus read-only GitHub API checks where noted.
 
-| Item | Verified state | Evidence |
-|---|---|---|
-| Dependabot preset: “Dismiss low-impact alerts for development-scoped dependencies” | **Disabled** | Founder screenshot |
-| Dependabot preset: “Dismiss package malware alerts” | **Disabled** | Founder screenshot; unchanged |
-| Dependabot security updates | **On** | Founder screenshot |
-| Grouped security updates | **On** | Founder screenshot |
-| Prevent direct alert dismissals | **Off** | Founder screenshot; unchanged |
-| Ruleset `protect-rentmate-conversion` | **Active** | GitHub API read |
-| Ruleset target | `refs/heads/feature/rentmate-conversion` only | GitHub API read |
-| Ruleset rules | **Deletion restriction** and **non-fast-forward (force-push) block** only | GitHub API read |
-| Ruleset bypass actors | **None** | GitHub API read |
-| Dependabot alerts | **0 open; 1 closed as Fixed** | Founder screenshots |
-| CodeQL alerts | **1 open; 2 closed as Fixed** | Founder screenshots |
+| Item                                                                               | Verified state                                                            | Evidence                      |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------- |
+| Dependabot preset: “Dismiss low-impact alerts for development-scoped dependencies” | **Disabled**                                                              | Founder screenshot            |
+| Dependabot preset: “Dismiss package malware alerts”                                | **Disabled**                                                              | Founder screenshot; unchanged |
+| Dependabot security updates                                                        | **On**                                                                    | Founder screenshot            |
+| Grouped security updates                                                           | **On**                                                                    | Founder screenshot            |
+| Prevent direct alert dismissals                                                    | **Off**                                                                   | Founder screenshot; unchanged |
+| Ruleset `protect-rentmate-conversion`                                              | **Active**                                                                | GitHub API read               |
+| Ruleset target                                                                     | `refs/heads/feature/rentmate-conversion` only                             | GitHub API read               |
+| Ruleset rules                                                                      | **Deletion restriction** and **non-fast-forward (force-push) block** only | GitHub API read               |
+| Ruleset bypass actors                                                              | **None**                                                                  | GitHub API read               |
+| Dependabot alerts                                                                  | **0 open; 1 closed as Fixed**                                             | Founder screenshots           |
+| CodeQL alerts                                                                      | **1 open; 2 closed as Fixed**                                             | Founder screenshots           |
 
 Ruleset details: ID `27708840`, created 2026-11-20 12:58:53 +05:30. The API reports exactly two rules: `deletion` and `non_fast_forward`. Normal fast-forward pushes remain allowed.
 
@@ -28,9 +28,9 @@ Ruleset details: ID `27708840`, created 2026-11-20 12:58:53 +05:30. The API repo
 
 Both latest workflows ran against branch head `dbbbea36308feec6b3ac51abc9fcce1062511ac6`.
 
-| Workflow | Run | Result | Started (UTC) | Completed (UTC) |
-|---|---:|---|---|---|
-| CI | [#9](https://github.com/Shivaaye-Technologies/RentMate/actions/runs/44693746799) | **Success** | 2026-11-20 07:16:25 | 2026-11-20 07:17:47 |
+| Workflow                |                                                                               Run | Result      | Started (UTC)       | Completed (UTC)     |
+| ----------------------- | --------------------------------------------------------------------------------: | ----------- | ------------------- | ------------------- |
+| CI                      |  [#9](https://github.com/Shivaaye-Technologies/RentMate/actions/runs/44693746799) | **Success** | 2026-11-20 07:16:25 | 2026-11-20 07:17:47 |
 | CodeQL default analysis | [#10](https://github.com/Shivaaye-Technologies/RentMate/actions/runs/44693739437) | **Success** | 2026-11-20 07:16:21 | 2026-11-20 07:18:06 |
 
 “Success” means the workflow completed successfully; it does not mean the CodeQL alert count is zero. The founder's latest alert screenshot still shows one open high-severity `js/insufficient-password-hash` finding at `apps/api/src/live/providers.ts:70`. The two historical findings at lines 49 and 57 are closed as Fixed. The current finding remains intentionally open; it has not been dismissed or suppressed.
