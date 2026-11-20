@@ -2,7 +2,7 @@
 // change here must be deliberate and approved by the founder.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import config, { ANDROID_PACKAGE, URL_SCHEME } from "../../app.config";
+import config, { ANDROID_PACKAGE, EAS_PROJECT_ID, EXPO_OWNER, URL_SCHEME } from "../../app.config";
 
 const APPROVED_PACKAGE = "com.shivaayetechnologies.rentmate";
 const eas = JSON.parse(readFileSync(new URL("../../eas.json", import.meta.url).pathname, "utf8")) as {
@@ -35,6 +35,22 @@ describe("Android identity", () => {
     expect(config.scheme).toBe("rentmate");
     expect(config.platforms).toEqual(["android"]);
     expect(config.android?.versionCode).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("EAS project link", () => {
+  it("links to the founder's EAS project shivaaye-technologies/rentmate", () => {
+    expect(EAS_PROJECT_ID).toBe("8b134aa5-6f2c-4741-90d9-05d03dae3662");
+    expect(config.extra?.eas).toEqual({ projectId: "8b134aa5-6f2c-4741-90d9-05d03dae3662" });
+    expect(EXPO_OWNER).toBe("shivaaye-technologies");
+    expect(config.owner).toBe("shivaaye-technologies");
+    expect(config.slug).toBe("rentmate");
+  });
+
+  it("the project id is a UUID and is not taken from the environment", () => {
+    expect(EAS_PROJECT_ID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    const src = readFileSync(new URL("../../app.config.ts", import.meta.url).pathname, "utf8");
+    expect(src).not.toMatch(/process\.env/);
   });
 });
 

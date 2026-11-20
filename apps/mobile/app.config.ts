@@ -13,10 +13,15 @@ import type { ExpoConfig } from "expo/config";
 export const ANDROID_PACKAGE = "com.shivaayetechnologies.rentmate";
 /** Custom URL scheme for app links such as rentmate://auth/callback. */
 export const URL_SCHEME = "rentmate";
+/** Expo organization that owns the EAS project (required for an organization-owned project). Not a secret. */
+export const EXPO_OWNER = "shivaaye-technologies";
+/** EAS project "rentmate" (created by the founder, 2026-11-20). An identifier, not a secret. */
+export const EAS_PROJECT_ID = "8b134aa5-6f2c-4741-90d9-05d03dae3662";
 
 const config: ExpoConfig = {
   name: "RentMate",
   slug: "rentmate",
+  owner: EXPO_OWNER,
   scheme: URL_SCHEME,
   version: "0.1.0",
   orientation: "portrait",
@@ -54,8 +59,8 @@ const config: ExpoConfig = {
   ],
   experiments: { typedRoutes: true },
   extra: {
-    // Set when the founder creates the EAS project; not a secret.
-    eas: process.env.EAS_PROJECT_ID ? { projectId: process.env.EAS_PROJECT_ID } : undefined,
+    // Links this app to the EAS project shivaaye-technologies/rentmate.
+    eas: { projectId: EAS_PROJECT_ID },
   },
 };
 
