@@ -1,28 +1,33 @@
 import { useState } from "react";
-import { deleteAccountViaServer, type ServerDeletion } from "../accountDeletion";
+import { AccountDeletionError, DELETION_RETRY_MESSAGE, deleteAccountViaServer } from "../accountDeletion";
 import { apiBaseUrl } from "../api";
 import { DELETE_CONFIRM_WORD, isDeleteConfirmed } from "../safety";
 import { clearPhotoCache, supabase } from "../supabase";
 
-/** Legal links, sign out, and permanent account deletion. */
-/** Every file in your own photo folder (Storage RLS only lists your own folder for writing). */
-async function ownPhotoFiles(userId: string, known: string[]): Promise<string[]> {
-  const { data } = await supabase.storage.from("photos").list(userId, { limit: 100 });
-  const listed = (data ?? []).map((f) => `${userId}/${f.name}`);
-  return [...new Set([...known, ...listed])];
+/**
+ * Deletes the signed-in account through the RentMate API only (P2-05). The server removes the photos and then the
+ * account. There is no browser-side fallback: if the server can't be reached or doesn't confirm, nothing is deleted
+ * and the member gets a message to try again. Returns null once the account is deleted, otherwise that message.
+ */
+export async function deleteMyAccount(
+  options: { fetchFn?: typeof fetch; base?: string; reload?: () => void } = {},
+): Promise<string | null> {
+  const { data: session } = await supabase.auth.getSession();
+  const token = session.session?.access_token;
+  if (!token) return "Please sign in again, then delete your account.";
+  try {
+    await deleteAccountViaServer(token, options.base ?? apiBaseUrl(), options.fetchFn);
+  } catch (e) {
+    return e instanceof AccountDeletionError ? e.message : DELETION_RETRY_MESSAGE;
+  }
+  clearPhotoCache();
+  await supabase.auth.signOut().catch(() => undefined);
+  (options.reload ?? (() => window.location.reload()))();
+  return null;
 }
 
-export function AccountPanel({
-  userId,
-  email,
-  photoPaths,
-  onSignOut,
-}: {
-  userId: string;
-  email: string | undefined;
-  photoPaths: string[];
-  onSignOut: () => void;
-}) {
+/** Legal links, sign out, and permanent account deletion. */
+export function AccountPanel({ email, onSignOut }: { email: string | undefined; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,49 +37,11 @@ export function AccountPanel({
     if (!isDeleteConfirmed(typed)) return;
     setBusy(true);
     setError(null);
-    // The server removes the photos and then the account, so closing the browser cannot leave photos behind.
-    const { data: session } = await supabase.auth.getSession();
-    const token = session.session?.access_token;
-    if (!token) {
+    const problem = await deleteMyAccount();
+    if (problem) {
       setBusy(false);
-      setError("Please sign in again, then delete your account.");
-      return;
+      setError(problem);
     }
-    let outcome: ServerDeletion;
-    try {
-      outcome = await deleteAccountViaServer(token, apiBaseUrl());
-    } catch (e) {
-      setBusy(false);
-      setError(e instanceof Error ? e.message : "Couldn't delete your account. Please try again.");
-      return;
-    }
-    if (outcome === "deleted") {
-      clearPhotoCache();
-      await supabase.auth.signOut().catch(() => undefined);
-      window.location.reload();
-      return;
-    }
-    // No API answered: remove the photos from here. The database refuses to delete an account with photos left.
-    const files = await ownPhotoFiles(userId, photoPaths).catch(() => photoPaths);
-    if (files.length > 0) {
-      const { error: removeError } = await supabase.storage.from("photos").remove(files);
-      if (removeError) {
-        setBusy(false);
-        setError(
-          `Couldn't delete your photos, so your account wasn't deleted yet. Please try again. (${removeError.message})`,
-        );
-        return;
-      }
-    }
-    const { error } = await supabase.rpc("delete_my_account");
-    if (error) {
-      setBusy(false);
-      setError(error.message);
-      return;
-    }
-    clearPhotoCache();
-    await supabase.auth.signOut().catch(() => undefined);
-    window.location.reload();
   }
 
   return (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deleteAccountViaServer } from "./accountDeletion";
+import { AccountDeletionError, DELETION_RETRY_MESSAGE, deleteAccountViaServer } from "./accountDeletion";
 
 const reply = (status: number, body: unknown = {}) =>
   (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -18,16 +18,36 @@ describe("deleteAccountViaServer", () => {
     expect(JSON.parse(String(seen!.init.body))).toEqual({ confirm: "DELETE" });
   });
 
-  it("reports an unreachable or older server so the browser can fall back", async () => {
+  it("fails with the retry message when the server is unreachable, missing (404) or not configured (503)", async () => {
     const down = (async () => {
       throw new TypeError("Failed to fetch");
     }) as unknown as typeof fetch;
-    await expect(deleteAccountViaServer("tok", "https://api", down)).resolves.toBe("unreachable");
-    await expect(deleteAccountViaServer("tok", "https://api", reply(404))).resolves.toBe("unreachable");
-    await expect(deleteAccountViaServer("tok", "https://api", reply(503))).resolves.toBe("unreachable");
+    for (const fetchFn of [down, reply(404), reply(503)]) {
+      const attempt = deleteAccountViaServer("tok", "https://api", fetchFn);
+      await expect(attempt).rejects.toBeInstanceOf(AccountDeletionError);
+      await expect(deleteAccountViaServer("tok", "https://api", fetchFn)).rejects.toThrow(
+        DELETION_RETRY_MESSAGE,
+      );
+    }
   });
 
-  it("surfaces the server's message on a real failure instead of falling back", async () => {
+  it("gives up after the timeout instead of waiting forever", async () => {
+    const hang = ((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      })) as unknown as typeof fetch;
+    await expect(deleteAccountViaServer("tok", "https://api", hang, 20)).rejects.toThrow(
+      DELETION_RETRY_MESSAGE,
+    );
+  });
+
+  it("only reports success when the server confirms the deletion", async () => {
+    await expect(deleteAccountViaServer("tok", "https://api", reply(200, {}))).rejects.toThrow(
+      DELETION_RETRY_MESSAGE,
+    );
+  });
+
+  it("surfaces the server's message on a real failure", async () => {
     const failed = reply(502, {
       error: "Couldn't delete your photos. Your account was not deleted; please try again.",
     });

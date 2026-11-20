@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { detailsFromRow } from "../details";
-import {
-  allPhotos,
-  profileStrength,
-  type ProfileRow,
-  type ProfileSection,
-  type StrengthItem,
-} from "../profile";
+import { profileStrength, type ProfileRow, type ProfileSection, type StrengthItem } from "../profile";
 import type { ProfilePatch } from "../profileApi";
 import { AccountPanel } from "./AccountPanel";
 import { Icon, VerifiedBadge, type IconName } from "./Icon";
@@ -168,14 +162,7 @@ export function ProfileDashboard({
         {page === "privacy" && <PrivacySettings profile={profile} onChange={onChange} />}
         {page === "blocked" && <BlockedList me={profile.id} />}
         {page === "help" && <HelpSafety onSafetyIntro={onSafetyIntro} />}
-        {page === "account" && (
-          <AccountPanel
-            userId={profile.id}
-            email={email}
-            photoPaths={allPhotos(profile)}
-            onSignOut={onSignOut}
-          />
-        )}
+        {page === "account" && <AccountPanel email={email} onSignOut={onSignOut} />}
       </section>
     );
   }
