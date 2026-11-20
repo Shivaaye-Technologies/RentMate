@@ -22,6 +22,13 @@ read-only.
 verification; requirement switch off). P2-01, P2-02, P2-06, P2-07, P2-08: proposals in
 `RENTMATE_PHASE3_PROPOSALS.md`, awaiting approval. Everything else below is still open.
 
+**P2-03 database enforcement (2026-11-20, local commit, not pushed or applied):** migration
+`20261123140000_age_attestation_enforcement.sql` lets the database refuse new non-demo profiles without a valid
+self-declared attestation when `require_age_attestation` is on, so direct Supabase or API requests cannot skip the
+app's date-of-birth step. Default stays `false`; enabled only in disposable staging. Existing members unaffected; demo
+exemption limited to reserved demo accounts; no admin or service-role exception. Still a self-declaration, not
+verification. Details, activation and rollback: `RENTMATE_AGE_ATTESTATION.md`.
+
 | ID    | Severity | Finding                                                                                                                       | Where                                                                             |
 | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | P2-01 | High     | Prohibited-content filter bypassed by common wording and obfuscation ("happy ending massage", "nude photos", "s3x", "e$c0rt") | `20261118100000_policy_hardening.sql:12-24`                                       |

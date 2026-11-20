@@ -17,6 +17,9 @@ Phase 2 audit adds these to the blockers below:
 2. **P2-03:** date of birth and 18+ confirmation are now prepared (`0369f63`, self-declared, switch off), but this is
    **not verification**; a verification provider is still a founder decision (F-04/F-05). Still a blocker for
    public launch.
+   Database enforcement is ready (`20261123140000`, rehearsed in disposable staging). For the controlled beta: apply
+   the migration, then run `docs/ops/require_age_attestation.enable.sql`, each only with explicit approval; undo with
+   `require_age_attestation.disable.sql`. See `RENTMATE_AGE_ATTESTATION.md`.
 3. **P2-04, P2-05:** fixed in local commits (`6fbd3d9`; `923d939` + `ac396b7`). Their three migrations must be
    applied to production only with approval, after merge. Not a blocker once applied.
 4. **P2-06:** `render.yaml` `Permissions-Policy` must allow `geolocation=(self)`, or location sharing fails in

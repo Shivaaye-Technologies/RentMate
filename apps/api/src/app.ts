@@ -8,6 +8,7 @@ import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
 import { DeleteAccountInput, ProfileInput } from "./validation.js";
 import { AccountDeletionError, type AccountDeleter } from "./account.js";
+import { AgeAttestationRequiredError } from "./profileErrors.js";
 import { liveRouter, type LiveDeps } from "./live/routes.js";
 import { callsRouter } from "./live/calls.js";
 import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
@@ -172,6 +173,11 @@ export function createApp({ config, verifyToken, storeFor, live, webhook, accoun
       await storeFor(req).upsertProfile(req.user!.id, parsed.data);
       res.status(204).end();
     } catch (err) {
+      if (err instanceof AgeAttestationRequiredError) {
+        // Database-level age attestation (P2-03): record the date of birth and 18+ confirmation first.
+        res.status(422).json({ error: err.message, code: "age_attestation_required" });
+        return;
+      }
       next(err);
     }
   });

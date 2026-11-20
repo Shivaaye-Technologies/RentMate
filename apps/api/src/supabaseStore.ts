@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ProfileStore } from "./app.js";
+import { AgeAttestationRequiredError, isAgeAttestationRefusal } from "./profileErrors.js";
 import type { MatchProfile } from "./matching.js";
 import type { ProfileInput } from "./validation.js";
 
@@ -148,6 +149,7 @@ export class SupabaseProfileStore implements ProfileStore {
 
   async upsertProfile(userId: string, p: ProfileInput): Promise<void> {
     const { error } = await this.db.from("profiles").upsert(toProfileRow(userId, p));
+    if (isAgeAttestationRefusal(error)) throw new AgeAttestationRequiredError(error!.message);
     if (error) throw new Error(`Saving profile failed: ${error.message}`);
   }
 

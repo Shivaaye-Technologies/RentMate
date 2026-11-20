@@ -108,6 +108,13 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: ci-throwaway
         run: scripts/test-db-concurrency.sh
+      - name: Age attestation staging rehearsal (requirement on, disable, rollback)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: ci-throwaway
+        run: scripts/test-age-attestation-staging.sh
 
   rtc:
     # Real voice, video and broadcast through a real LiveKit server, in real Chromium with fake camera/microphone.
