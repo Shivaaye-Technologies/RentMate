@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ageOn, birthDateError, latestAdultBirthDate } from "../age";
 import { personFromOwnRow } from "../api";
 import {
   CHILDREN_LABELS,
@@ -134,6 +135,11 @@ export function Onboarding({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<ProfileRow | null>(null);
+  // Date of birth and 18+ confirmation (P2-03): a self-declaration, not verification. Kept in memory only (not in the
+  // on-device draft); the server records it privately with attest_adult and derives the profile age from it.
+  const [birthDate, setBirthDate] = useState("");
+  const [adultOk, setAdultOk] = useState(false);
+  const [dobError, setDobError] = useState<string | null>(null);
   const index = STEPS.indexOf(step);
   const beforeSave = index <= STEPS.indexOf(SAVE_AFTER);
 
@@ -144,10 +150,26 @@ export function Onboarding({
   const setDetail = <K extends keyof EditorState["details"]>(k: K, v: EditorState["details"][K]) =>
     setState((s) => ({ ...s, details: { ...s.details, [k]: v } }));
 
+  /** A message when the date of birth or the 18+ confirmation is missing or not acceptable. */
+  function adultProblem(): string | null {
+    return birthDateError(birthDate) ?? (adultOk ? null : "Please confirm that you are 18 or older.");
+  }
+
+  /** The editor state with the age taken from the date of birth, when it is valid. */
+  function coreWithAge(): EditorState["core"] {
+    const years = ageOn(birthDate);
+    return years !== null && years >= 18 ? { ...state.core, age: String(years) } : state.core;
+  }
+
   function checkStep(): boolean {
+    if (step === "basics") {
+      const problem = adultProblem();
+      setDobError(problem);
+      if (problem) return false;
+    }
     const core: DraftErrors =
       step === "basics"
-        ? stepErrors(state.core, ["displayName", "age"])
+        ? stepErrors(coreWithAge(), ["displayName", "age"])
         : step === "goals"
           ? stepErrors(state.core, ["lookingFor", "ageMin", "ageMax"])
           : step === "interests"
@@ -178,7 +200,14 @@ export function Onboarding({
   }
 
   async function save(): Promise<boolean> {
-    const core = validateProfile(state.core);
+    const problem = adultProblem();
+    if (problem) {
+      setDobError(problem);
+      setSaveError("Please add your date of birth and confirm that you are 18 or older.");
+      setStep("basics");
+      return false;
+    }
+    const core = validateProfile(coreWithAge());
     const det = validateDetails(state.details);
     if (!core.ok) {
       setErrors({ core: core.errors, details: {} });
@@ -191,6 +220,14 @@ export function Onboarding({
       return false;
     }
     setBusy(true);
+    // Recorded privately before the profile exists. PGRST202: the database update is not applied yet, so continue.
+    const attested = await supabase.rpc("attest_adult", { p_birth_date: birthDate, p_confirm: adultOk });
+    if (attested.error && attested.error.code !== "PGRST202") {
+      setBusy(false);
+      setSaveError(attested.error.message);
+      setStep("basics");
+      return false;
+    }
     const row = { id: userId, ...core.row, ...det.row };
     let { error } = await supabase.from("profiles").upsert(row);
     let partial = false;
@@ -275,7 +312,38 @@ export function Onboarding({
         <h2 className="display-sm">{title}</h2>
         <p className="muted">{subtitle}</p>
 
-        {step === "basics" && <SectionFields section="about" {...fields} part="basics" />}
+        {step === "basics" && (
+          <>
+            <SectionFields section="about" {...fields} part="basics" />
+            <label className="field">
+              <span>Date of birth</span>
+              <input
+                type="date"
+                required
+                max={latestAdultBirthDate()}
+                aria-invalid={!!dobError}
+                value={birthDate}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setBirthDate(value);
+                  const years = ageOn(value);
+                  if (years !== null && years >= 18)
+                    setState((st) => ({ ...st, core: { ...st.core, age: String(years) } }));
+                }}
+              />
+              <small className="muted">
+                Private: never shown to other members. Your profile shows your age.
+              </small>
+            </label>
+            <label className="field check">
+              <span>
+                <input type="checkbox" checked={adultOk} onChange={(e) => setAdultOk(e.target.checked)} /> I
+                confirm that I am 18 or older and that this date of birth is correct.
+              </span>
+            </label>
+            {dobError && <small className="err">{dobError}</small>}
+          </>
+        )}
 
         {step === "identity" && (
           <>

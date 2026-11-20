@@ -160,6 +160,28 @@ try {
     await context.close();
   }
 
+  // 2b. Sign-up needs the explicit 18+ confirmation before anything is sent (P2-03; a declaration, not verification).
+  {
+    const { context, page } = await open(browser, base, { width: 390, height: 844 });
+    const signups = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/auth/v1/signup")) signups.push(r.url());
+    });
+    await page.locator('input[type="email"]').first().waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('input[type="email"]').first().fill("new.member@example.com");
+    await page.locator('input[autocomplete="new-password"]').first().fill("walks2026cafe");
+    await page.locator("form button.btn.block").first().click();
+    const message = page.getByText("Please confirm that you are 18 or older.");
+    await message.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    check("sign-up without the 18+ confirmation shows why", await message.isVisible());
+    check("sign-up without the 18+ confirmation sends nothing", signups.length === 0, signups.join(", "));
+    await page.getByLabel("I confirm that I am 18 or older.").check();
+    await page.locator("form button.btn.block").first().click();
+    await page.waitForTimeout(1500);
+    check("with the 18+ confirmation, sign-up is sent", signups.length > 0);
+    await context.close();
+  }
+
   // 3. Build without Supabase settings: must show the configuration message instead of failing.
   const bare = await serve(build("unconfigured", {}));
   servers.push(bare);

@@ -46,7 +46,9 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<AuthProblem | null>(initialProblem);
-  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
+  const [fieldError, setFieldError] = useState<{ email?: string; password?: string; adult?: string }>({});
+  // Explicit 18+ confirmation at sign-up (P2-03). A declaration, not verification; the date of birth comes in onboarding.
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** Email address we just sent a confirmation or reset link to. */
   const [sentTo, setSentTo] = useState<{ email: string; kind: "signup" | "recovery" } | null>(null);
@@ -87,8 +89,10 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
           : ((mode === "signup" ? passwordProblem(password) : password ? null : "Enter your password.") ??
             undefined),
     };
-    setFieldError(errs);
-    if (errs.email || errs.password) return;
+    const adult =
+      mode === "signup" && !adultConfirmed ? "Please confirm that you are 18 or older." : undefined;
+    setFieldError({ ...errs, adult });
+    if (errs.email || errs.password || adult) return;
     if ((mode === "signup" || mode === "forgot") && wait > 0) {
       setNotice(`Please wait ${wait}s before asking for another email.`);
       return;
@@ -358,6 +362,22 @@ export function AuthScreen({ initialProblem = null }: { initialProblem?: AuthPro
               <small className="muted">At least 8 characters, with letters and numbers.</small>
             )}
             {fieldError.password && <small className="err">{fieldError.password}</small>}
+          </label>
+        )}
+
+        {mode === "signup" && (
+          <label className="field check">
+            <span>
+              <input
+                type="checkbox"
+                required
+                checked={adultConfirmed}
+                aria-invalid={!!fieldError.adult}
+                onChange={(e) => setAdultConfirmed(e.target.checked)}
+              />{" "}
+              I confirm that I am 18 or older.
+            </span>
+            {fieldError.adult && <small className="err">{fieldError.adult}</small>}
           </label>
         )}
 
