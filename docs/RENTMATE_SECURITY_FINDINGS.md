@@ -209,7 +209,7 @@ and API origins in a preview deploy. A wrong CSP breaks the app, so this needs a
   - `helmet`, a CORS allowlist and a 100 kb body limit are in place;
   - 120 requests/minute per IP, and 20 joins/minute;
   - the provider listing is admin-only and never returns secrets;
-  - `LIVEKIT_API_SECRET` must be at least 16 characters and never leaves the server.
+  - `LIVEKIT_API_SECRET` must be the LiveKit-generated secret (32+ characters, no spaces, 12+ distinct characters; 16 before 2026-11-20) and never leaves the server.
 - **Secrets:** no `.env` is committed. The policy guard scans every file for key patterns. `npm audit` reports 0
   vulnerabilities.
 

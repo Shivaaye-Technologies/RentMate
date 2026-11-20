@@ -1,121 +1,100 @@
-# Security note — LiveKit JWT signing (CodeQL alerts in `apps/api/src/live/providers.ts`)
+# Security note — LiveKit JWT signing and the CodeQL alert in `apps/api/src/live/providers.ts`
 
-Date: 2026-11-19 · Branch: `feature/rentmate-conversion`
+Last reviewed: 2026-11-20 · Branch `feature/rentmate-conversion` · Reviewed from `5bb6d5d`; line numbers below refer to
+the commit that adds this revision.
 
-## What was flagged
-
-GitHub code scanning (CodeQL) raised two alerts on the HMAC lines of `apps/api/src/live/providers.ts` (lines 49 and
-57). After commit `c58ee51` those became outdated and one alert remains at **line 57**.
-
-On 2026-11-19 the CodeQL CLI **2.27.4** was run locally on this branch with the `javascript-code-scanning` suite (the
-suite GitHub's default setup uses) and with `javascript-security-extended`. Both report exactly one result there:
+## 1. The alert
 
 - Rule: `js/insufficient-password-hash` ("Use of password hash with insufficient computational effort").
-- Message: "Password from an access to apiKey is hashed insecurely."
-- Data flow: `this.opts.apiKey` → `requireCreds()` → the `iss` claim of the token payload (`issueToken` and
-  `adminToken`) → `JSON.stringify(payload)` → base64url → `` `${header}.${body}` `` → `hs256Mac(signingInput)` →
-  `createHmac("sha256", apiSecret).update(signingInput)` on line 57.
+- Location: `apps/api/src/live/providers.ts:70`, `createHmac("sha256", apiSecret).update(signingInput).digest()` inside
+  `hs256Mac`, the HS256 signer.
+- CodeQL's message: "Password from an access to apiKey is hashed insecurely."
+- Data flow (CodeQL CLI, `javascript-code-scanning` suite, the suite GitHub's default setup runs):
+  `this.opts.apiKey` (`requireCreds()`, line 175) → the `iss` claim of a token payload (`issueToken` line 185,
+  `adminToken` line 217) → `JSON.stringify(payload)` → base64url → `` `${header}.${body}` `` → `signingInput` →
+  `.update(signingInput)` on line 70.
 
-So CodeQL's name heuristic classifies the LiveKit **API key** as a password. The LiveKit API key is the public key
-identifier (for example `APIxxxxxxxx`). LiveKit requires it in the `iss` claim so the server knows which secret to verify
-with. It is readable by anyone holding a token, by design. It is not a password, nothing stores it, and the "hash" is the
-JWT signature over the token body.
+**Root cause.** CodeQL's name heuristic treats a value called `apiKey` as a password. In LiveKit, the API key is the
+public key **identifier** (`APIxxxxxxxx`). LiveKit requires it in the token's `iss` claim so its server knows which
+secret to verify with, and anyone holding a token can read it. Nothing in RentMate stores it, compares it as a credential
+or hashes it for storage. The "hash" CodeQL sees is the JWT signature computed over a token body that contains the key ID.
 
-## What the code does
+## 2. HMAC signing is not password hashing
 
-LiveKit access tokens are JSON Web Tokens signed with **HS256**, which is HMAC-SHA256 keyed with the project's
-**API secret**. The LiveKit server verifies tokens only in that format, so the algorithm and token layout cannot change
-without breaking every join. These functions:
+|                             | Password hashing                                                                   | HMAC-SHA256 here (HS256)                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Purpose                     | Store a human-chosen secret so it can be checked later, without keeping the secret | Prove a message (the token) was produced by someone holding the key, and was not changed |
+| Input that must stay secret | The password (low entropy, chosen by a person)                                     | The **key**: the LiveKit API secret, a random value LiveKit generates (43 characters)    |
+| What is "hashed"            | The password                                                                       | The token header and claims, which are public (base64 in every token)                    |
+| Right algorithm             | Deliberately slow, salted (Argon2, scrypt, bcrypt) to make guessing expensive      | A MAC fixed by the protocol: RFC 7518 HS256 = HMAC-SHA256; LiveKit verifies only this    |
 
-- sign room-join tokens (`issueToken`) and short-lived RoomService admin tokens (`adminToken`);
-- receive only claims (identity, room, grants, expiry) and the server-side API secret, which comes from the
-  environment and is never sent to clients;
-- never receive a user password. Login is handled by Supabase Auth.
+**Why a slow hash would be wrong.** LiveKit's server accepts a token only if its signature is HMAC-SHA256 of
+`header.body` keyed with the API secret ([LiveKit tokens & grants](https://docs.livekit.io/frontends/reference/tokens-grants.md);
+the official SDK signs with `Algorithm::HS256` and `EncodingKey::from_secret(api_secret)`,
+[livekit-api `access_token.rs`](https://docs.rs/livekit-api/0.4.9/src/livekit_api/access_token.rs.html)). Argon2, scrypt or
+bcrypt output is not an HS256 signature, so every join, webhook and RoomService call would fail. A slow hash also
+protects nothing here: the security of HS256 depends on the **secret** being unguessable, which is enforced in
+configuration (§4).
 
-## Assessment
+## 3. Verification (traced in code and tests, not taken from comments)
 
-| Possible finding                                                             | Applies? | Reason                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Weak or insufficient hash used on a password (password-hashing rules)        | No       | HMAC-SHA256 here is a message authentication code, not password storage. Slow password hashes (bcrypt, scrypt, Argon2) produce no MAC that LiveKit can verify and would break compatibility. The key is a high-entropy random API secret, not a human-chosen password. |
-| Broken or risky algorithm                                                    | No       | SHA-256 in HMAC is the algorithm required by RFC 7518 for HS256 and by LiveKit.                                                                                                                                                                                        |
-| Non-constant-time signature comparison in `verifyJwt`                        | **Yes**  | The old code compared signatures with `!==`. Fixed (see below).                                                                                                                                                                                                        |
-| `alg` header not checked in `verifyJwt` (`alg: none` or algorithm confusion) | **Yes**  | The old code ignored the header. Fixed (see below).                                                                                                                                                                                                                    |
+| #   | Property                                                           | Result                 | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ------------------------------------------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | No user password reaches `signJwt`, `hs256Mac` or the webhook hash | Pass                   | Callers of `signJwt`: `issueToken`, `adminToken` (claims: key ID, user id, room, grants, times) and tests. Webhook hash input: the raw request body. Member passwords never reach the API (Supabase Auth).                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2   | API secret is held server-side only                                | Pass                   | Read from the environment (`config.ts`, redacted when printed: `SECRET_KEYS`), used only as the HMAC key. Join responses are `{url, token, expiresAt, room, …}` (`calls.ts`, `routes.ts`). Tests: "never puts the API secret in responses or error messages", "shows admins which providers are configured, never their secrets", "never prints secret settings when the config is logged".                                                                                                                                                                                                                                                              |
+| 3   | HS256 only; algorithm substitution refused                         | Pass                   | Fixed header `{"alg":"HS256"}`; `verifyJwt` returns null unless `alg === "HS256"` (line 95). Test: `none`, `HS512`, `RS256` headers refused, with and without a signature.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 4   | Constant-time signature comparison                                 | Pass                   | `timingSafeEqual` after a length check (line 98), and for the webhook body digest (line 297).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 5   | `exp` and `nbf` enforced                                           | Pass                   | `verifyJwt` with `nowSeconds` refuses missing or past `exp` and future `nbf` (lines 103–104); the webhook always passes the time. Tests: expired, not-yet-valid, no expiry; webhook expired and not-yet-valid. In production LiveKit's server checks the tokens RentMate issues.                                                                                                                                                                                                                                                                                                                                                                         |
+| 6   | Webhook issuer and exact body digest                               | Pass                   | `claims.iss === apiKey` and base64 SHA-256 of the exact raw body (lines 294–297); the route is mounted before the JSON parser. Tests: wrong issuer, wrong secret, changed body, another body's digest, short digest, no digest, malformed payloads (non-JSON, array, string, null, empty): all 401, nothing stored.                                                                                                                                                                                                                                                                                                                                      |
+| 7   | Admin tokens short-lived with minimum permissions                  | **Was failing, fixed** | Every RoomService call was signed with `roomAdmin + roomList + roomCreate`. `roomCreate` is not room-scoped, so each 60-second mute or stats token could also create or delete any room in the project. Now each call carries only what LiveKit documents for it ([RoomService API](https://docs.livekit.io/reference/other/roomservice-api.md)): `DeleteRoom` → `roomCreate`; `ListParticipants`, `GetParticipant`, `RemoveParticipant`, `MutePublishedTrack`, `UpdateParticipant` → `roomAdmin` for that one room. No `roomList`, no `roomJoin`, no `sub`; 60 seconds. Verified against a real LiveKit 1.13.11 server (`npm run test:e2e:rtc`, 59/59). |
+| 8   | Client responses never contain the key secret                      | Pass                   | See 2. The key **ID** is inside every token by protocol (`iss`); it is not a secret.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 9   | Only authorised server code issues participant tokens              | Pass                   | `/api/v1/calls` and `/api/v1/live` are mounted after `requireAuth` (`app.ts`); every join first runs a database check (`call_join_check`, `live_watch_check`, `live_broadcast_check`, `live_session_check`) and signs only when it returns no problems. Tests: sign-in required, refusals issue no token, suspended accounts get none, 503 without credentials.                                                                                                                                                                                                                                                                                          |
+| 10  | Room, identity and TTL validated                                   | Pass (hardened)        | Callers pass `TOKEN_TTL_SECONDS` (600), database-generated room names (`sm-`/`ps-`/`call-` + random UUID) and the signed-in user's id. The signer now also refuses, as defence in depth, TTLs that are not whole numbers from 1 to 3600 and rooms or identities that are empty, longer than 256 characters or contain control characters.                                                                                                                                                                                                                                                                                                                |
 
-Conclusion: the hashing itself is a **false positive** for password-hashing rules. The surrounding verifier still
-had two genuine weaknesses, and those have been fixed. `verifyJwt` is used by tests and for defence in depth; production
-tokens are verified by the LiveKit server.
+**Secret strength (found during item 2).** `LIVEKIT_API_SECRET` was accepted at 16 characters of anything. Every member
+receives a token signed with this secret, so a guessable value could be recovered offline from any token and used to forge
+admin tokens. It must now be at least 32 characters, contain no whitespace and have at least 12 distinct characters;
+messages never repeat the value. LiveKit-generated secrets (43 characters) pass.
 
-## Changes made
+## 4. Other hashing in the code base
 
-- `verifyJwt` now requires exactly three parts and a header declaring `alg: "HS256"`, compares the signature with
-  `crypto.timingSafeEqual`, returns `null` for malformed input instead of throwing, and only returns object payloads.
-- The HMAC is computed in one documented helper (`hs256Mac`). Token output is byte-for-byte unchanged.
-- New tests in `apps/api/test/live.test.ts`:
-  - a known-answer test using the published jwt.io HS256 example, which proves the format is standard and unchanged;
-  - rejection of tampered payloads, flipped and truncated signatures, `alg: none` tokens (with and without a
-    signature), extra segments and malformed base64.
+| Where                                | What is hashed                       | Verdict                                                                                                 |
+| ------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `providers.ts` webhook SHA-256       | Webhook request body                 | Integrity check against LiveKit's `sha256` claim; not a secret                                          |
+| Member passwords                     | Never seen by RentMate code          | Supabase Auth stores them                                                                               |
+| `private.integration_secrets` (SQL)  | Webhook integration secret, SHA-256  | Correct for a generated token; strength enforced since `20261123100000_integration_secret_strength.sql` |
+| `private.mfa_recovery_codes` (SQL)   | Recovery codes, SHA-256              | 80 random bits per code                                                                                 |
+| `private.retained_suspensions` (SQL) | Email with a random per-database key | Pseudonymous identifier, not a credential                                                               |
 
-## Re-check on 2026-11-20 (alert now at line 70)
+## 5. Disposition
 
-Lines moved as LiveKit functions were added (57 → 61 → 70); the alert is the same. CodeQL CLI 2.27.5,
-`javascript-code-scanning` suite (GitHub's default setup) on the current branch, reports **one** result:
+**False positive** for `js/insufficient-password-hash`. No code was changed, suppressed or renamed to silence it. The
+two defects above (admin-token scope and secret strength) are separate, real findings and are fixed with tests; they do
+not change the flagged line.
 
-- Rule `js/insufficient-password-hash`, `apps/api/src/live/providers.ts:70`:
-  `createHmac("sha256", apiSecret).update(signingInput).digest()` (the HS256 signer, `hs256Mac`).
-- Source in all four flows: `this.opts.apiKey` (line 139, `requireCreds()`).
-- Path: `apiKey` → `iss` claim of the token payload (`issueToken` line 148, `adminToken` line 178) →
-  `JSON.stringify(payload)` → base64url → `` `${header}.${body}` `` → `signingInput` → `.update(signingInput)`.
+**CodeQL re-run on this revision (2026-11-20).** CodeQL CLI 2.27.5, `javascript-code-scanning` suite (87 rules), on the
+working tree with the changes above: **one result**, `js/insufficient-password-hash` at `providers.ts:70`, with four
+flows, all starting from `apiKey` (`requireCreds()` line 175 or the `iss: apiKey` claims at lines 185 and 217) and
+ending at the HMAC. No other rule fires anywhere in the repository, and the admin-token, secret-strength and grant-check
+changes introduced no new result. This is a local run; GitHub's own analysis of the pushed commit is what the alert
+page shows.
 
-**What CodeQL calls a password is the LiveKit API key ID**, and the "hash" is the HMAC-SHA256 over the token body
-that contains it. The API **secret** never appears in a flow: it is only the HMAC key. That is the token format LiveKit
-defines:
+**GitHub has not dismissed the alert.** This session cannot read or change code-scanning alerts. A maintainer with
+write access dismisses it:
 
-- LiveKit's token reference describes `iss` as the "API key used to issue this token" and says tokens are "signed
-  with your API secret to prevent forgery";
-- LiveKit's official Rust SDK sets `iss: api_key` and signs with `Algorithm::HS256` and
-  `EncodingKey::from_secret(api_secret)`.
+1. Open `https://github.com/Shivaaye-Technologies/RentMate/security/code-scanning`.
+2. Filter `is:open rule:js/insufficient-password-hash` (or open the alert linked from PR #1's CodeQL check).
+3. Confirm the alert's location is `apps/api/src/live/providers.ts` on the `hs256Mac` line and its source is `apiKey`.
+   If it points anywhere else, stop: that is a new finding.
+4. Click **Dismiss alert** → choose **False positive**.
+5. Paste this comment and confirm:
 
-The key ID is readable (base64) in every token LiveKit clients receive, by design. Nothing stores it, and nothing
-compares it as a credential.
+> CodeQL's name heuristic treats the LiveKit API key ID as a password. Flow: opts.apiKey → JWT `iss` claim → token
+> body → HMAC-SHA256 (HS256) signing input. LiveKit defines `iss` as the API key ID and requires HS256 keyed with the
+> API secret; a slow password hash would produce tokens LiveKit rejects. The key ID is public in every token and is not
+> stored as a credential. Verifier: alg=HS256 only, constant-time comparison, exp/nbf. Admin tokens: per-call minimum
+> grants, 60 s. Secret: ≥ 32 chars, ≥ 12 distinct. Evidence: docs/SECURITY_NOTES_LIVEKIT_JWT.md.
 
-Sources:
+6. Re-open PR #1's checks and confirm the CodeQL check no longer reports the alert.
 
-- [LiveKit: Tokens & grants](https://docs.livekit.io/frontends/reference/tokens-grants.md)
-- [livekit-api `access_token.rs`](https://docs.rs/livekit-api/0.4.9/src/livekit_api/access_token.rs.html)
-
-**Is any real password or secret hashed insecurely?** Every hashing operation in the code base was checked:
-
-| Where                                | What is hashed                                       | Verdict                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `providers.ts:70` HMAC-SHA256        | Token header and claims (incl. the public key ID)    | Message authentication, required by LiveKit; not a password                                                                                                                                                                                                                                                                                                                  |
-| `providers.ts` webhook SHA-256       | Webhook request body                                 | Integrity check against LiveKit's `sha256` claim; not secret                                                                                                                                                                                                                                                                                                                 |
-| Member passwords                     | Never seen by RentMate code                          | Supabase Auth stores them (bcrypt)                                                                                                                                                                                                                                                                                                                                           |
-| `private.integration_secrets` (SQL)  | LiveKit webhook integration secret, unsalted SHA-256 | Correct for a **generated** high-entropy token, not for a chosen phrase. Until now only length ≥ 32 was enforced, so a guessable value would have been accepted. **Fixed** in `20261123100000_integration_secret_strength.sql`: token alphabet only, no spaces, ≥ 12 distinct characters; test refuses phrases and repeats (3 guessable values were accepted before the fix) |
-| `private.mfa_recovery_codes` (SQL)   | Recovery codes, SHA-256                              | 80 random bits per code: offline brute force out of reach                                                                                                                                                                                                                                                                                                                    |
-| `private.retained_suspensions` (SQL) | Email with a random per-database key                 | Pseudonymous identifier, not a credential                                                                                                                                                                                                                                                                                                                                    |
-
-## Dismissal guidance
-
-**Disposition: false positive.** No code was suppressed and no variable renamed to avoid the heuristic.
-
-How to dismiss (this session has no GitHub access, so the founder or a maintainer does it):
-
-1. GitHub → **Security** → **Code scanning** → the `js/insufficient-password-hash` alert on `providers.ts`.
-2. **Dismiss alert** → reason **False positive**.
-3. Comment (paste):
-
-> CodeQL's name heuristic classifies the LiveKit API key ID as a password. Flow (CodeQL 2.27.5): opts.apiKey →
-> JWT `iss` claim → token body → HMAC-SHA256 signing input. LiveKit defines `iss` as the API key ID and requires
-> HS256 signed with the API secret (LiveKit token docs; official Rust SDK). The key ID is public in every token; it is
-> not stored or hashed as a credential. The API secret is only the HMAC key. Verifier: constant-time comparison,
-> alg=HS256, exp/nbf. Evidence: docs/SECURITY_NOTES_LIVEKIT_JWT.md.
-
-Or with the GitHub CLI (`<n>` = the alert number in the URL):
-
-```bash
-gh api -X PATCH repos/Shivaaye-Technologies/RentMate/code-scanning/alerts/<n> \
-  -f state=dismissed -f dismissed_reason="false positive" \
-  -f dismissed_comment="LiveKit API key ID in the HS256 JWT iss claim, not a password; see docs/SECURITY_NOTES_LIVEKIT_JWT.md"
-```
-
-If CodeQL later reports this rule anywhere else, or a different rule on these lines, treat it as new and investigate.
+If CodeQL later reports this rule elsewhere, or a different rule on these lines, treat it as new and investigate.

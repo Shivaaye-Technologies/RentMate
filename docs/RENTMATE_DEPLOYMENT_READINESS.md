@@ -49,7 +49,7 @@ for live; payments, KYC, legal and GST (F-10, F-24) for paid bookings; a verific
 | `TRUST_PROXY`            | API     | No          | Optional              | 0–5; defaults to 1 in production (Render's proxy), so rate limits see real client IPs                                         |
 | `LIVEKIT_URL`            | API     | No          | Only with live (F-06) | Must start with `wss://` or `https://`                                                                                        |
 | `LIVEKIT_API_KEY`        | API     | Key ID      | Only with live        | Public identifier (token issuer)                                                                                              |
-| `LIVEKIT_API_SECRET`     | API     | **Secret**  | Only with live        | At least 16 characters; never sent to clients or logs                                                                         |
+| `LIVEKIT_API_SECRET`     | API     | **Secret**  | Only with live        | The LiveKit-generated secret (32+ characters, 12+ distinct); never sent to clients or logs                                    |
 | `LIVE_COUNTRY_HEADER`    | API     | No          | Optional              | Lower-case header from a trusted CDN (e.g. `cf-ipcountry`). Unset = country unknown, and country-limited content stays hidden |
 | `VITE_API_URL`           | Web     | No          | Yes                   | API base URL, baked into the build                                                                                            |
 | `VITE_SUPABASE_URL`      | Web     | No          | Yes                   | Baked into the build                                                                                                          |
