@@ -78,6 +78,8 @@ jobs:
         run: npm run test:e2e
       - name: Admin MFA screens (enrolment, challenge, recovery)
         run: npm run test:e2e:mfa
+      - name: Onboarding age declaration fails closed (attest_adult errors)
+        run: npm run test:e2e:onboarding
 
   db-concurrency:
     # Real PostgreSQL with two simultaneous sessions: double-booking, idempotent retries, cancel-vs-accept.

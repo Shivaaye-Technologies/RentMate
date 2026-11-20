@@ -11,8 +11,8 @@ import {
   type DetailErrors,
 } from "../details";
 import { stepErrors, validateProfile, type DraftErrors, type ProfileRow } from "../profile";
-import { isMissingColumn, saveErrorMessage, type ProfilePatch } from "../profileApi";
-import { supabase } from "../supabase";
+import { attestThenCreateProfile } from "../onboardingSave";
+import type { ProfilePatch } from "../profileApi";
 import { ChoiceChips, HeightField } from "./Editors";
 import { PersonDetails } from "./PersonDetails";
 import { PhotoManager } from "./PhotoManager";
@@ -220,40 +220,26 @@ export function Onboarding({
       return false;
     }
     setBusy(true);
-    // Recorded privately before the profile exists. PGRST202: the database update is not applied yet, so continue.
-    const attested = await supabase.rpc("attest_adult", { p_birth_date: birthDate, p_confirm: adultOk });
-    if (attested.error && attested.error.code !== "PGRST202") {
-      setBusy(false);
-      setSaveError(attested.error.message);
-      setStep("basics");
-      return false;
-    }
-    const row = { id: userId, ...core.row, ...det.row };
-    let { error } = await supabase.from("profiles").upsert(row);
-    let partial = false;
-    if (error && isMissingColumn(error)) {
-      // The details columns aren't in the database yet: save the essentials so you can start.
-      ({ error } = await supabase.from("profiles").upsert({ id: userId, ...core.row }));
-      partial = true;
-    }
+    // Fails closed: the age declaration must be recorded (attest_adult) before the profile is created. Any error stops
+    // here; nothing is created and onboarding is not completed.
+    const result = await attestThenCreateProfile(
+      { userId, birthDate, adultConfirmed: adultOk, coreRow: core.row, detailsRow: det.row },
+      (row, partial) => {
+        if (partial) {
+          setNotice(
+            "Your profile is saved. Some details (like city and prompts) will be added once an update is finished.",
+          );
+        }
+        setSaved({ ...row, photo_path: null, lat: null, lng: null, verified: false } as ProfileRow);
+        storeDraft(userId, null);
+      },
+    );
     setBusy(false);
-    if (error) {
-      setSaveError(saveErrorMessage(error));
+    if (!result.ok) {
+      setSaveError(result.message);
+      if (result.stage === "attestation") setStep("basics");
       return false;
     }
-    if (partial) {
-      setNotice(
-        "Your profile is saved. Some details (like city and prompts) will be added once an update is finished.",
-      );
-    }
-    setSaved({
-      ...(partial ? { id: userId, ...core.row } : row),
-      photo_path: null,
-      lat: null,
-      lng: null,
-      verified: false,
-    } as ProfileRow);
-    storeDraft(userId, null);
     return true;
   }
 

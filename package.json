@@ -33,6 +33,7 @@
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:rtc": "node scripts/e2e-rtc.mjs",
     "test:e2e:mfa": "node scripts/e2e-mfa.mjs",
+    "test:e2e:onboarding": "node scripts/e2e-onboarding.mjs",
     "audit:advisories": "node scripts/advisory-scan.mjs",
     "test:bundle-secrets": "node scripts/test-bundle-secrets.mjs"
   },
