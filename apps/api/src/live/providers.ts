@@ -109,7 +109,43 @@ export function verifyJwt(
   }
 }
 
+// ---------- Join grant checks ----------
+
+/** Longest token lifetime the API will sign (callers use 600 s). */
+export const MAX_TOKEN_TTL_SECONDS = 3600;
+const NAME_MAX = 256;
+
+/**
+ * Defence in depth: callers pass a constant TTL, server-generated room names and the signed-in user's id, but the
+ * signer refuses anything that would produce an expired, endless or malformed token if that ever changed.
+ */
+export function assertJoinGrant(g: Pick<JoinGrant, "room" | "identity" | "ttlSeconds">): void {
+  if (!Number.isInteger(g.ttlSeconds) || g.ttlSeconds < 1 || g.ttlSeconds > MAX_TOKEN_TTL_SECONDS)
+    throw new TypeError(`ttlSeconds must be a whole number from 1 to ${MAX_TOKEN_TTL_SECONDS}`);
+  for (const [field, value] of [
+    ["room", g.room],
+    ["identity", g.identity],
+  ] as const) {
+    if (
+      typeof value !== "string" ||
+      value.length === 0 ||
+      value.length > NAME_MAX ||
+      [...value].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)
+    )
+      throw new TypeError(`${field} must be 1-${NAME_MAX} characters without control characters`);
+  }
+}
+
 // ---------- LiveKit ----------
+
+/** The RoomService calls RentMate makes. */
+export type RoomServiceMethod =
+  | "DeleteRoom"
+  | "ListParticipants"
+  | "GetParticipant"
+  | "RemoveParticipant"
+  | "MutePublishedTrack"
+  | "UpdateParticipant";
 
 export interface LiveKitOptions {
   url: string;
@@ -141,6 +177,7 @@ export class LiveKitProvider implements StreamingProvider {
 
   async issueToken(g: JoinGrant): Promise<JoinToken> {
     const { apiKey, apiSecret } = this.requireCreds();
+    assertJoinGrant(g);
     const nowS = Math.floor(this.now() / 1000);
     const exp = nowS + g.ttlSeconds;
     const token = signJwt(
@@ -169,26 +206,29 @@ export class LiveKitProvider implements StreamingProvider {
     return { url: this.opts.url, token, expiresAt: new Date(exp * 1000).toISOString() };
   }
 
-  /** Short-lived server token for RoomService calls. */
-  private adminToken(room?: string): string {
+  /**
+   * Short-lived (60 s) server token for one RoomService call, carrying only the grant LiveKit documents for that call:
+   * DeleteRoom needs `roomCreate`; the participant calls need `roomAdmin` for that one room. `roomList` is never needed.
+   */
+  private adminToken(method: RoomServiceMethod, room: string): string {
     const { apiKey, apiSecret } = this.requireCreds();
     const nowS = Math.floor(this.now() / 1000);
-    return signJwt(
-      {
-        iss: apiKey,
-        nbf: nowS - 5,
-        exp: nowS + 60,
-        video: { roomAdmin: true, roomList: true, roomCreate: true, room },
-      },
-      apiSecret,
-    );
+    const video = method === "DeleteRoom" ? { roomCreate: true } : { roomAdmin: true, room };
+    return signJwt({ iss: apiKey, nbf: nowS - 5, exp: nowS + 60, video }, apiSecret);
   }
 
-  private async rpc(method: string, body: Record<string, unknown>, room?: string): Promise<Response> {
+  private async rpc(
+    method: RoomServiceMethod,
+    body: Record<string, unknown>,
+    room: string,
+  ): Promise<Response> {
     const base = this.opts.url.replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/+$/, "");
     return this.fetchFn(`${base}/twirp/livekit.RoomService/${method}`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.adminToken(room)}` },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.adminToken(method, room)}`,
+      },
       body: JSON.stringify(body),
     });
   }

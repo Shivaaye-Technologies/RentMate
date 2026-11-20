@@ -26,7 +26,17 @@ const EnvSchema = z.object({
     .regex(/^(wss|https):\/\/\S+$/, "must start with wss:// or https://")
     .optional(),
   LIVEKIT_API_KEY: z.string().min(1).optional(),
-  LIVEKIT_API_SECRET: z.string().min(16).optional(),
+  /**
+   * Signs every LiveKit token, and every member receives a token, so a guessable secret could be recovered offline and
+   * used to forge admin tokens. LiveKit generates 43-character secrets; require 32+ characters, no whitespace and at
+   * least 12 distinct characters. Messages never include the value.
+   */
+  LIVEKIT_API_SECRET: z
+    .string()
+    .min(32, "must be at least 32 characters (use the secret LiveKit generated)")
+    .refine((s) => !/\s/.test(s), "must not contain whitespace")
+    .refine((s) => new Set(s).size >= 12, "is too repetitive to be a generated secret")
+    .optional(),
   /**
    * Secret the API presents to the database for LiveKit webhooks and the room-removal queue. Must match the value
    * stored with private.set_integration_secret('livekit_webhook', ...). Without it the webhook route returns 503.

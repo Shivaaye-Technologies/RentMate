@@ -15,7 +15,7 @@ import {
 import { drainKicks } from "../src/live/webhook.js";
 import { MemoryProfileStore } from "../src/store.js";
 
-const SECRET = "test-secret-0123456789abcdef";
+const SECRET = "test-secret-0123456789abcdef-GHIJKLmnop";
 const CALL = "44444444-4444-4444-8444-444444444444";
 const config = loadConfig({ NODE_ENV: "test" });
 const verifier: TokenVerifier = async (t) => (t === "good" ? { id: "u-caller" } : null);
@@ -278,6 +278,40 @@ describe("LiveKit webhook", () => {
     ]) {
       expect(res.status).toBe(401);
     }
+    expect(integration.events).toHaveLength(0);
+  });
+
+  it("refuses not-yet-valid tokens, another body's digest and malformed payloads, and stores nothing", async () => {
+    const integration = new FakeIntegration();
+    const app = webhookApp(integration, liveKit([]));
+    const nowS = Math.floor(NOW / 1000);
+    const post = (auth: string, body: string) =>
+      request(app)
+        .post("/api/v1/live/webhook")
+        .set("content-type", "application/webhook+json")
+        .set("authorization", auth)
+        .send(body);
+    const notYet = signJwt(
+      {
+        iss: "APIkey",
+        nbf: nowS + 120,
+        exp: nowS + 600,
+        sha256: createHash("sha256").update(joined).digest("base64"),
+      },
+      SECRET,
+    );
+    const otherDigest = createHash("sha256").update("another body").digest("base64"); // right length, wrong body
+    const noDigest = signJwt({ iss: "APIkey", nbf: nowS - 5, exp: nowS + 300 }, SECRET);
+    const results = [
+      await post(notYet, joined),
+      await post(signedWebhook(joined, { hash: otherDigest }), joined),
+      await post(noDigest, joined),
+    ];
+    // Correctly signed over the exact bytes, but not a JSON object: refused before anything is stored.
+    for (const body of ["not json", "[1,2,3]", '"a string"', "null", ""]) {
+      results.push(await post(signedWebhook(body), body));
+    }
+    for (const res of results) expect(res.status).toBe(401);
     expect(integration.events).toHaveLength(0);
   });
 

@@ -7,6 +7,7 @@ import { classifyHealth, explainProblems, refusalStatus, viewerCountry } from ".
 import {
   buildRegistry,
   LiveKitProvider,
+  MAX_TOKEN_TTL_SECONDS,
   MemoryProvider,
   signJwt,
   verifyJwt,
@@ -15,7 +16,7 @@ import {
 import { LiveStoreError, type AdminStream, type LiveStore, type StreamRoom } from "../src/live/store.js";
 import { MemoryProfileStore } from "../src/store.js";
 
-const SECRET = "test-secret-0123456789abcdef";
+const SECRET = "test-secret-0123456789abcdef-GHIJKLmnop";
 const STREAM = "11111111-1111-4111-8111-111111111111";
 const SESSION = "22222222-2222-4222-8222-222222222222";
 
@@ -170,8 +171,92 @@ describe("LiveKit provider", () => {
     expect(calls[0].url).toBe("https://x.livekit.cloud/twirp/livekit.RoomService/DeleteRoom");
     expect(calls[0].body).toEqual({ room: "sm-1" });
     const admin = verifyJwt(calls[0].auth.replace(/^Bearer /, ""), SECRET)!;
-    expect(admin.video).toMatchObject({ roomAdmin: true, room: "sm-1" });
+    expect(admin.video).toEqual({ roomCreate: true });
     expect(Number(admin.exp) - Math.floor(now() / 1000)).toBeLessThanOrEqual(60);
+  });
+
+  it("gives each RoomService call only the grant LiveKit documents for it, for 60 seconds", async () => {
+    const seen: { method: string; token: string; claims: Record<string, unknown> }[] = [];
+    const fetchFn = (async (url: string, init: RequestInit) => {
+      const token = (init.headers as Record<string, string>).authorization.replace(/^Bearer /, "");
+      seen.push({ method: url.split("/").pop()!, token, claims: verifyJwt(token, SECRET)! });
+      if (url.endsWith("GetParticipant"))
+        return new Response(JSON.stringify({ tracks: [{ sid: "TR_v", type: "VIDEO" }] }), { status: 200 });
+      return new Response(JSON.stringify({ participants: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const lk = new LiveKitProvider({
+      url: "wss://x.livekit.cloud",
+      apiKey: "APIkey",
+      apiSecret: SECRET,
+      fetchFn,
+      now,
+    });
+    await lk.closeRoom("sm-1");
+    await lk.roomStats("sm-2");
+    await lk.removeParticipant("sm-3", "u3");
+    await lk.muteParticipant("sm-4", "u4", "video");
+    await lk.setPublishSources("sm-5", "u5", ["microphone"]);
+    const nowS = Math.floor(now() / 1000);
+    expect(seen.map((s) => [s.method, s.claims.video])).toEqual([
+      ["DeleteRoom", { roomCreate: true }],
+      ["ListParticipants", { roomAdmin: true, room: "sm-2" }],
+      ["RemoveParticipant", { roomAdmin: true, room: "sm-3" }],
+      ["GetParticipant", { roomAdmin: true, room: "sm-4" }],
+      ["MutePublishedTrack", { roomAdmin: true, room: "sm-4" }],
+      ["UpdateParticipant", { roomAdmin: true, room: "sm-5" }],
+    ]);
+    for (const { token, claims } of seen) {
+      expect(claims.iss).toBe("APIkey");
+      expect(claims.exp).toBe(nowS + 60);
+      expect(verifyJwt(token, SECRET, { nowSeconds: nowS + 59 })).not.toBeNull();
+      expect(verifyJwt(token, SECRET, { nowSeconds: nowS + 60 })).toBeNull(); // expired after a minute
+      expect(claims).not.toHaveProperty("sub"); // a server token, not a participant
+      expect(claims.video).not.toHaveProperty("roomJoin");
+      expect(claims.video).not.toHaveProperty("roomList");
+      expect(claims.video).not.toHaveProperty("roomRecord");
+    }
+  });
+
+  it("refuses to sign tokens with an invalid room, identity or lifetime", async () => {
+    const lk = new LiveKitProvider({
+      url: "wss://x.livekit.cloud",
+      apiKey: "APIkey",
+      apiSecret: SECRET,
+      now,
+    });
+    const base = { room: "sm-1", identity: "u1", canPublish: false, ttlSeconds: 600 };
+    for (const ttlSeconds of [0, -1, 1.5, NaN, Infinity, MAX_TOKEN_TTL_SECONDS + 1])
+      await expect(lk.issueToken({ ...base, ttlSeconds })).rejects.toThrow(/ttlSeconds/);
+    for (const room of ["", "a".repeat(257), "sm-1\nx", "sm\u0000"])
+      await expect(lk.issueToken({ ...base, room })).rejects.toThrow(/room/);
+    for (const identity of ["", "u".repeat(257), "u1\r"])
+      await expect(lk.issueToken({ ...base, identity })).rejects.toThrow(/identity/);
+    await expect(lk.issueToken({ ...base, ttlSeconds: 1 })).resolves.toHaveProperty("token");
+    await expect(lk.issueToken({ ...base, ttlSeconds: MAX_TOKEN_TTL_SECONDS })).resolves.toHaveProperty(
+      "token",
+    );
+  });
+
+  it("never puts the API secret in responses or error messages", async () => {
+    const fetchFn = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
+    const lk = new LiveKitProvider({
+      url: "wss://x.livekit.cloud",
+      apiKey: "APIkey",
+      apiSecret: SECRET,
+      fetchFn,
+      now,
+    });
+    const t = await lk.issueToken({ room: "sm-1", identity: "u1", canPublish: true, ttlSeconds: 600 });
+    expect(JSON.stringify(t)).not.toContain(SECRET);
+    for (const fail of [() => lk.closeRoom("sm-1"), () => lk.removeParticipant("sm-1", "u1")]) {
+      const err = await fail().catch((e: unknown) => e);
+      expect(String(err)).toMatch(/failed \(500\)/);
+      expect(String(err)).not.toContain(SECRET);
+    }
+    const bad = await lk
+      .issueToken({ room: "", identity: "u1", canPublish: false, ttlSeconds: 600 })
+      .catch((e: unknown) => e);
+    expect(String(bad)).not.toContain(SECRET);
   });
 
   it("is only registered when configured from the environment", () => {
@@ -711,5 +796,30 @@ describe("live configuration", () => {
       expect(String(e)).toMatch(/LIVEKIT_API_SECRET/);
       expect(String(e)).not.toContain("short-secret");
     }
+  });
+
+  it("refuses empty, short, repetitive or whitespace LiveKit secrets without echoing them", () => {
+    for (const weak of [
+      "",
+      "0123456789abcdefghijklmnopqrstu", // 31 characters
+      "a".repeat(64), // long but guessable
+      "abababababababababababababababab", // 32 characters, 2 distinct
+      "abcdefghij klmnopqrstuvwxyz012345", // whitespace
+    ]) {
+      let message = "";
+      try {
+        loadConfig({ NODE_ENV: "test", LIVEKIT_API_SECRET: weak });
+      } catch (e) {
+        message = String(e);
+      }
+      expect(message, `accepted ${JSON.stringify(weak)}`).toMatch(/LIVEKIT_API_SECRET/);
+      if (weak) expect(message).not.toContain(weak);
+    }
+    // A LiveKit-generated style secret (43 characters) is accepted, and so is the test fixture.
+    const generated = "Zq3xK9pW2mT7vL4nB8cR1sD6fG0hJ5aE3yU9iO2kQwE";
+    expect(loadConfig({ NODE_ENV: "test", LIVEKIT_API_SECRET: generated }).LIVEKIT_API_SECRET).toBe(
+      generated,
+    );
+    expect(loadConfig({ NODE_ENV: "test", LIVEKIT_API_SECRET: SECRET }).LIVEKIT_API_SECRET).toBe(SECRET);
   });
 });

@@ -172,7 +172,7 @@ describe("loadConfig", () => {
     const { inspect } = await import("node:util");
     const secrets = {
       SUPABASE_ANON_KEY: "anon-key-value-should-not-print",
-      LIVEKIT_API_SECRET: "livekit-secret-should-not-print",
+      LIVEKIT_API_SECRET: "livekit-secret-should-not-print-0123456789",
       LIVE_WEBHOOK_DB_SECRET: "webhook-db-secret-should-not-print-0123456789",
     };
     const c = loadConfig({ NODE_ENV: "test", LIVEKIT_API_KEY: "APIkey", ...secrets });
