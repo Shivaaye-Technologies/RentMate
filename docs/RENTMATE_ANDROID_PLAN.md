@@ -2,7 +2,7 @@
 
 Date: 2026-11-20 · Branch `feature/rentmate-conversion` · Audited at `75d3d01` · Markets: Delhi NCR, Bengaluru.
 
-Status: **plan + first scaffold only. Not built for a device, not tested on an emulator or phone, not
+Status: **scaffold, package id, shared profile data layer and authentication done; first device build pending. Not built for a device, not tested on an emulator or phone, not
 production-ready.** Nothing is pushed, merged or deployed; no production setting or migration is changed.
 
 Evidence labels: **Verified** = run in this workspace; **Inspected** = read in code or package metadata;
@@ -124,18 +124,18 @@ then. Booking reminders can use local scheduled notifications in the meantime.
 
 ## 6. Android build requirements
 
-| Item                  | Plan                                                                                                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Package id            | Proposed `com.shivaayetechnologies.rentmate` — **founder must confirm**; it cannot change after the first Play upload.                                                                      |
-| SDK levels            | compileSdk 36, targetSdk 36, minSdk 24 (Google Play: new apps and updates must target API 36 since 2026-08-31).                                                                             |
-| Edge-to-edge          | Required behaviour on Android 15+; layouts use safe-area insets.                                                                                                                            |
-| Permissions           | Only what a feature needs, asked at the moment of use: camera, microphone (calls), notifications (Android 13+), location (optional city/distance). Unused ones are blocked in the manifest. |
-| Deep links            | Custom scheme `rentmate://` now; verified Android App Links for the web domain later.                                                                                                       |
-| Builds                | EAS Build (cloud) or a machine with Android Studio. **This workspace cannot build an APK/AAB:** no Android SDK, and Google Maven, Gradle and Expo's servers are not reachable from here.    |
-| Development build     | `eas build --profile development --platform android` (APK with dev client).                                                                                                                 |
-| Signed App Bundle     | `eas build --profile production --platform android` (AAB). Upload key managed by EAS or the founder; Play App Signing enabled. Never committed.                                             |
-| Play internal testing | Play Console app, internal track, data safety form, 18+ content rating, account-deletion URL, privacy policy, test accounts for review.                                                     |
-| Testing               | Emulator (API 36 image) and at least two physical phones common in Delhi NCR / Bengaluru (budget Android + one recent), slow-network tests.                                                 |
+| Item                  | Plan                                                                                                                                                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package id            | **`com.shivaayetechnologies.rentmate` — approved by the founder as permanent (2026-11-20).** A constant in `app.config.ts` (no environment override), pinned by unit tests and by the native check (`applicationId`, `namespace`, Kotlin package). |
+| SDK levels            | compileSdk 36, targetSdk 36, minSdk 24 (Google Play: new apps and updates must target API 36 since 2026-08-31).                                                                                                                                    |
+| Edge-to-edge          | Required behaviour on Android 15+; layouts use safe-area insets.                                                                                                                                                                                   |
+| Permissions           | Only what a feature needs, asked at the moment of use: camera, microphone (calls), notifications (Android 13+), location (optional city/distance). Unused ones are blocked in the manifest.                                                        |
+| Deep links            | Custom scheme `rentmate://` now; verified Android App Links for the web domain later.                                                                                                                                                              |
+| Builds                | EAS Build (cloud) or a machine with Android Studio. **This workspace cannot build an APK/AAB:** no Android SDK, and Google Maven, Gradle and Expo's servers are not reachable from here.                                                           |
+| Development build     | `eas build --profile development --platform android` (APK with dev client).                                                                                                                                                                        |
+| Signed App Bundle     | `eas build --profile production --platform android` (AAB). Upload key managed by EAS or the founder; Play App Signing enabled. Never committed.                                                                                                    |
+| Play internal testing | Play Console app, internal track, data safety form, 18+ content rating, account-deletion URL, privacy policy, test accounts for review.                                                                                                            |
+| Testing               | Emulator (API 36 image) and at least two physical phones common in Delhi NCR / Bengaluru (budget Android + one recent), slow-network tests.                                                                                                        |
 
 ## 7. Risks and blockers
 
@@ -143,7 +143,7 @@ then. Booking reminders can use local scheduled notifications in the meantime.
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | B1  | No native build possible here; LiveKit on RN 0.88 is unproven until the first development build.                                                                                                                  | Founder (EAS) |
 | B2  | Expo account + EAS project, Google Play Console account, FCM (Firebase) project.                                                                                                                                  | Founder       |
-| B3  | Package id must be confirmed before the first upload.                                                                                                                                                             | Founder       |
+| B3  | ~~Package id must be confirmed before the first upload.~~ **Resolved 2026-11-20:** `com.shivaayetechnologies.rentmate`.                                                                                           | Done          |
 | B4  | Supabase redirect allowlist needs `rentmate://auth/callback` (production setting).                                                                                                                                | Founder       |
 | B5  | Push needs a new table, a sender and credentials — new backend work, needs approval.                                                                                                                              | Founder       |
 | B6  | Google Play policy review for a companionship app: listing must state 18+, non-sexual, public meetings; expect closer review. Personal developer accounts need a 12-tester, 14-day closed test before production. | Founder       |
@@ -153,10 +153,11 @@ then. Booking reminders can use local scheduled notifications in the meantime.
 
 ## 8. Implementation sequence
 
-1. **Scaffold** (done, commit after the plan): Expo SDK 58 + Expo Router + TypeScript, secure session storage, config guard, API
-   client for existing routes only, sign-in/sign-up, 18+ declaration (fails closed), settings with server-only
-   account deletion, EAS profiles, unit tests, Android JS bundle export + secrets scan in CI. Web untouched.
-2. **Shared core**: move the RPC wrappers into `packages/core` with client injection; web keeps passing its tests.
+1. **Scaffold** — done (`20e8686`). Package id locked and native project verified — done (`9cec6d3`).
+2. **Shared data layer** — started (`b29a835`): `apps/web/src/shared/profileData.ts` takes the database as a port and is
+   used by both apps (declaration, declaration status, profile creation, profile save). Next: matches, chat, safety,
+   bookings and calls wrappers the same way. Mobile authentication — done (`f2941ee`): sign-in, sign-up with the 18+
+   declaration, forgot/reset password, email links (PKCE).
 3. **First development build** on EAS; run on emulator and a phone; confirm sign-in, session persistence, back
    navigation. Founder actions B2/B3 first.
 4. **Profile**: creation/editing, photo picking and upload (private bucket, signed links).
@@ -168,3 +169,33 @@ then. Booking reminders can use local scheduled notifications in the meantime.
 10. **Deep links** (after B4), accessibility pass (TalkBack, font scaling, contrast), slow-network and offline tests.
 11. **Release prep**: signed AAB, Play internal testing, data safety form, store listing; physical-device test
     report. Only then can anything be called production-ready.
+
+## 9. First Android development build (runbook)
+
+Prepared and verified here: package id, app config, native project (`npm run check:native`), EAS profiles, Android
+JavaScript bundle and secrets scan. Building the APK itself needs an Expo account (EAS) or a machine with Android
+Studio; neither is available in this workspace.
+
+| Step | Command / action (run in `apps/mobile`)                                                                                                                                                                                                | Needs                         |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| 1    | `npm ci`                                                                                                                                                                                                                               | —                             |
+| 2    | `npx eas-cli@latest login` (founder's Expo account), then `npx eas-cli@latest init` — note the project id                                                                                                                              | **Expo account**              |
+| 3    | Put the project id in `app.config.ts` (`extra.eas.projectId`; it is not a secret) and commit it                                                                                                                                        | —                             |
+| 4    | Create EAS environment variables for `development`: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (publishable key), `EXPO_PUBLIC_API_URL`. Public values only — never the service role key or LiveKit secrets.          | **Expo account**              |
+| 5    | `npx eas-cli@latest build --profile development --platform android` → development APK (dev client). EAS generates and keeps the upload keystore.                                                                                       | **Expo account**              |
+| 6    | Install the APK on an emulator (Android 16 / API 36 image) and a phone; `npx expo start --dev-client` on the same network                                                                                                              | **Android device / emulator** |
+| 7    | Device checks: sign-up (18+ box required), email confirmation, sign-in, session kept after closing the app, declaration screen, back button on every screen, offline message, TalkBack labels, large font, dark mode, account deletion | **Android device**            |
+| 8    | Founder: add `rentmate://auth/callback` and `rentmate://auth/reset` to Supabase Auth → Redirect URLs (production setting) so email links open the app                                                                                  | **Supabase dashboard**        |
+
+Not needed yet: Firebase (only for push, step 9 of the sequence), Google Play Console (only for the signed App Bundle
+and internal testing). Nothing is uploaded to Google Play.
+
+### Verified in this workspace (2026-11-20)
+
+| Check                                    | Result                                                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mobile unit tests                        | 55/55 (config, secure session, API client, app config + EAS, declaration, authentication)                                                                     |
+| Typecheck                                | strict, including typed routes for all 9 screens                                                                                                              |
+| `npm run check:native` (`expo prebuild`) | 16/16: applicationId/namespace/Kotlin package, SDK 36/36/24, `rentmate://` intent filter, singleTask, only INTERNET + VIBRATE, backup exclusion, no cleartext |
+| `npm run check:bundle-secrets`           | Android bundle builds; none of 5 server secrets present (control value found)                                                                                 |
+| Web after the shared-layer refactor      | 223/223 unit tests (208 existing + 15 shared layer), onboarding browser test 17/17                                                                            |
