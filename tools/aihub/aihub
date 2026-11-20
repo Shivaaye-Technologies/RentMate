@@ -1,0 +1,763 @@
+#!/usr/bin/env bash
+# aihub: one command to check and drive the local side of the Claude-centred dev setup.
+#
+# Design rules (see docs/AIHUB.md):
+# - Reports only what it can verify on THIS machine. It never claims another device is connected.
+# - Never prints secret values: env vars are reported as "set"/"unset", and all tool output is redacted.
+# - Never runs remote install scripts and never installs anything. It prints the commands instead.
+# - Never changes a repo it cannot fast-forward cleanly. No force, no reset, no merge commits.
+# - Compatible with bash 3.2 (macOS default), bash 5 (Linux) and Termux.
+
+set -u
+
+AIHUB_VERSION="1.0.0"
+
+# Exit codes
+EX_OK=0
+EX_FAIL=1         # a check or command failed
+EX_USAGE=2        # bad arguments
+EX_UNAVAILABLE=3  # component not installed / not configured / not supported here
+
+SECRET_VARS="ANTHROPIC_API_KEY GITHUB_PAT GH_TOKEN GITHUB_TOKEN RENDER_API_KEY SUPABASE_ACCESS_TOKEN SUPABASE_SERVICE_ROLE_KEY DATABASE_URL OPENROUTER_API_KEY OPENAI_API_KEY DEEPSEEK_API_KEY GOOGLE_API_KEY TAILSCALE_AUTHKEY"
+# Not secret, but useful to know whether they are configured.
+CONFIG_VARS="SUPABASE_PROJECT_REF"
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/aihub"
+CONFIG_FILE="$CONFIG_DIR/config"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/aihub"
+LOG_FILE="$STATE_DIR/aihub.log"
+
+OMNIROUTE_PORT=20128
+OMNIROUTE_MIN_NODE="22.22.2"
+OLLAMA_PORT=11434
+JARVIS_PORT=8000
+MIN_NODE="20.0.0"
+HARNESS_CMD=""
+REPOS=""  # newline-separated absolute paths
+
+# ---------------------------------------------------------------- output
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_OK=$(printf '\033[32m'); C_WARN=$(printf '\033[33m'); C_FAIL=$(printf '\033[31m')
+  C_DIM=$(printf '\033[2m'); C_B=$(printf '\033[1m'); C_0=$(printf '\033[0m')
+else
+  C_OK=""; C_WARN=""; C_FAIL=""; C_DIM=""; C_B=""; C_0=""
+fi
+
+N_PASS=0; N_WARN=0; N_FAIL=0
+pass() { N_PASS=$((N_PASS + 1)); printf '  %sPASS%s %s\n' "$C_OK" "$C_0" "$*"; }
+warn() { N_WARN=$((N_WARN + 1)); printf '  %sWARN%s %s\n' "$C_WARN" "$C_0" "$*"; }
+fail() { N_FAIL=$((N_FAIL + 1)); printf '  %sFAIL%s %s\n' "$C_FAIL" "$C_0" "$*"; }
+info() { printf '  %sINFO%s %s\n' "$C_DIM" "$C_0" "$*"; }
+hint() { printf '       %s-> %s%s\n' "$C_DIM" "$*" "$C_0"; }
+head1() { printf '\n%s%s%s\n' "$C_B" "$*" "$C_0"; }
+die() { printf 'aihub: %s\n' "$*" >&2; exit "$EX_USAGE"; }
+
+# Mask secrets in any text that came from another program before it is shown.
+redact() {
+  awk -v names="$SECRET_VARS" '
+    BEGIN { n = split(names, N, " ") }
+    {
+      line = $0
+      for (k = 1; k <= n; k++) {
+        v = ENVIRON[N[k]]
+        if (length(v) >= 6) {
+          out = ""
+          while ((i = index(line, v)) > 0) { out = out substr(line, 1, i - 1) "***"; line = substr(line, i + length(v)) }
+          line = out line
+        }
+      }
+      print line
+    }' | sed -E \
+    -e 's/sk-[A-Za-z0-9_-]{8,}/sk-***/g' \
+    -e 's/(gh[pousr]_|github_pat_)[A-Za-z0-9_]{10,}/\1***/g' \
+    -e 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/eyJ***/g' \
+    -e 's#(postgres(ql)?://)[^:/@[:space:]]+:[^@[:space:]]+@#\1***:***@#g' \
+    -e 's/(([Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss]([Ww][Oo][Rr][Dd]|[Ww][Dd]))["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^"'"'"'[:space:]]+/\1***/g'
+}
+
+log_event() {
+  # Logs the subcommand only, never its arguments (they could contain paths or values).
+  mkdir -p "$STATE_DIR" 2>/dev/null || return 0
+  printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PLATFORM" "$1" >>"$LOG_FILE" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- helpers
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# version_ge A B: true when A >= B (numeric dotted versions; leading "v" ignored).
+version_ge() {
+  awk -v a="${1#v}" -v b="${2#v}" 'BEGIN {
+    na = split(a, A, "."); nb = split(b, B, "."); m = (na > nb) ? na : nb
+    for (i = 1; i <= m; i++) { x = A[i] + 0; y = B[i] + 0; if (x > y) exit 0; if (x < y) exit 1 }
+    exit 0 }'
+}
+
+first_line() { "$@" 2>/dev/null | head -n 1 | redact; }
+
+tool_version() {
+  case "$1" in
+    node) first_line node -v ;;
+    tailscale) first_line tailscale version ;;
+    *) first_line "$1" --version ;;
+  esac
+}
+
+detect_platform() {
+  if [ -n "${TERMUX_VERSION:-}" ] || case "${PREFIX:-}" in *com.termux*) true ;; *) false ;; esac; then
+    PLATFORM="termux"
+  else
+    case "$(uname -s 2>/dev/null)" in
+      Darwin) PLATFORM="macos" ;;
+      Linux)
+        if grep -qi microsoft /proc/version 2>/dev/null; then PLATFORM="wsl"; else PLATFORM="linux"; fi ;;
+      *) PLATFORM="unsupported" ;;
+    esac
+  fi
+}
+
+expand_path() {
+  # Matches a literal "~" from the config file on purpose.
+  # shellcheck disable=SC2088
+  case "$1" in
+    "~") printf '%s\n' "$HOME" ;;
+    "~/"*) printf '%s/%s\n' "$HOME" "${1#\~/}" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+add_repo() {
+  p=$(expand_path "$1")
+  [ -n "$p" ] || return 0
+  case "
+$REPOS
+" in *"
+$p
+"*) return 0 ;; esac
+  if [ -z "$REPOS" ]; then REPOS="$p"; else REPOS="$REPOS
+$p"; fi
+}
+
+# Config is parsed, never sourced, so it cannot run code.
+load_config() {
+  if [ -f "$CONFIG_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in ''|'#'*) continue ;; esac
+      key=$(printf '%s' "${line%%=*}" | tr -d '[:space:]')
+      val=${line#*=}
+      val=$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/')
+      case "$key" in
+        repo) add_repo "$val" ;;
+        harness_cmd) HARNESS_CMD="$val" ;;
+        omniroute_port) OMNIROUTE_PORT="$val" ;;
+      esac
+    done <"$CONFIG_FILE"
+  fi
+  # Environment overrides (colon-separated, like PATH).
+  if [ -n "${AIHUB_REPOS:-}" ]; then
+    old_ifs=$IFS; IFS=:
+    for r in $AIHUB_REPOS; do add_repo "$r"; done
+    IFS=$old_ifs
+  fi
+  [ -n "${AIHUB_HARNESS_CMD:-}" ] && HARNESS_CMD="$AIHUB_HARNESS_CMD"
+  [ -n "${AIHUB_OMNIROUTE_PORT:-}" ] && OMNIROUTE_PORT="$AIHUB_OMNIROUTE_PORT"
+  return 0
+}
+
+# Prints the local addresses something is LISTENING on for a TCP port, one per line.
+# Prints nothing if nothing listens. Returns 3 if the platform gives no way to tell.
+listen_addrs() {
+  port=$1
+  if have ss; then
+    ss -ltn 2>/dev/null | awk -v p=":$port" 'NR > 1 { a = $4; if (substr(a, length(a) - length(p) + 1) == p) print substr(a, 1, length(a) - length(p)) }'
+    return 0
+  elif have lsof; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -Fn 2>/dev/null | awk -v p=":$port" '/^n/ { a = substr($0, 2); if (substr(a, length(a) - length(p) + 1) == p) print substr(a, 1, length(a) - length(p)) }' | sort -u
+    return 0
+  elif have netstat; then
+    netstat -ltn 2>/dev/null | awk -v p=":$port" '$6 == "LISTEN" || $NF == "LISTEN" { a = $4; if (substr(a, length(a) - length(p) + 1) == p) print substr(a, 1, length(a) - length(p)) }'
+    return 0
+  fi
+  return 3
+}
+
+is_loopback() {
+  case "$1" in
+    127.*|'[::1]'|::1|localhost|'[::ffff:127.'*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# check_port NAME PORT: PASS when bound to loopback only, FAIL when reachable from the network.
+check_port() {
+  name=$1; port=$2
+  addrs=$(listen_addrs "$port"); rc=$?
+  if [ "$rc" -eq 3 ]; then
+    info "$name: cannot inspect port $port on this platform (no ss/lsof/netstat)"
+    return 0
+  fi
+  if [ -z "$addrs" ]; then
+    info "$name: nothing listening on port $port (not running)"
+    return 0
+  fi
+  exposed=$(printf '%s\n' "$addrs" | while IFS= read -r a; do is_loopback "$a" || printf ' %s' "$a"; done)
+  if [ -n "$exposed" ]; then
+    fail "$name listens on port $port on a network address:$exposed"
+    hint "bind it to 127.0.0.1 only, or put real authentication in front of it"
+  else
+    pass "$name listens on port $port on localhost only"
+  fi
+}
+
+# ---------------------------------------------------------------- install hints (printed, never run)
+
+install_hint() {
+  tool=$1
+  case "$PLATFORM:$tool" in
+    macos:git) echo "xcode-select --install   (or: brew install git)" ;;
+    macos:node|macos:npm) echo "brew install node@22   (or use nvm/fnm)" ;;
+    macos:gh) echo "brew install gh" ;;
+    macos:tailscale) echo "install the Tailscale app from the Mac App Store (only if you need it)" ;;
+    linux:git|wsl:git) echo "sudo apt install git" ;;
+    linux:node|linux:npm|wsl:node|wsl:npm) echo "install Node 22 LTS from nodejs.org or with nvm/fnm (distro packages are often too old)" ;;
+    linux:gh|wsl:gh) echo "see https://github.com/cli/cli/blob/trunk/docs/install_linux.md" ;;
+    termux:git) echo "pkg install git" ;;
+    termux:node|termux:npm) echo "pkg install nodejs-lts" ;;
+    termux:gh) echo "pkg install gh" ;;
+    *:claude) echo "npm install -g @anthropic-ai/claude-code" ;;
+    *:playwright) echo "npx playwright install chromium   (inside a project that uses it)" ;;
+    *:ollama) echo "see https://ollama.com/download (inspect before running any script)" ;;
+    *:jarvis) echo "see docs/AIHUB.md#openjarvis: inspect install.sh before running it" ;;
+    *:omniroute) echo "see docs/AIHUB.md#omniroute: verify the upstream repo first" ;;
+    *) echo "see docs/AIHUB.md" ;;
+  esac
+}
+
+# ---------------------------------------------------------------- shared sections
+
+section_platform() {
+  head1 "Platform"
+  case "$PLATFORM" in
+    macos) info "macOS $(sw_vers -productVersion 2>/dev/null || uname -r) ($(uname -m))" ;;
+    linux) info "Linux $(uname -r) ($(uname -m))" ;;
+    wsl) info "Linux under WSL $(uname -r)" ;;
+    termux) info "Android Termux ${TERMUX_VERSION:-} ($(uname -m)). Reduced mode: local gateways are not supported here" ;;
+    *) info "unsupported OS: $(uname -s 2>/dev/null)" ;;
+  esac
+  info "shell: bash ${BASH_VERSION:-?}; aihub $AIHUB_VERSION"
+}
+
+section_tools_status() {
+  head1 "Tools"
+  for t in git node npm gh claude playwright docker supabase ollama jarvis omniroute tailscale; do
+    if have "$t"; then
+      printf '  %-10s %s\n' "$t" "$(tool_version "$t")"
+    else
+      printf '  %-10s %snot installed%s\n' "$t" "$C_DIM" "$C_0"
+    fi
+  done
+}
+
+section_env() {
+  head1 "Credentials in this shell (values are never shown)"
+  for v in $SECRET_VARS $CONFIG_VARS; do
+    eval "val=\${$v:-}"
+    if [ -n "$val" ]; then printf '  %-26s set\n' "$v"; else printf '  %-26s %sunset%s\n' "$v" "$C_DIM" "$C_0"; fi
+  done
+  val=""
+}
+
+repo_summary() {
+  r=$1
+  if [ ! -d "$r/.git" ] && ! git -C "$r" rev-parse --git-dir >/dev/null 2>&1; then
+    printf '  %s: %snot a git repository%s\n' "$r" "$C_FAIL" "$C_0"; return 1
+  fi
+  br=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null || echo "(detached)")
+  dirty=$(git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  up=$(git -C "$r" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+  ab=""
+  if [ -n "$up" ]; then
+    ab=$(git -C "$r" rev-list --left-right --count "HEAD...$up" 2>/dev/null |
+      awk -v up="$up" '{ printf ", ahead %s / behind %s of %s (as of last fetch)", $1, $2, up }')
+  fi
+  printf '  %s\n       branch %s, %s uncommitted change(s)%s\n' "$r" "$br" "$dirty" "$ab"
+}
+
+section_repos_status() {
+  head1 "Repositories"
+  if [ -z "$REPOS" ]; then
+    info "none configured. Run: aihub setup --repo /path/to/repo"
+    return 0
+  fi
+  printf '%s\n' "$REPOS" | while IFS= read -r r; do repo_summary "$r"; done
+  return 0
+}
+
+# ---------------------------------------------------------------- commands
+
+cmd_help() {
+  cat <<EOF
+aihub $AIHUB_VERSION: local control for the Claude + GitHub + Render + Supabase setup
+
+Usage: aihub <command> [options]
+
+  status            What is installed, configured and running on this machine
+  doctor [--online] Checks with PASS/WARN/FAIL and fixes; exit 1 if anything fails
+  setup [--repo P]... [--link] [--force]
+                    Create ~/.config/aihub/config, register repos, print install steps
+  gateway [status|info]   OmniRoute AI gateway (optional, macOS/Linux)
+  harness [status|info]   DeepSeek Harness (optional, unverified until configured)
+  jarvis [status|doctor|info]  OpenJarvis local assistant (optional, macOS/Linux)
+  connect [status|start [PATH]]  Let Claude web/app reach this machine (Remote Control)
+  test [--install]  Run each registered repo's own test suite
+  logs [-n N|path]  Show aihub's own activity log
+  update            Fast-forward clean registered repos to their upstream
+  version           Print the version
+
+Nothing here installs software, runs remote scripts, deploys, or prints secret values.
+Docs: docs/AIHUB.md
+EOF
+}
+
+cmd_status() {
+  section_platform
+  section_tools_status
+  section_env
+  section_repos_status
+  head1 "Local services"
+  if [ "$PLATFORM" = "termux" ]; then info "not checked on Termux (local gateways are not supported here)"; fi
+  [ "$PLATFORM" = "termux" ] || for pair in "OmniRoute:$OMNIROUTE_PORT" "Ollama:$OLLAMA_PORT" "OpenJarvis API:$JARVIS_PORT"; do
+    name=${pair%%:*}; port=${pair##*:}
+    addrs=$(listen_addrs "$port"); rc=$?
+    if [ "$rc" -eq 3 ]; then printf '  %-15s port %-6s unknown (cannot inspect ports here)\n' "$name" "$port"
+    elif [ -z "$addrs" ]; then printf '  %-15s port %-6s %snot running%s\n' "$name" "$port" "$C_DIM" "$C_0"
+    else printf '  %-15s port %-6s listening on %s\n' "$name" "$port" "$(printf '%s' "$addrs" | tr '\n' ' ')"; fi
+  done
+  head1 "Remote devices"
+  info "aihub only sees this machine. Whether Claude can reach it is shown in Claude itself (see: aihub connect)."
+  return 0
+}
+
+doctor_core() {
+  head1 "Platform"
+  case "$PLATFORM" in
+    macos|linux|wsl) pass "supported platform: $PLATFORM" ;;
+    termux) pass "Termux detected: reduced mode (status, doctor, test, logs, update)" ;;
+    *) fail "unsupported platform: $(uname -s 2>/dev/null)"; hint "aihub supports macOS, Linux, WSL and Termux" ;;
+  esac
+
+  head1 "Core tools"
+  if have git; then pass "git $(git --version 2>/dev/null | awk '{print $3}')"; else fail "git is missing"; hint "$(install_hint git)"; fi
+  if have node; then
+    nv=$(node -v 2>/dev/null)
+    if version_ge "$nv" "$MIN_NODE"; then pass "node $nv (needs >= $MIN_NODE)"; else fail "node $nv is too old (needs >= $MIN_NODE)"; hint "$(install_hint node)"; fi
+  else
+    fail "node is missing"; hint "$(install_hint node)"
+  fi
+  if have npm; then pass "npm $(npm -v 2>/dev/null)"; else fail "npm is missing"; hint "$(install_hint npm)"; fi
+  if have claude; then
+    pass "Claude Code CLI: $(tool_version claude)"
+  elif [ "$PLATFORM" = "termux" ]; then
+    info "Claude Code CLI not installed. On Android the Claude app is the supported interface"
+  else
+    warn "Claude Code CLI not installed (needed only to work locally or share this machine with Claude)"
+    hint "$(install_hint claude)"
+  fi
+  if have gh; then
+    if gh auth status >/dev/null 2>&1; then pass "gh is installed and signed in"; else warn "gh is installed but not signed in"; hint "gh auth login"; fi
+  else
+    info "gh not installed (optional; Claude web uses its own GitHub connection)"
+  fi
+}
+
+doctor_repos() {
+  head1 "Repositories"
+  if [ -z "$REPOS" ]; then
+    warn "no repositories registered"; hint "aihub setup --repo /path/to/repo"
+    return 0
+  fi
+  tmp=$(mktemp "${TMPDIR:-/tmp}/aihub.XXXXXX") || return 0
+  printf '%s\n' "$REPOS" >"$tmp"
+  while IFS= read -r r; do
+    if ! git -C "$r" rev-parse --git-dir >/dev/null 2>&1; then
+      fail "$r is not a git repository"; continue
+    fi
+    br=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null || echo "(detached)")
+    dirty=$(git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    case "$br" in
+      main|master)
+        if [ "$dirty" -gt 0 ]; then warn "$r: $dirty uncommitted change(s) on $br"; hint "work on a feature branch and open a pull request"
+        else pass "$r: on $br, clean"; fi ;;
+      *) pass "$r: on $br, $dirty uncommitted change(s)" ;;
+    esac
+    tracked_env=$(git -C "$r" ls-files 2>/dev/null | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$' || true)
+    if [ -n "$tracked_env" ]; then
+      fail "$r: .env file(s) committed to git: $(printf '%s' "$tracked_env" | tr '\n' ' ')"
+      hint "remove them from git, rotate every secret they contained, and add them to .gitignore"
+    fi
+    for f in "$r/.env" "$r"/apps/*/.env; do
+      [ -f "$f" ] || continue
+      perms=$(ls -l "$f" 2>/dev/null | cut -c8-10)
+      case "$perms" in
+        ---) : ;;
+        *) warn "$f is readable by other users on this machine"; hint "chmod 600 '$f'" ;;
+      esac
+    done
+  done <"$tmp"
+  rm -f "$tmp"
+}
+
+doctor_optional() {
+  head1 "Optional components"
+  if [ "$PLATFORM" = "termux" ]; then
+    info "OmniRoute, OpenJarvis and Ollama are not supported on Termux; skipped"
+  else
+    if have omniroute; then
+      nv=$(node -v 2>/dev/null || echo v0)
+      if version_ge "$nv" "$OMNIROUTE_MIN_NODE"; then pass "OmniRoute installed; node $nv meets its >= $OMNIROUTE_MIN_NODE requirement"
+      else fail "OmniRoute needs node >= $OMNIROUTE_MIN_NODE, found $nv"; fi
+      check_port "OmniRoute dashboard" "$OMNIROUTE_PORT"
+    else
+      info "OmniRoute not installed (optional)"
+    fi
+    if have ollama; then pass "Ollama installed: $(tool_version ollama)"; check_port "Ollama" "$OLLAMA_PORT"; else info "Ollama not installed (optional, used by OpenJarvis)"; fi
+    if have jarvis; then pass "OpenJarvis installed: $(tool_version jarvis)"; check_port "OpenJarvis API" "$JARVIS_PORT"; else info "OpenJarvis not installed (optional)"; fi
+  fi
+  if [ -n "$HARNESS_CMD" ]; then
+    hc=${HARNESS_CMD%% *}
+    if have "$hc"; then pass "harness command '$hc' found"; else fail "configured harness command '$hc' not found"; fi
+  else
+    info "DeepSeek Harness not configured (optional; see docs/AIHUB.md#deepseek-harness)"
+  fi
+  if have tailscale; then
+    if tailscale status >/dev/null 2>&1; then pass "Tailscale is connected"; else warn "Tailscale is installed but not connected"; hint "tailscale up   (only if you use it)"; fi
+  else
+    info "Tailscale not installed (not needed for Claude Remote Control)"
+  fi
+}
+
+doctor_online() {
+  head1 "Network"
+  if ! have curl; then warn "curl missing; cannot test network"; return 0; fi
+  for u in https://github.com https://registry.npmjs.org https://api.anthropic.com; do
+    code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$u" 2>/dev/null || echo 000)
+    case "$code" in
+      000) fail "cannot reach $u" ;;
+      *) pass "reachable: $u (HTTP $code)" ;;
+    esac
+  done
+}
+
+cmd_doctor() {
+  online=0
+  while [ $# -gt 0 ]; do
+    case "$1" in --online) online=1 ;; *) die "doctor: unknown option '$1'" ;; esac
+    shift
+  done
+  doctor_core
+  doctor_repos
+  doctor_optional
+  [ "$online" -eq 1 ] && doctor_online
+  printf '\n%s passed, %s warning(s), %s failed\n' "$N_PASS" "$N_WARN" "$N_FAIL"
+  [ "$N_FAIL" -eq 0 ] || return "$EX_FAIL"
+  return "$EX_OK"
+}
+
+cmd_setup() {
+  force=0; link=0; new_repos=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) [ $# -ge 2 ] || die "setup: --repo needs a path"; new_repos="$new_repos
+$2"; shift ;;
+      --force) force=1 ;;
+      --link) link=1 ;;
+      *) die "setup: unknown option '$1'" ;;
+    esac
+    shift
+  done
+
+  head1 "Configuration"
+  mkdir -p "$CONFIG_DIR" || { fail "cannot create $CONFIG_DIR"; return "$EX_FAIL"; }
+  if [ -f "$CONFIG_FILE" ] && [ "$force" -eq 1 ]; then
+    bak="$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$CONFIG_FILE" "$bak" && info "backed up existing config to $bak"
+    rm -f "$CONFIG_FILE"
+  fi
+  if [ ! -f "$CONFIG_FILE" ]; then
+    cat >"$CONFIG_FILE" <<'EOF'
+# aihub configuration. Plain key=value lines; this file is parsed, never executed.
+# Do NOT put secrets here. Keep API keys in your shell profile or a password manager.
+#
+# repo=~/code/soulmate-ai
+# harness_cmd=           (command that starts the DeepSeek Harness, once verified)
+# omniroute_port=20128
+EOF
+    chmod 600 "$CONFIG_FILE" 2>/dev/null
+    pass "created $CONFIG_FILE"
+  else
+    pass "using existing $CONFIG_FILE (unchanged unless repos are added; --force recreates it after a backup)"
+  fi
+
+  if [ -n "$new_repos" ]; then
+    tmp=$(mktemp "${TMPDIR:-/tmp}/aihub.XXXXXX") || return "$EX_FAIL"
+    printf '%s\n' "$new_repos" >"$tmp"
+    while IFS= read -r r; do
+      [ -n "$r" ] || continue
+      p=$(expand_path "$r")
+      case "$p" in /*) : ;; *) p="$(pwd)/$p" ;; esac
+      if ! git -C "$p" rev-parse --git-dir >/dev/null 2>&1; then fail "$p is not a git repository; not added"; continue; fi
+      p=$(git -C "$p" rev-parse --show-toplevel)
+      if grep -qxF "repo=$p" "$CONFIG_FILE" 2>/dev/null; then info "already registered: $p"
+      else printf 'repo=%s\n' "$p" >>"$CONFIG_FILE"; pass "registered repo $p"; fi
+    done <"$tmp"
+    rm -f "$tmp"
+  fi
+
+  if [ "$link" -eq 1 ]; then
+    if [ "$PLATFORM" = "termux" ]; then bindir="${PREFIX:-/data/data/com.termux/files/usr}/bin"; else bindir="$HOME/.local/bin"; fi
+    mkdir -p "$bindir"
+    self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+    if [ -e "$bindir/aihub" ] && [ ! -L "$bindir/aihub" ]; then
+      fail "$bindir/aihub exists and is not a symlink; left untouched"
+    else
+      ln -sf "$self" "$bindir/aihub" && pass "linked $bindir/aihub -> $self"
+      case ":$PATH:" in *":$bindir:"*) : ;; *) warn "$bindir is not on your PATH"; hint "add: export PATH=\"$bindir:\$PATH\" to your shell profile" ;; esac
+    fi
+  fi
+
+  head1 "Missing tools (install them yourself; aihub never installs anything)"
+  missing=0
+  for t in git node npm claude; do
+    [ "$PLATFORM" = "termux" ] && [ "$t" = "claude" ] && continue
+    if ! have "$t"; then missing=1; printf '  %-8s %s\n' "$t" "$(install_hint "$t")"; fi
+  done
+  [ "$missing" -eq 0 ] && pass "core tools present"
+  info "next: aihub doctor"
+  return 0
+}
+
+cmd_gateway() {
+  sub=${1:-status}
+  case "$sub" in
+    info)
+      cat <<EOF
+OmniRoute: a local AI gateway that routes the Claude Code CLI through other providers.
+  - Optional. Claude web and the Claude app do not use it.
+  - Sends your prompts and code to whichever third-party provider it picks.
+  - Upstream to verify before installing: the npm package 'omniroute' points to
+    github.com/diegosouzapw/OmniRoute; some guides link github.com/cheaper-inference/OmniRoute.
+    Confirm which one is official before running 'npm install -g omniroute'.
+  - Needs node >= $OMNIROUTE_MIN_NODE. Dashboard: http://127.0.0.1:$OMNIROUTE_PORT (keep it on localhost, set a password).
+Full notes: docs/AIHUB.md#omniroute
+EOF
+      return 0 ;;
+    status) ;;
+    *) die "gateway: unknown subcommand '$sub' (status|info)" ;;
+  esac
+  [ "$PLATFORM" = "termux" ] && { info "OmniRoute is not supported on Termux"; return "$EX_UNAVAILABLE"; }
+  head1 "OmniRoute"
+  if ! have omniroute; then info "not installed (optional). Run: aihub gateway info"; return "$EX_UNAVAILABLE"; fi
+  pass "installed: $(tool_version omniroute)"
+  nv=$(node -v 2>/dev/null || echo v0)
+  if version_ge "$nv" "$OMNIROUTE_MIN_NODE"; then pass "node $nv"; else fail "needs node >= $OMNIROUTE_MIN_NODE, found $nv"; fi
+  check_port "OmniRoute dashboard" "$OMNIROUTE_PORT"
+  [ "$N_FAIL" -eq 0 ] || return "$EX_FAIL"
+}
+
+cmd_harness() {
+  sub=${1:-status}
+  case "$sub" in
+    info)
+      cat <<EOF
+DeepSeek Harness: NOT VERIFIED. No configuration, source or install guide was found for it.
+aihub will only manage it after you name the exact upstream project and its start command:
+  echo 'harness_cmd=<command>' >> $CONFIG_FILE
+Until then it is not part of the supported setup. See docs/AIHUB.md#deepseek-harness
+EOF
+      return 0 ;;
+    status) ;;
+    *) die "harness: unknown subcommand '$sub' (status|info)" ;;
+  esac
+  head1 "DeepSeek Harness"
+  if [ -z "$HARNESS_CMD" ]; then info "not configured. Run: aihub harness info"; return "$EX_UNAVAILABLE"; fi
+  hc=${HARNESS_CMD%% *}
+  if have "$hc"; then pass "command '$hc' found: $(tool_version "$hc")"; return 0; fi
+  fail "configured command '$hc' not found"
+  return "$EX_FAIL"
+}
+
+cmd_jarvis() {
+  sub=${1:-status}
+  case "$sub" in
+    info)
+      cat <<EOF
+OpenJarvis: an open-source, local-first personal assistant (github.com/open-jarvis/OpenJarvis).
+  - Optional, macOS/Linux/WSL only. Installs uv, Python 3.11, Ollama and a 1.5 GB+ model.
+  - Install by downloading install.sh, READING it, then running it. Never pipe it straight into bash.
+  - Setting ANTHROPIC/OPENAI/OPENROUTER keys makes it default to cloud models (not local).
+  - Its API (jarvis serve) must stay on 127.0.0.1:$JARVIS_PORT.
+Full notes: docs/AIHUB.md#openjarvis
+EOF
+      return 0 ;;
+    status|doctor) ;;
+    *) die "jarvis: unknown subcommand '$sub' (status|doctor|info)" ;;
+  esac
+  [ "$PLATFORM" = "termux" ] && { info "OpenJarvis is not supported on Termux"; return "$EX_UNAVAILABLE"; }
+  if ! have jarvis; then
+    head1 "OpenJarvis"; info "not installed (optional). Run: aihub jarvis info"; return "$EX_UNAVAILABLE"
+  fi
+  if [ "$sub" = "doctor" ]; then
+    jarvis doctor 2>&1 | redact
+    return "${PIPESTATUS[0]}"
+  fi
+  head1 "OpenJarvis"
+  pass "installed: $(tool_version jarvis)"
+  if have ollama; then pass "Ollama: $(tool_version ollama)"; else warn "Ollama not installed (default local backend)"; fi
+  check_port "Ollama" "$OLLAMA_PORT"
+  check_port "OpenJarvis API" "$JARVIS_PORT"
+  [ "$N_FAIL" -eq 0 ] || return "$EX_FAIL"
+}
+
+cmd_connect() {
+  sub=${1:-status}
+  case "$sub" in
+    status)
+      head1 "Connect this machine to Claude"
+      if [ "$PLATFORM" = "termux" ]; then
+        info "On Android, use the Claude app directly; it reaches GitHub, Render and Supabase through its own connectors."
+        info "Sharing a Termux folder with Claude is not supported."
+        return 0
+      fi
+      if have claude; then pass "Claude Code CLI: $(tool_version claude)"
+      else warn "Claude Code CLI not installed"; hint "$(install_hint claude)"; fi
+      info "Recommended: Claude Remote Control (first-party, no open ports)."
+      info "  Desktop app: Settings > Claude Code > Remote Control, then add a repo folder."
+      info "  Or in a repo root: aihub connect start   (runs: claude remote-control)"
+      info "Only the repository root can be shared, and not folders under ~/Library or hidden folders."
+      info "Whether Claude can see this machine is shown in Claude itself; aihub cannot confirm it from here."
+      if have tailscale; then
+        if tailscale status >/dev/null 2>&1; then info "Tailscale: connected (only needed for a private server)"; else info "Tailscale: installed, not connected"; fi
+      fi
+      return 0 ;;
+    start)
+      [ "$PLATFORM" = "termux" ] && { info "not supported on Termux"; return "$EX_UNAVAILABLE"; }
+      have claude || { fail "Claude Code CLI not installed"; hint "$(install_hint claude)"; return "$EX_UNAVAILABLE"; }
+      dir=${2:-.}
+      top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || { fail "$dir is not inside a git repository"; return "$EX_FAIL"; }
+      case "$top" in */.*|"$HOME"/Library/*) fail "$top is hidden or under ~/Library; Claude cannot use it"; return "$EX_FAIL" ;; esac
+      info "starting Claude Remote Control in $top (Ctrl+C to stop)"
+      cd "$top" && exec claude remote-control ;;
+    *) die "connect: unknown subcommand '$sub' (status|start [PATH])" ;;
+  esac
+}
+
+cmd_test() {
+  install=0
+  while [ $# -gt 0 ]; do
+    case "$1" in --install) install=1 ;; *) die "test: unknown option '$1'" ;; esac
+    shift
+  done
+  [ -n "$REPOS" ] || { warn "no repositories registered"; hint "aihub setup --repo /path/to/repo"; return "$EX_UNAVAILABLE"; }
+  have npm || { fail "npm is missing"; return "$EX_FAIL"; }
+  results=""
+  overall=0
+  tmp=$(mktemp "${TMPDIR:-/tmp}/aihub.XXXXXX") || return "$EX_FAIL"
+  printf '%s\n' "$REPOS" >"$tmp"
+  while IFS= read -r r; do
+    head1 "Testing $r"
+    if [ ! -f "$r/package.json" ]; then info "no package.json; skipped"; results="$results
+  SKIP $r"; continue; fi
+    if [ ! -d "$r/node_modules" ]; then
+      if [ "$install" -eq 1 ]; then (cd "$r" && npm ci) </dev/null || { results="$results
+  FAIL $r (npm ci)"; overall=1; continue; }
+      else warn "dependencies not installed"; hint "aihub test --install   (runs npm ci)"; results="$results
+  SKIP $r (no node_modules)"; continue; fi
+    fi
+    scripts=$(cd "$r" && node -e 'const s=require("./package.json").scripts||{};console.log(Object.keys(s).join(" "))' 2>/dev/null)
+    case " $scripts " in
+      *" check "*) cmd="npm run check" ;;
+      *" test "*) cmd="npm test" ;;
+      *) info "no check/test script; skipped"; results="$results
+  SKIP $r"; continue ;;
+    esac
+    case " $scripts " in *" test:hooks "*) cmd="$cmd && npm run test:hooks" ;; esac
+    info "running: $cmd"
+    if (cd "$r" && sh -c "$cmd") </dev/null 2>&1 | redact; [ "${PIPESTATUS[0]}" -eq 0 ]; then
+      results="$results
+  ${C_OK}PASS${C_0} $r"
+    else
+      results="$results
+  ${C_FAIL}FAIL${C_0} $r"; overall=1
+    fi
+  done <"$tmp"
+  rm -f "$tmp"
+  head1 "Summary"
+  printf '%s\n' "$results" | sed '/^$/d'
+  return "$overall"
+}
+
+cmd_logs() {
+  n=50
+  case "${1:-}" in
+    path) printf '%s\n' "$LOG_FILE"; return 0 ;;
+    -n) [ $# -ge 2 ] || die "logs: -n needs a number"; n=$2 ;;
+    '') ;;
+    *) die "logs: unknown option '$1' (-n N | path)" ;;
+  esac
+  case "$n" in ''|*[!0-9]*) die "logs: -n needs a number" ;; esac
+  if [ ! -f "$LOG_FILE" ]; then info "no log yet ($LOG_FILE)"; return 0; fi
+  tail -n "$n" "$LOG_FILE"
+  info "Render and Supabase logs: ask Claude (it has those connectors) or use their dashboards."
+}
+
+cmd_update() {
+  [ -n "$REPOS" ] || { warn "no repositories registered"; hint "aihub setup --repo /path/to/repo"; return "$EX_UNAVAILABLE"; }
+  overall=0
+  tmp=$(mktemp "${TMPDIR:-/tmp}/aihub.XXXXXX") || return "$EX_FAIL"
+  printf '%s\n' "$REPOS" >"$tmp"
+  head1 "Updating repositories (fast-forward only)"
+  while IFS= read -r r; do
+    if ! git -C "$r" rev-parse --git-dir >/dev/null 2>&1; then fail "$r: not a git repository"; overall=1; continue; fi
+    if [ -n "$(git -C "$r" status --porcelain 2>/dev/null)" ]; then warn "$r: has uncommitted changes; skipped"; continue; fi
+    br=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null) || { warn "$r: detached HEAD; skipped"; continue; }
+    up=$(git -C "$r" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || { warn "$r: $br has no upstream; skipped"; continue; }
+    if ! git -C "$r" fetch --quiet 2>&1 | redact; then :; fi
+    if git -C "$r" merge --ff-only --quiet "$up" >/dev/null 2>&1; then
+      pass "$r: $br is up to date with $up"
+    else
+      warn "$r: $br has diverged from $up; not changed"; hint "resolve it yourself (or ask Claude) on a branch"
+    fi
+  done <"$tmp"
+  rm -f "$tmp"
+  return "$overall"
+}
+
+# ---------------------------------------------------------------- main
+
+detect_platform
+load_config
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  help|-h|--help) cmd_help; exit 0 ;;
+  version|-v|--version) echo "aihub $AIHUB_VERSION"; exit 0 ;;
+esac
+
+log_event "$cmd"
+case "$cmd" in
+  status) cmd_status "$@" ;;
+  doctor) cmd_doctor "$@" ;;
+  setup) cmd_setup "$@" ;;
+  gateway) cmd_gateway "$@" ;;
+  harness) cmd_harness "$@" ;;
+  jarvis) cmd_jarvis "$@" ;;
+  connect) cmd_connect "$@" ;;
+  test) cmd_test "$@" ;;
+  logs) cmd_logs "$@" ;;
+  update) cmd_update "$@" ;;
+  *) printf 'aihub: unknown command "%s"\n\n' "$cmd" >&2; cmd_help >&2; exit "$EX_USAGE" ;;
+esac
+exit $?

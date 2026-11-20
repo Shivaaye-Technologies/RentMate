@@ -1,0 +1,50 @@
+{
+  "name": "soulmate-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SOULMATE.AI dating app (API + web) with Claude Code automation",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces && npm run test:demo && npm run test:db",
+    "test:db": "node scripts/test-db.mjs",
+    "test:rollback": "node scripts/test-rollback.mjs",
+    "test:wallet-upgrade": "node scripts/test-wallet-backfill.mjs",
+    "test:db:concurrency": "bash scripts/test-db-concurrency.sh",
+    "test:demo": "node --test scripts/demo/generate-demo-profiles.test.mjs",
+    "build": "npm run build --workspaces",
+    "check": "npm run test:policy && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "test:hooks": "node scripts/test-hooks.mjs",
+    "test:policy": "node scripts/policy-check.mjs && node scripts/advisory-scan.mjs --self-test",
+    "test:aihub": "bash tools/aihub/test/aihub.test.sh",
+    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:e2e:rtc": "node scripts/e2e-rtc.mjs",
+    "test:e2e:mfa": "node scripts/e2e-mfa.mjs",
+    "audit:advisories": "node scripts/advisory-scan.mjs"
+  },
+  "devDependencies": {
+    "@dicebear/core": "^9.4.3",
+    "@dicebear/personas": "^9.4.2",
+    "@electric-sql/pglite": "^0.5.11",
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.73.0"
+  }
+}

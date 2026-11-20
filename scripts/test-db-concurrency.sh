@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Real concurrency tests for the booking engine. PGlite (npm run test:db) has one connection, so it cannot prove what
+# happens when two requests arrive at the same moment; this script uses a real, disposable PostgreSQL server.
+#
+# Usage: PGHOST=... PGPORT=... PGUSER=... [PGPASSWORD=...] scripts/test-db-concurrency.sh
+# It creates and drops its own database (rentmate_concurrency_<pid>). Never point it at production.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+DB="rentmate_concurrency_$$"
+PSQL=(psql -X -q -At -v ON_ERROR_STOP=1)
+fail=0
+ok() { echo "ok   $1"; }
+bad() { echo "FAIL $1"; fail=1; }
+cleanup() { "${PSQL[@]}" -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+
+"${PSQL[@]}" -d postgres -c "create database $DB"
+{
+  # Roles are cluster-wide: create them only if this server does not have them yet.
+  sed -E "s/^create role ([a-z_]+) nologin;/do \$\$ begin create role \1 nologin; exception when duplicate_object then null; end \$\$;/" \
+    supabase/tests/supabase_stubs.sql
+  for f in supabase/migrations/*.sql; do cat "$f"; echo; done
+} | "${PSQL[@]}" -d "$DB" >/dev/null
+echo "Migrations applied to a fresh PostgreSQL $("${PSQL[@]}" -d "$DB" -c 'show server_version')."
+
+CM=11111111-0000-4000-8000-000000000001
+M1=11111111-0000-4000-8000-000000000002
+M2=11111111-0000-4000-8000-000000000003
+SVC=22222222-0000-4000-8000-000000000001
+SLOT="(date_trunc('day', now() at time zone 'Asia/Kolkata') + interval '5 days 11 hours') at time zone 'Asia/Kolkata'"
+
+"${PSQL[@]}" -d "$DB" >/dev/null <<SQL
+insert into auth.users (id, email, aud, role) values
+  ('$CM', 'cm@race.test', 'authenticated', 'authenticated'),
+  ('$M1', 'm1@race.test', 'authenticated', 'authenticated'),
+  ('$M2', 'm2@race.test', 'authenticated', 'authenticated');
+insert into public.profiles (id, display_name, age, looking_for, age_min, age_max)
+  select id, 'Racer', 30, 'friendship', 18, 60 from auth.users where email like '%@race.test';
+insert into public.companion_profiles (user_id, headline, city, status, verified)
+  values ('$CM', 'City walks guide', 'Pune', 'approved', true);
+insert into public.companion_services (id, companion_id, category, title, pricing, price_inr, min_minutes, max_minutes)
+  values ('$SVC', '$CM', 'coffee', 'Coffee chat', 'hourly', 500, 60, 120);
+insert into public.companion_availability (companion_id, weekday, start_minute, end_minute, timezone)
+  select '$CM', d, 0, 1440, 'Asia/Kolkata' from generate_series(0, 6) d;
+SQL
+
+as_user() { # $1 user, $2 sql, $3 seconds to hold the transaction open
+  "${PSQL[@]}" -d "$DB" 2>&1 <<SQL
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"$1","role":"authenticated"}', true) is null;
+$2
+select pg_sleep($3);
+commit;
+SQL
+}
+
+# Two members request the same slot (requests do not reserve; acceptance does).
+B1=$(as_user "$M1" "select public.booking_request('$SVC', $SLOT, 60, 'Cafe on FC Road', '', 'race-key-0001');" 0 | grep -E '^[0-9a-f-]{36}$')
+B2=$(as_user "$M2" "select public.booking_request('$SVC', $SLOT, 60, 'Cafe on FC Road', '', 'race-key-0002');" 0 | grep -E '^[0-9a-f-]{36}$')
+
+# 1. The companion accepts both at the same moment from two connections.
+as_user "$CM" "select public.booking_respond('$B1', 'accept', null);" 3 >/tmp/race_a.$$ &
+sleep 1
+as_user "$CM" "select public.booking_respond('$B2', 'accept', null);" 0 >/tmp/race_b.$$ || true
+wait
+accepted=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.bookings where id in ('$B1', '$B2') and status = 'accepted'")
+if [ "$accepted" = "1" ] && grep -q "overlaps another accepted booking" /tmp/race_b.$$; then
+  ok "simultaneous accepts of one slot: exactly one wins, the other gets a clear error"
+else
+  bad "simultaneous accepts: $accepted accepted; second session said: $(tr '\n' ' ' </tmp/race_b.$$)"
+fi
+
+# 2. The same member sends the same request twice at the same moment (double tap / network retry).
+REQ="select 'id=' || public.booking_request('$SVC', $SLOT + interval '1 day', 60, 'Cafe on FC Road', '', 'same-key-0777');"
+as_user "$M1" "$REQ" 3 >/tmp/race_c.$$ &
+sleep 1
+as_user "$M1" "$REQ" 0 >/tmp/race_d.$$ || true
+wait
+rows=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.bookings where idempotency_key = 'same-key-0777'")
+id_c=$(grep -o 'id=.*' /tmp/race_c.$$ || true)
+id_d=$(grep -o 'id=.*' /tmp/race_d.$$ || true)
+if [ "$rows" = "1" ] && [ -n "$id_c" ] && [ "$id_c" = "$id_d" ]; then
+  ok "simultaneous retries with one idempotency key: one booking, both callers get its id"
+else
+  bad "idempotent retry: rows=$rows first=[$id_c] second=[$id_d] $(tr '\n' ' ' </tmp/race_d.$$)"
+fi
+
+# 3. Member and companion act on one booking at once: cancel vs accept. The row lock serialises them.
+B3=$(as_user "$M2" "select public.booking_request('$SVC', $SLOT + interval '2 days', 60, 'Cafe on FC Road', '', 'race-key-0003');" 0 | grep -E '^[0-9a-f-]{36}$')
+as_user "$M2" "select public.booking_cancel('$B3', 'changed plans');" 3 >/tmp/race_e.$$ &
+sleep 1
+as_user "$CM" "select public.booking_respond('$B3', 'accept', null);" 0 >/tmp/race_f.$$ || true
+wait
+st=$("${PSQL[@]}" -d "$DB" -c "select status from public.bookings where id = '$B3'")
+events=$("${PSQL[@]}" -d "$DB" -c "select string_agg(coalesce(from_status, '-') || '>' || to_status, ',' order by created_at) from public.booking_events where booking_id = '$B3'")
+if [ "$st" = "cancelled" ] && grep -q "can no longer be answered" /tmp/race_f.$$ && [ "$events" = "->requested,requested>cancelled" ]; then
+  ok "cancel and accept at once: the first wins, the second is refused, history stays consistent ($events)"
+else
+  bad "cancel vs accept: status=$st events=$events second said: $(tr '\n' ' ' </tmp/race_f.$$)"
+fi
+
+# 4. Two spends against one wallet at the same moment (100-token bonus, 60 each): exactly one may succeed.
+# private.ledger_post is server-only, so this runs as the database owner, the way server code would call it.
+spend() { # $1 key, $2 seconds to hold
+  "${PSQL[@]}" -d "$DB" 2>&1 <<SQL
+begin;
+select 'entry=' || private.ledger_post('$M1', -60, 'video_call', 'call', 'race', '$1');
+select pg_sleep($2);
+commit;
+SQL
+}
+spend "race-spend-0001" 3 >/tmp/race_g.$$ &
+sleep 1
+spend "race-spend-0002" 0 >/tmp/race_h.$$ || true
+wait
+bal=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M1'")
+sum=$("${PSQL[@]}" -d "$DB" -c "select sum(delta) from public.token_ledger where user_id = '$M1'")
+if [ "$bal" = "40" ] && [ "$sum" = "40" ] && grep -q "Not enough tokens" /tmp/race_h.$$; then
+  ok "two simultaneous spends from one wallet: one succeeds, the other is refused, balance never negative"
+else
+  bad "concurrent spends: balance=$bal ledger_sum=$sum second said: $(tr '\n' ' ' </tmp/race_h.$$)"
+fi
+
+# 5. The same spend replayed at the same moment (webhook retry): charged once.
+spend "race-spend-0003" 3 >/tmp/race_i.$$ &
+sleep 1
+spend "race-spend-0003" 0 >/tmp/race_j.$$ || true
+wait
+rows=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.token_ledger where idempotency_key = 'race-spend-0003'")
+# 40 tokens cannot cover 60, so both attempts must be refused and nothing posted; then retry with a fundable amount.
+if [ "$rows" = "0" ] && grep -q "Not enough tokens" /tmp/race_i.$$; then
+  "${PSQL[@]}" -d "$DB" -c "select private.ledger_post('$M2', -10, 'message', 'msg', 'r', 'race-spend-0004')" >/dev/null
+  (echo "begin; select private.ledger_post('$M2', -10, 'message', 'msg', 'r', 'race-spend-0005'); select pg_sleep(3); commit;" \
+    | "${PSQL[@]}" -d "$DB" >/tmp/race_k.$$ 2>&1) &
+  sleep 1
+  echo "select private.ledger_post('$M2', -10, 'message', 'msg', 'r', 'race-spend-0005');" | "${PSQL[@]}" -d "$DB" >/tmp/race_l.$$ 2>&1 || true
+  wait
+  rows=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.token_ledger where idempotency_key = 'race-spend-0005'")
+  bal=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M2'")
+  if [ "$rows" = "1" ] && [ "$bal" = "80" ]; then
+    ok "a spend replayed at the same moment is charged once (balance $bal)"
+  else
+    bad "replayed spend: rows=$rows balance=$bal $(tr '\n' ' ' </tmp/race_l.$$)"
+  fi
+else
+  bad "unfundable replay: rows=$rows $(tr '\n' ' ' </tmp/race_i.$$)"
+fi
+
+rm -f /tmp/race_[a-l].$$
+exit $fail

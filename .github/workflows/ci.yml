@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Pinned so a runner-image change cannot silently alter the toolchain.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so the policy guard can check that migrations were added in version order.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Repository policy (GitHub terms, no secrets, no media, no adult content)
+        run: npm run test:policy
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Migration rollback rehearsal
+        run: npm run test:rollback
+      - name: Token wallet upgrade on a database with existing members
+        run: npm run test:wallet-upgrade
+      - name: Hook guard tests
+        run: npm run test:hooks
+      - name: aihub tests
+        run: npm run test:aihub
+      - name: Build
+        run: npm run build
+      - name: Secret scan (committed .env files)
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "::error::.env file committed"; exit 1
+          fi
+      - name: Dependency audit (high and critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  browser:
+    # Real Chromium against a production build of apps/web. All non-local requests are blocked.
+    # Pinned to ubuntu-24.04: Playwright's `install --with-deps` only knows the system packages of the Ubuntu
+    # releases it supports, so a moving `ubuntu-latest` can break the browser install.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright (not a project dependency)
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Browser smoke tests
+        run: npm run test:e2e
+      - name: Admin MFA screens (enrolment, challenge, recovery)
+        run: npm run test:e2e:mfa
+
+  db-concurrency:
+    # Real PostgreSQL with two simultaneous sessions: double-booking, idempotent retries, cancel-vs-accept.
+    # PGlite (npm run test:db, in the check job) has one connection and cannot test these races.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Throwaway container that exists only for this job; not a real credential.
+          POSTGRES_PASSWORD: ci-throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Booking concurrency tests
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: ci-throwaway
+        run: scripts/test-db-concurrency.sh
+
+  rtc:
+    # Real voice, video and broadcast through a real LiveKit server, in real Chromium with fake camera/microphone.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      LIVEKIT_VERSION: "1.13.11"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright (not a project dependency)
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Start a local LiveKit server (test-only key, loopback only)
+        run: |
+          curl -sSfL -o /tmp/lk.tgz "https://github.com/livekit/livekit/releases/download/v${LIVEKIT_VERSION}/livekit_${LIVEKIT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/lk.tgz -C /tmp livekit-server
+          nohup /tmp/livekit-server --config scripts/livekit/livekit-test.yaml > /tmp/livekit.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:7880/ && break; sleep 1; done
+      - name: Real-time media tests
+        run: npm run test:e2e:rtc
+      - name: LiveKit log (on failure)
+        if: failure()
+        run: tail -200 /tmp/livekit.log
