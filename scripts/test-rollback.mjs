@@ -18,7 +18,7 @@ const STEPS = [
   {
     migrations: ["20261123140000_age_attestation_enforcement.sql"],
     rollback: "docs/rollback/20261123_age_attestation_enforcement.rollback.sql",
-    suites: ["age_attestation.sql", "age_attestation_enforcement.sql"],
+    suites: ["age_attestation.sql", "age_attestation_enforcement.sql", "age_attestation_abuse.sql"],
   },
   {
     migrations: ["20261123130000_age_attestation.sql"],

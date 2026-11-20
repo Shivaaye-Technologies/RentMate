@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Staging rehearsal of database-level age attestation (P2-03) on a real, disposable PostgreSQL server.
+# Staging rehearsal of database-level age attestation (P2-03) on a real, disposable PostgreSQL server. Also runs the
+# age_attestation_enforcement.sql and age_attestation_abuse.sql suites on real PostgreSQL.
 #
 # Builds a fresh database from every migration, adds an existing member and the demo seed, then runs the real
 # operations files: docs/ops/require_age_attestation.enable.sql (staging value: true), checks the rules with one
@@ -66,6 +67,17 @@ insert into public.profiles (id, $PROFILE) values ('$EXIST', 'Existing', 33, 'fr
 "${PSQL[@]}" -d "$DB" -f supabase/seed/demo_profiles.sql >/dev/null
 DEMO_BEFORE=$(owner "select count(*) from public.profiles where is_demo")
 echo "Before enabling: 1 existing member, $DEMO_BEFORE demo profiles, require_age_attestation = $(owner 'select require_age_attestation from public.platform_settings')."
+
+# ===== The PGlite suites, on real PostgreSQL (each turns the switch on in its own transaction and rolls back) =====
+for suite in age_attestation_enforcement.sql age_attestation_abuse.sql; do
+  out=$("${PSQL[@]}" -d "$DB" -f "supabase/tests/$suite" 2>&1 || true)
+  results=$(sed -n 's/.*RESULTS: //p' <<<"$out" | tr ';' '\n' | sed 's/^ *//' | grep -v '^$' || true)
+  total=$(grep -c . <<<"$results" || true)
+  bad_n=$(grep -vc '^ok' <<<"$results" || true)
+  if [ "$total" -gt 0 ] && [ "$bad_n" = 0 ]; then ok "$suite on PostgreSQL: $total/$total"; else bad "$suite on PostgreSQL: $out"; fi
+done
+[ "$(owner 'select require_age_attestation from public.platform_settings')" = "f" ] &&
+  ok "the suites left the switch off (rolled back)" || bad "switch left on by a suite"
 
 # ===== Enable (staging value: true) =====
 "${PSQL[@]}" -d "$DB" -f docs/ops/require_age_attestation.enable.sql >/dev/null

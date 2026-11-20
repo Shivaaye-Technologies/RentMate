@@ -52,6 +52,7 @@ for (const test of [
   "account_deletion_photos.sql",
   "age_attestation.sql",
   "age_attestation_enforcement.sql",
+  "age_attestation_abuse.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));

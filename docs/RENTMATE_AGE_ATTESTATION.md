@@ -63,7 +63,33 @@ attests first.
 - The exemption requires **both** `is_demo = true` and a reserved demo email. Members cannot set `is_demo` (no
   column privilege), and a privileged client setting `is_demo` on a real account is still refused.
 
-## Production activation (later, only with explicit approval)
+## Migration ordering (forward-dated version)
+
+The version `20261123140000` is later than the date it was written (2026-11-20). That is intentional and follows the
+repository's existing convention: migration versions are ordering slots, not creation times.
+
+- Migrations dated 21–23 November were already on GitHub before this work (`20261121090000` … `20261123100000`,
+  added 18–20 November). A new migration must sort after all of them, or `supabase db push` would apply it out of
+  order or refuse it on a database that already has the newer ones. The policy guard enforces this
+  (`checkMigrationOrder` in `scripts/policy-check.mjs`).
+- The four Phase 3 migrations take the next slots: `20261123110000` photo privacy, `20261123120000` account deletion,
+  `20261123130000` age attestation, `20261123140000` enforcement.
+- None of them has been pushed or applied anywhere except disposable test databases, and none was renamed.
+- For anyone adding the next migration: do not use `supabase migration new` as is. Until the calendar passes 23
+  November, name it after the latest version (e.g. `20261123150000_…`); the guard fails otherwise.
+
+## Exemptions: why they cannot be abused
+
+Checked by `supabase/tests/age_attestation_abuse.sql` (18 checks, PGlite and real PostgreSQL 16).
+
+- **Existing-profile upsert.** The trigger skips the check only when a profile row with the same id already exists.
+  Members can only write their own id (RLS `id = auth.uid()`), and they cannot delete their profile row (no delete
+  policy). So the exemption never creates a row: refused cases include an upsert or a multi-row insert of a new id
+  (refused at the first row, even for the owner), a profile for another account, an insert or upsert over another
+  member's existing profile (RLS), and re-creating a profile after the platform removed it (counts as new).
+- **Demo profiles.** Need `is_demo = true` and a reserved demo email. Members have no privilege on `is_demo` (insert or
+  update) or on `auth.users`, no member-callable function writes `is_demo` or creates profiles, and members cannot
+  call the enforcement helpers. A member who signs up with a reserved-looking email still needs an attestation.
 
 1. Confirm a backup and that the web app at `769a5e3` or later (fail-closed onboarding) is deployed.
 2. Apply migration `20261123140000_age_attestation_enforcement.sql` (after `20261123130000`). This changes no rows and
@@ -84,11 +110,12 @@ attests first.
 
 ## Tests
 
-| Test                                                | Where                                                                         |
-| --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Staging rules, switch on (27 checks)                | `supabase/tests/age_attestation_enforcement.sql` (`npm run test:db`)          |
-| Staging rehearsal on real PostgreSQL 16 (29 checks) | `scripts/test-age-attestation-staging.sh` (`npm run test:db:age-staging`, CI) |
-| Declaration rules (22 checks)                       | `supabase/tests/age_attestation.sql`                                          |
-| Rollback and re-apply                               | `npm run test:rollback`                                                       |
-| API 422 mapping (5 tests)                           | `apps/api/test/ageAttestation.test.ts`                                        |
-| App fails closed (15 unit tests, 17 browser checks) | `apps/web/src/onboardingSave.test.ts`, `npm run test:e2e:onboarding`          |
+| Test                                                                   | Where                                                                         |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Staging rules, switch on (27 checks)                                   | `supabase/tests/age_attestation_enforcement.sql` (`npm run test:db`)          |
+| Abuse attempts on both exemptions (18 checks)                          | `supabase/tests/age_attestation_abuse.sql` (`npm run test:db`)                |
+| Staging rehearsal on real PostgreSQL 16 (32 checks, incl. both suites) | `scripts/test-age-attestation-staging.sh` (`npm run test:db:age-staging`, CI) |
+| Declaration rules (22 checks)                                          | `supabase/tests/age_attestation.sql`                                          |
+| Rollback and re-apply                                                  | `npm run test:rollback`                                                       |
+| API 422 mapping (5 tests)                                              | `apps/api/test/ageAttestation.test.ts`                                        |
+| App fails closed (15 unit tests, 17 browser checks)                    | `apps/web/src/onboardingSave.test.ts`, `npm run test:e2e:onboarding`          |
