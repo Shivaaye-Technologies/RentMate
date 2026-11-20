@@ -6,15 +6,16 @@ declare
   b uuid := gen_random_uuid();    -- another member
   x uuid := gen_random_uuid();    -- an account deleted before this change: files left, no profile, no user
   adm uuid := gen_random_uuid();
+  s uuid := gen_random_uuid();    -- removed by an admin in the dashboard (no member session)
   r text := ''; cnt int; names text[]; ok boolean;
 begin
   insert into auth.users (id, email, aud, role)
-  select u, u::text || '@deletion.test', 'authenticated', 'authenticated' from unnest(array[a, b, adm]) u;
+  select u, u::text || '@deletion.test', 'authenticated', 'authenticated' from unnest(array[a, b, adm, s]) u;
   insert into public.profiles (id, display_name, age, looking_for, age_min, age_max)
-  select u, 'Member', 30, 'friendship', 18, 60 from unnest(array[a, b, adm]) u;
+  select u, 'Member', 30, 'friendship', 18, 60 from unnest(array[a, b, adm, s]) u;
   insert into private.user_roles (user_id, role) values (adm, 'admin');
   insert into storage.objects (bucket_id, name, owner)
-  select 'photos', u::text || f, u from unnest(array[a, b]) u cross join unnest(array['/main.jpg', '/second.jpg', '/stray.jpg']) f;
+  select 'photos', u::text || f, u from unnest(array[a, b, s]) u cross join unnest(array['/main.jpg', '/second.jpg', '/stray.jpg']) f;
   insert into storage.objects (bucket_id, name, owner) values
     ('photos', x::text || '/left-behind.jpg', x), ('photos', 'not-a-uuid/file.jpg', null);
 
@@ -61,6 +62,12 @@ begin
   reset role;
   select count(*) into cnt from storage.objects where name like b::text || '/%';
   r := r || case when cnt = 3 then 'ok another member''s photos are untouched; ' else 'FAIL other member ' || cnt || '; ' end;
+
+  -- Deletions without a member session (dashboard, service role: claims carry no user) are not blocked by the trigger.
+  perform set_config('request.jwt.claims', '{}', true);
+  delete from auth.users where id = s;
+  select count(*) into cnt from auth.users where id = s;
+  r := r || case when cnt = 0 then 'ok an admin deletion without a member session is not blocked; ' else 'FAIL admin deletion blocked; ' end;
 
   -- ===== Orphaned photos (admins only) =====
   set local role authenticated;
