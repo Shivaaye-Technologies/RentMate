@@ -1,10 +1,13 @@
 # Security note — LiveKit JWT signing and the CodeQL alert in `apps/api/src/live/providers.ts`
 
-Last reviewed: 2026-11-20 · Branch `feature/rentmate-conversion` · Reviewed from `5bb6d5d`; line numbers below refer to
-the commit that adds this revision.
+Last reviewed: 2026-11-20 · Branch `feature/rentmate-conversion` · Re-reviewed at `1cea99b` (source unchanged since
+`4da9c6a`); line numbers refer to that source.
 
 ## 1. The alert
 
+- GitHub alert **#3**, severity High, first detected in `c58ee51`. Earlier alerts for the same code at lines 49 and 57
+  are closed as Fixed (the code moved). Status: **open**, per the founder's GitHub screenshots
+  (`docs/RENTMATE_GITHUB_SECURITY_VERIFICATION_ADDENDUM.md`).
 - Rule: `js/insufficient-password-hash` ("Use of password hash with insufficient computational effort").
 - Location: `apps/api/src/live/providers.ts:70`, `createHmac("sha256", apiSecret).update(signingInput).digest()` inside
   `hs256Mac`, the HS256 signer.
@@ -18,6 +21,20 @@ the commit that adds this revision.
 public key **identifier** (`APIxxxxxxxx`). LiveKit requires it in the token's `iss` claim so its server knows which
 secret to verify with, and anyone holding a token can read it. Nothing in RentMate stores it, compares it as a credential
 or hashes it for storage. The "hash" CodeQL sees is the JWT signature computed over a token body that contains the key ID.
+
+**Credential flow, environment to signature** (traced in code):
+
+1. Render dashboard → environment variables `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (`render.yaml`: `sync: false`, so
+   the values are never in the repository).
+2. `apps/api/src/config.ts` → `loadConfig` validates them with zod (secret: 32+ characters, no whitespace, 12+
+   distinct; errors never repeat the value) and lists the secret in `SECRET_KEYS`, so a printed config shows
+   `[redacted]`.
+3. `buildRegistry(config)` (`providers.ts`, line 393) → `new LiveKitProvider({ apiKey, apiSecret })`; the values stay
+   in private `opts`.
+4. `requireCreds()` (line 175) → `signJwt(payload, apiSecret)` → `hs256Mac(signingInput, apiSecret)` (line 70). The
+   secret is only ever the HMAC key; the key ID goes into `iss`.
+5. Out of the process: the signed token only (to the member's browser, or as a `Bearer` header to LiveKit over HTTPS).
+   Neither value is logged; errors carry only an HTTP status.
 
 ## 2. HMAC signing is not password hashing
 
@@ -50,6 +67,18 @@ configuration (§4).
 | 8   | Client responses never contain the key secret                      | Pass                   | See 2. The key **ID** is inside every token by protocol (`iss`); it is not a secret.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 9   | Only authorised server code issues participant tokens              | Pass                   | `/api/v1/calls` and `/api/v1/live` are mounted after `requireAuth` (`app.ts`); every join first runs a database check (`call_join_check`, `live_watch_check`, `live_broadcast_check`, `live_session_check`) and signs only when it returns no problems. Tests: sign-in required, refusals issue no token, suspended accounts get none, 503 without credentials.                                                                                                                                                                                                                                                                                          |
 | 10  | Room, identity and TTL validated                                   | Pass (hardened)        | Callers pass `TOKEN_TTL_SECONDS` (600), database-generated room names (`sm-`/`ps-`/`call-` + random UUID) and the signed-in user's id. The signer now also refuses, as defence in depth, TTLs that are not whole numbers from 1 to 3600 and rooms or identities that are empty, longer than 256 characters or contain control characters.                                                                                                                                                                                                                                                                                                                |
+
+**Browser bundle (checked 2026-11-20).** The web app reads only `VITE_`-prefixed variables (Vite's default `envPrefix`,
+not overridden; no `define`). `npm run test:bundle-secrets` builds the web app with unique dummy values in
+`LIVEKIT_API_SECRET`, `LIVEKIT_API_KEY`, `LIVE_WEBHOOK_DB_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` and fails if any
+appears in `apps/web/dist`. A `VITE_` control value is found, proving the search works; none of the four is found. It
+also fails on any secret-named `VITE_` variable. Both failure paths were checked by mutation (exposing `LIVEKIT_` to Vite;
+adding `VITE_LIVEKIT_SECRET`). It runs in CI's `check` job.
+
+**Randomness of the secret.** RentMate never generates LiveKit credentials: LiveKit Cloud issues them, or
+`livekit-server generate-keys` for self-hosting. The configuration check (32+ characters, 12+ distinct) rejects
+short or obviously patterned values. It cannot prove randomness. Use the generated value unchanged, never a
+hand-typed one.
 
 **Secret strength (found during item 2).** `LIVEKIT_API_SECRET` was accepted at 16 characters of anything. Every member
 receives a token signed with this secret, so a guessable value could be recovered offline from any token and used to forge
