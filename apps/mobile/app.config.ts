@@ -52,8 +52,11 @@ const config: ExpoConfig = {
     [
       "expo-build-properties",
       {
-        // Google Play: new apps and updates must target Android 16 (API 36) since 2026-08-31.
-        android: { compileSdkVersion: 36, targetSdkVersion: 36, minSdkVersion: 24 },
+        // Compile against API 37: Expo SDK 58 / React Native 0.88 libraries are built for it (their AAR metadata
+        // requires compileSdk 37; RN 0.88's version catalog uses compile 37 / target 36 / min 24).
+        // Target stays at API 36, Google Play's requirement since 2026-08-31; moving the target to 37 needs a
+        // separate compatibility and Play policy review.
+        android: { compileSdkVersion: 37, targetSdkVersion: 36, minSdkVersion: 24 },
       },
     ],
   ],

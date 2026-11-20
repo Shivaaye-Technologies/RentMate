@@ -33,7 +33,7 @@ try {
     existsSync(javaDir) &&
       ["MainActivity.kt", "MainApplication.kt"].every((f) => readdirSync(javaDir).includes(f)),
   );
-  check("compileSdk 36", /android\.compileSdkVersion=36\b/.test(props));
+  check("compileSdk 37 (required by Expo SDK 58 libraries)", /android\.compileSdkVersion=37\b/.test(props));
   check("targetSdk 36 (Google Play requirement)", /android\.targetSdkVersion=36\b/.test(props));
   check("minSdk 24", /android\.minSdkVersion=24\b/.test(props));
 

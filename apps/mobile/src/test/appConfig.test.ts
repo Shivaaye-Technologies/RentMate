@@ -58,9 +58,9 @@ describe("Android build settings", () => {
   const buildProps = config.plugins?.find((p) => Array.isArray(p) && p[0] === "expo-build-properties") as
     [string, { android: Record<string, number> }] | undefined;
 
-  it("targets API 36 (Google Play requirement) with compile 36 and min 24", () => {
+  it("compiles against API 37 (Expo SDK 58 libraries), targets API 36 (Google Play) and supports min 24", () => {
     expect(buildProps?.[1].android).toEqual({
-      compileSdkVersion: 36,
+      compileSdkVersion: 37,
       targetSdkVersion: 36,
       minSdkVersion: 24,
     });
