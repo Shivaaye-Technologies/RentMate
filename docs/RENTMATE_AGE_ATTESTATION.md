@@ -94,8 +94,11 @@ Checked by `supabase/tests/age_attestation_abuse.sql` (18 checks, PGlite and rea
 1. Confirm a backup and that the web app at `769a5e3` or later (fail-closed onboarding) is deployed.
 2. Apply migration `20261123140000_age_attestation_enforcement.sql` (after `20261123130000`). This changes no rows and
    leaves the switch off.
-3. Run `docs/ops/require_age_attestation.enable.sql` as the database owner. It refuses to run if the migration is
-   missing and prints the new value.
+3. Run `docs/ops/require_age_attestation.enable.sql` as the database owner (with psql, use `-v ON_ERROR_STOP=1`).
+   It runs in one transaction and stops with an error, changing nothing, if the enforcement migration is missing or
+   if the update does not change exactly one `platform_settings` row. It never creates a missing settings row: if
+   that error appears, stop and check you are on the right database. A missing row already counts as "required"
+   (fail closed) until it is restored in a separate, reviewed step. On success it prints the new value.
 4. Check: sign up a test account in the app (succeeds after the date of birth step); a direct REST insert without a
    declaration is refused; an existing member can still edit their profile.
 
@@ -110,12 +113,12 @@ Checked by `supabase/tests/age_attestation_abuse.sql` (18 checks, PGlite and rea
 
 ## Tests
 
-| Test                                                                   | Where                                                                         |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Staging rules, switch on (27 checks)                                   | `supabase/tests/age_attestation_enforcement.sql` (`npm run test:db`)          |
-| Abuse attempts on both exemptions (18 checks)                          | `supabase/tests/age_attestation_abuse.sql` (`npm run test:db`)                |
-| Staging rehearsal on real PostgreSQL 16 (32 checks, incl. both suites) | `scripts/test-age-attestation-staging.sh` (`npm run test:db:age-staging`, CI) |
-| Declaration rules (22 checks)                                          | `supabase/tests/age_attestation.sql`                                          |
-| Rollback and re-apply                                                  | `npm run test:rollback`                                                       |
-| API 422 mapping (5 tests)                                              | `apps/api/test/ageAttestation.test.ts`                                        |
-| App fails closed (15 unit tests, 17 browser checks)                    | `apps/web/src/onboardingSave.test.ts`, `npm run test:e2e:onboarding`          |
+| Test                                                                                                         | Where                                                                         |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Staging rules, switch on (27 checks)                                                                         | `supabase/tests/age_attestation_enforcement.sql` (`npm run test:db`)          |
+| Abuse attempts on both exemptions (18 checks)                                                                | `supabase/tests/age_attestation_abuse.sql` (`npm run test:db`)                |
+| Staging rehearsal on real PostgreSQL 16 (44 checks, incl. both suites and the enable script's failure cases) | `scripts/test-age-attestation-staging.sh` (`npm run test:db:age-staging`, CI) |
+| Declaration rules (22 checks)                                                                                | `supabase/tests/age_attestation.sql`                                          |
+| Rollback and re-apply                                                                                        | `npm run test:rollback`                                                       |
+| API 422 mapping (5 tests)                                                                                    | `apps/api/test/ageAttestation.test.ts`                                        |
+| App fails closed (15 unit tests, 17 browser checks)                                                          | `apps/web/src/onboardingSave.test.ts`, `npm run test:e2e:onboarding`          |

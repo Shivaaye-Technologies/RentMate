@@ -18,7 +18,10 @@ fail=0
 passed=0
 ok() { echo "ok   $1"; passed=$((passed + 1)); }
 bad() { echo "FAIL $1"; fail=1; }
-cleanup() { "${PSQL[@]}" -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true; }
+cleanup() {
+  "${PSQL[@]}" -d postgres -c "drop database if exists $DB" >/dev/null 2>&1 || true
+  "${PSQL[@]}" -d postgres -c "drop database if exists ${DB}_premig" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
 "${PSQL[@]}" -d postgres -c "create database $DB"
@@ -79,10 +82,53 @@ done
 [ "$(owner 'select require_age_attestation from public.platform_settings')" = "f" ] &&
   ok "the suites left the switch off (rolled back)" || bad "switch left on by a suite"
 
+# ===== Enable script refuses unsafe states and changes nothing =====
+ENABLE=docs/ops/require_age_attestation.enable.sql
+setting_rows() { owner "select count(*) from public.platform_settings"; }
+
+# (a) Enforcement migration not applied: a database built only up to 20261123130000.
+"${PSQL[@]}" -d postgres -c "create database ${DB}_premig"
+{
+  sed -E "s/^create role ([a-z_]+) nologin;/do \$\$ begin create role \1 nologin; exception when duplicate_object then null; end \$\$;/" \
+    supabase/tests/supabase_stubs.sql
+  for f in supabase/migrations/*.sql; do
+    [[ "$(basename "$f")" > "20261123130000_age_attestation.sql" ]] && continue
+    cat "$f"; echo
+  done
+} | "${PSQL[@]}" -d "${DB}_premig" >/dev/null
+expect_err "enable script stops when the enforcement migration is missing" \
+  "\"\${PSQL[@]}\" -d \"${DB}_premig\" -f $ENABLE 2>&1" "Apply migration 20261123140000"
+[ "$("${PSQL[@]}" -d "${DB}_premig" -c 'select require_age_attestation from public.platform_settings')" = "f" ] &&
+  ok "...and leaves require_age_attestation false" || bad "setting changed without the migration"
+
+# (b) Settings row missing: the script must fail, roll back, and not create a row.
+owner "delete from public.platform_settings" >/dev/null
+expect_err "enable script stops when the settings row is missing (psql, ON_ERROR_STOP)" \
+  "\"\${PSQL[@]}\" -d \"$DB\" -f $ENABLE 2>&1" "exactly 1 platform_settings row, but 0 rows"
+[ "$(setting_rows)" = "0" ] && ok "...and does not insert a settings row" || bad "a settings row was created"
+# Without ON_ERROR_STOP (like an editor that keeps going), the aborted transaction must still not commit.
+out=$(psql -X -q -At -d "$DB" -f "$ENABLE" 2>&1 || true)
+if grep -q "exactly 1 platform_settings row" <<<"$out"; then
+  [ "$(setting_rows)" = "0" ] && ok "without ON_ERROR_STOP the error is shown and nothing is committed" ||
+    bad "without ON_ERROR_STOP a row appeared"
+else
+  bad "without ON_ERROR_STOP the error was not shown: $out"
+fi
+[ "$(owner 'select private.age_attestation_required()')" = "t" ] &&
+  ok "with the settings row missing, enforcement stays on (fail closed)" || bad "missing row turned enforcement off"
+expect_err "...so a direct insert without an attestation is still refused" \
+  "as_member $NONE \"insert into public.profiles (id, $PROFILE) values ('$NONE', 'Nina', 30, 'friendship', 18, 60);\"" \
+  "confirm your date of birth"
+# Test setup only (not part of the script): put the settings row back with its defaults.
+owner "insert into public.platform_settings default values" >/dev/null
+[ "$(owner 'select require_age_attestation from public.platform_settings')" = "f" ] &&
+  ok "restored settings row has the default false" || bad "restored default"
+
 # ===== Enable (staging value: true) =====
-"${PSQL[@]}" -d "$DB" -f docs/ops/require_age_attestation.enable.sql >/dev/null
+expect_ok "enable script succeeds with exactly one settings row" "\"\${PSQL[@]}\" -d \"$DB\" -f $ENABLE"
 [ "$(owner 'select require_age_attestation from public.platform_settings')" = "t" ] &&
   ok "enable script sets require_age_attestation = true" || bad "enable script"
+[ "$(setting_rows)" = "1" ] && ok "still exactly one settings row" || bad "settings row count changed"
 
 # ===== Rules =====
 expect_err "direct REST insert without an attestation is refused" \
@@ -143,7 +189,9 @@ expect_ok "the demo seed still runs with the requirement on (reserved demo accou
   ok "every demo profile belongs to a reserved demo account" || bad "non-reserved demo profile"
 
 # ===== Disable: previous behaviour returns =====
-"${PSQL[@]}" -d "$DB" -f docs/ops/require_age_attestation.disable.sql >/dev/null
+expect_ok "disable script runs" "\"\${PSQL[@]}\" -d \"$DB\" -f docs/ops/require_age_attestation.disable.sql"
+[ "$(owner 'select require_age_attestation from public.platform_settings')" = "f" ] &&
+  ok "disable script sets require_age_attestation = false" || bad "disable script"
 expect_ok "after the disable script, a profile without an attestation is created as before" \
   "as_member $NONE \"insert into public.profiles (id, $PROFILE) values ('$NONE', 'Nina', 30, 'friendship', 18, 60);\""
 
