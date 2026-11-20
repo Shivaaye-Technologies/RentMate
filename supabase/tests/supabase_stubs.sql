@@ -20,7 +20,8 @@ create table auth.users (
   is_anonymous boolean not null default false
 );
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid;
+  -- Like Supabase's own auth.uid(): an empty claims setting (left behind after a transaction-local set) means no user.
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'sub', '')::uuid;
 $$;
 -- Supabase Auth: the JWT claims (aal = assurance level), MFA factors and sessions.
 create function auth.jwt() returns jsonb language sql stable as $$
