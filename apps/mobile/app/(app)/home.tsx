@@ -1,37 +1,26 @@
 import { Link, Redirect, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { supabase } from "../../src/lib/supabase";
+import { profileDb } from "../../src/lib/data";
+import { declarationStatus, type DeclarationStatus } from "../../src/lib/shared";
 import { Body, Button, Notice, Screen, Title } from "../../src/ui";
-
-type Gate = "checking" | "declared" | "needs-declaration" | { error: string };
 
 /**
  * Signed-in home. Before anything else the member must have recorded their date of birth and 18+ declaration
- * (my_age_attestation). If that cannot be checked, the app stops here (fails closed) and offers a retry.
+ * (shared declarationStatus → my_age_attestation). If that cannot be checked, the app stops here (fails closed) and
+ * offers a retry.
  */
 export default function Home() {
-  const [gate, setGate] = useState<Gate>("checking");
+  const [gate, setGate] = useState<DeclarationStatus | "checking">("checking");
 
   const check = useCallback(() => {
-    if (!supabase) return;
+    if (!profileDb) return;
     setGate("checking");
-    void Promise.resolve(supabase.rpc("my_age_attestation"))
-      .then(({ data, error }) => {
-        if (error) {
-          // Function missing: the member still has to declare; the declaration screen fails closed with a message.
-          if (error.code === "PGRST202") return setGate("needs-declaration");
-          return setGate({ error: "We couldn't check your account. Check your connection and try again." });
-        }
-        setGate(Array.isArray(data) && data.length > 0 ? "declared" : "needs-declaration");
-      })
-      .catch(() =>
-        setGate({ error: "We couldn't check your account. Check your connection and try again." }),
-      );
+    void declarationStatus(profileDb).then(setGate);
   }, []);
 
   useFocusEffect(check);
 
-  if (gate === "needs-declaration") return <Redirect href="/declare-age" />;
+  if (gate === "missing") return <Redirect href="/declare-age" />;
   return (
     <Screen>
       <Title>Welcome to RentMate</Title>

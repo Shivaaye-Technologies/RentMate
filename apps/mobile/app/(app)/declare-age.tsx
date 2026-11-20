@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { declareAdult, isoDate } from "../../src/lib/declareAdult";
-import { supabase } from "../../src/lib/supabase";
+import { profileDb } from "../../src/lib/data";
 import { Body, Button, Checkbox, Field, Notice, Screen, Title } from "../../src/ui";
 
 /** Mandatory date of birth + 18+ declaration (attest_adult). Recorded once; a self-declaration, not verification. */
@@ -15,16 +15,11 @@ export default function DeclareAge() {
   const [problem, setProblem] = useState<{ message: string; field?: "date" | "confirm" } | null>(null);
 
   async function submit() {
-    if (!supabase) return;
-    const client = supabase;
+    if (!profileDb) return;
     setBusy(true);
     setProblem(null);
     const birth = isoDate(day, month, year);
-    const result = await declareAdult(
-      (args) => client.rpc("attest_adult", args),
-      birth || "invalid",
-      confirmed,
-    );
+    const result = await declareAdult(profileDb, birth || "invalid", confirmed);
     setBusy(false);
     if (!result.ok) return setProblem(result);
     router.replace("/home");

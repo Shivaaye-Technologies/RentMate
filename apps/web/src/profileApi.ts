@@ -1,33 +1,13 @@
 import type { ProfileRow } from "./profile";
+import { saveProfileFields as saveFields, supabaseProfileDb } from "./shared/profileData";
 import { supabase } from "./supabase";
-import { POLICY_TEXT_BLOCKED } from "./safety";
 
-/** True when the database doesn't have a column yet (migration not applied). */
-export function isMissingColumn(err: { code?: string; message?: string } | null | undefined): boolean {
-  if (!err) return false;
-  return (
-    err.code === "PGRST204" ||
-    err.code === "42703" ||
-    /could not find the '.*' column|column .* does not exist/i.test(err.message ?? "")
-  );
-}
-
-/** Message for a failed profile save that people can act on. */
-export function saveErrorMessage(err: { code?: string; message?: string }): string {
-  if (isMissingColumn(err)) {
-    return "This part of your profile can't be saved yet because a database update is still pending. Your other details are safe.";
-  }
-  if (/RentMate does not allow/i.test(err.message ?? "")) return POLICY_TEXT_BLOCKED;
-  if (err.code === "23514")
-    return "One of the values isn't allowed. Check the highlighted fields and try again.";
-  if (/row-level security/i.test(err.message ?? "")) return "You can only change your own profile.";
-  return `Could not save: ${err.message ?? "unknown error"}`;
-}
+// The rules live in the shared data layer (also used by the Android app); this binds them to the web client.
+export { isMissingColumn, saveErrorMessage } from "./shared/profileData";
 
 export type ProfilePatch = Partial<Omit<ProfileRow, "id" | "created_at" | "verified" | "last_seen_at">>;
 
 /** Saves some of your own profile fields. RLS only allows your own row. */
 export async function saveProfileFields(userId: string, patch: ProfilePatch): Promise<void> {
-  const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
-  if (error) throw new Error(saveErrorMessage(error));
+  await saveFields(supabaseProfileDb(supabase), userId, patch);
 }

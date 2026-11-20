@@ -4,16 +4,15 @@
  * (missing function, permission, sign-in, network, database or anything unexpected) stops here, the profile is not
  * created and onboarding is not completed, and the member can try again.
  *
- * This records a self-declaration ("self_declared"), not age or identity verification.
+ * The sequence lives in the shared data layer (./shared/profileData.ts), which the Android app uses too; this binds it
+ * to the web Supabase client. This records a self-declaration ("self_declared"), not age or identity verification.
  */
-import { isMissingColumn, saveErrorMessage } from "./profileApi";
-import { supabase } from "./supabase";
-
 import {
-  ATTESTATION_FAILED,
-  attestationErrorMessage,
-  type AttestationDbError as DbError,
-} from "./attestation";
+  attestThenCreateProfile as attestThenCreate,
+  supabaseProfileDb,
+  type CreateProfileResult,
+} from "./shared/profileData";
+import { supabase } from "./supabase";
 
 export {
   ATTESTATION_FAILED,
@@ -22,15 +21,13 @@ export {
   attestationErrorMessage,
 } from "./attestation";
 
-export type OnboardingSaveResult =
-  | { ok: true; row: Record<string, unknown>; partial: boolean }
-  | { ok: false; stage: "attestation" | "profile"; message: string };
+export type OnboardingSaveResult = CreateProfileResult;
 
 /**
  * Records the age declaration, then creates the profile. `onCreated` (which marks onboarding as saved) runs only
  * after both succeed.
  */
-export async function attestThenCreateProfile(
+export function attestThenCreateProfile(
   input: {
     userId: string;
     birthDate: string;
@@ -40,33 +37,5 @@ export async function attestThenCreateProfile(
   },
   onCreated: (row: Record<string, unknown>, partial: boolean) => void,
 ): Promise<OnboardingSaveResult> {
-  let attested: { data: unknown; error: DbError };
-  try {
-    attested = await supabase.rpc("attest_adult", {
-      p_birth_date: input.birthDate,
-      p_confirm: input.adultConfirmed,
-    });
-  } catch {
-    return { ok: false, stage: "attestation", message: ATTESTATION_FAILED };
-  }
-  if (attested.error) {
-    return { ok: false, stage: "attestation", message: attestationErrorMessage(attested.error) };
-  }
-  // attest_adult returns the member's age; anything else means it did not confirm an adult.
-  if (typeof attested.data !== "number" || attested.data < 18) {
-    return { ok: false, stage: "attestation", message: ATTESTATION_FAILED };
-  }
-
-  const row: Record<string, unknown> = { id: input.userId, ...input.coreRow, ...input.detailsRow };
-  let { error } = await supabase.from("profiles").upsert(row);
-  let partial = false;
-  if (error && isMissingColumn(error)) {
-    // The details columns aren't in the database yet: save the essentials so the member can start.
-    ({ error } = await supabase.from("profiles").upsert({ id: input.userId, ...input.coreRow }));
-    partial = true;
-  }
-  if (error) return { ok: false, stage: "profile", message: saveErrorMessage(error) };
-  const created: Record<string, unknown> = partial ? { id: input.userId, ...input.coreRow } : row;
-  onCreated(created, partial);
-  return { ok: true, row: created, partial };
+  return attestThenCreate(supabaseProfileDb(supabase), input, onCreated);
 }

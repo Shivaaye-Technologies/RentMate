@@ -21,3 +21,15 @@ export {
   looksLikeExistingAccount,
   passwordProblem,
 } from "../../../web/src/auth";
+export {
+  attestAdult,
+  attestThenCreateProfile,
+  DECLARATION_CHECK_FAILED,
+  declarationStatus,
+  isMissingColumn,
+  saveErrorMessage,
+  saveProfileFields,
+  supabaseProfileDb,
+  type DeclarationStatus,
+  type ProfileDb,
+} from "../../../web/src/shared/profileData";
