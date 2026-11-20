@@ -168,5 +168,7 @@ jobs:
         run: npm test
       - name: App config resolves (package id, SDK 36, permissions)
         run: npm run -s config > /dev/null
+      - name: Native Android project (expo prebuild) has the approved package id, SDK 36, deep links, no extra permissions
+        run: npm run check:native
       - name: Android bundle has no server secrets (also proves the Android JavaScript bundle builds)
         run: npm run check:bundle-secrets
