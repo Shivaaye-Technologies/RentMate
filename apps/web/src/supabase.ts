@@ -12,9 +12,12 @@ export const supabase = createClient(url || "http://localhost:54321", key || "mi
   auth: { persistSession: true, autoRefreshToken: true },
 });
 
-/** Signed links last an hour; refresh them a few minutes early. */
-export const SIGNED_URL_SECONDS = 60 * 60;
-const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+/**
+ * Signed photo links are valid for 10 minutes (P2-04): after a block, a hidden profile or an unmatch, links already
+ * handed out stop working soon. The cache refreshes a link 2 minutes before it expires.
+ */
+export const SIGNED_URL_SECONDS = 10 * 60;
+const REFRESH_MARGIN_MS = 2 * 60 * 1000;
 
 type CacheEntry = { url: string; expiresAt: number } | Promise<string | null>;
 const cache = new Map<string, CacheEntry>();

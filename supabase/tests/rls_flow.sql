@@ -107,9 +107,12 @@ begin
   insert into storage.objects (bucket_id, name) values ('photos', a::text || '/me.jpg');
   r := r || 'ok upload to own folder; ';
   begin insert into storage.objects (bucket_id, name) values ('photos', b::text || '/x.jpg'); r := r||'FAIL upload other folder; '; exception when others then r := r||'ok cannot upload to others folder; '; end;
+  -- Since 20261123110000_photo_privacy.sql only published photos are readable by others (P2-04), so publish me.jpg
+  -- first. Unpublished uploads staying private is tested in photo_privacy.sql (this suite also runs after rollbacks).
+  update public.profiles set photo_path = a::text || '/me.jpg' where id = a;
   perform set_config('request.jwt.claims', json_build_object('sub',c,'role','authenticated')::text, true);
   select count(*) into n from storage.objects where bucket_id = 'photos' and name = a::text || '/me.jpg';
-  r := r || case when n = 1 then 'ok signed-in member can read photo; ' else 'FAIL photo read; ' end;
+  r := r || case when n = 1 then 'ok signed-in member can read a published photo; ' else 'FAIL photo read; ' end;
   select not public into ok from storage.buckets where id = 'photos';
   r := r || case when ok then 'ok photos bucket private; ' else 'FAIL photos bucket public; ' end;
 
