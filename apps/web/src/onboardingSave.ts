@@ -9,34 +9,18 @@
 import { isMissingColumn, saveErrorMessage } from "./profileApi";
 import { supabase } from "./supabase";
 
-type DbError = { code?: string; message?: string; status?: number } | null | undefined;
+import {
+  ATTESTATION_FAILED,
+  attestationErrorMessage,
+  type AttestationDbError as DbError,
+} from "./attestation";
 
-export const ATTESTATION_UNAVAILABLE =
-  "Age confirmation is temporarily unavailable, so your profile wasn't created. Please try again later.";
-export const ATTESTATION_SIGN_IN = "Your session has ended. Please sign in again, then continue.";
-export const ATTESTATION_FAILED =
-  "We couldn't confirm your age right now, so your profile wasn't created. Please check your connection and try again.";
-
-const SIGN_IN_CODES = new Set(["28000", "42501", "PGRST301", "PGRST302", "PGRST303"]);
-// Errors raised by attest_adult itself, with messages written for members (under 18, missing confirmation,
-// invalid date, date already recorded).
-const MEMBER_MESSAGE_CODES = new Set(["P0001", "22023"]);
-
-/** A safe message for a failed attest_adult call. Raw database errors are never shown. */
-export function attestationErrorMessage(err: NonNullable<DbError>): string {
-  const code = err.code ?? "";
-  if (code === "PGRST202") return ATTESTATION_UNAVAILABLE;
-  if (
-    SIGN_IN_CODES.has(code) ||
-    err.status === 401 ||
-    err.status === 403 ||
-    /jwt|permission denied|not authenticated|please sign in/i.test(err.message ?? "")
-  ) {
-    return ATTESTATION_SIGN_IN;
-  }
-  if (MEMBER_MESSAGE_CODES.has(code) && err.message) return err.message;
-  return ATTESTATION_FAILED;
-}
+export {
+  ATTESTATION_FAILED,
+  ATTESTATION_SIGN_IN,
+  ATTESTATION_UNAVAILABLE,
+  attestationErrorMessage,
+} from "./attestation";
 
 export type OnboardingSaveResult =
   | { ok: true; row: Record<string, unknown>; partial: boolean }
