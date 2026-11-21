@@ -202,12 +202,12 @@ export default function Profile() {
       if (asset.fileSize && asset.fileSize > 25 * 1024 * 1024) {
         throw new Error("That photo is over 25 MB. Choose a smaller image.");
       }
-      const longest = Math.max(asset.width, asset.height);
-      const actions =
-        longest > 1080
-          ? [{ resize: asset.width >= asset.height ? { width: 1080 } : { height: 1080 } }]
-          : [];
-      const processed = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+      const context = ImageManipulator.ImageManipulator.manipulate(asset.uri, {
+        maxWidth: 1080,
+        maxHeight: 1080,
+      });
+      const rendered = await context.renderAsync();
+      const processed = await rendered.saveAsync({
         compress: 0.85,
         format: ImageManipulator.SaveFormat.JPEG,
       });
