@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { Link, type Href, useFocusEffect } from "expo-router";
 import { Image, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { useSession } from "../../src/session";
 import { apiRequest, API_ROUTES, ApiError } from "../../src/lib/api";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
@@ -41,6 +43,9 @@ export default function Profile() {
   const [ageMin, setAgeMin] = useState("21");
   const [ageMax, setAgeMax] = useState("35");
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +84,9 @@ export default function Profile() {
           return urlData.signedUrl;
         }),
       );
-      setPhotoUrls(signed.filter((url): url is string => !!url));
+      const visiblePhotos = signed.flatMap((url, index) => (url ? [{ path: paths[index], url }] : []));
+      setPhotoPaths(visiblePhotos.map((item) => item.path));
+      setPhotoUrls(visiblePhotos.map((item) => item.url));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load your profile.");
     } finally {
@@ -222,24 +229,53 @@ export default function Profile() {
 
       <View style={{ gap: 10 }}>
         <Title>Profile photos</Title>
+        <Body muted>{photoPaths.length} of 6 photos. The first photo is your main photo.</Body>
         {photoUrls.length ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {photoUrls.map((uri) => (
-              <Image
-                key={uri}
-                source={{ uri }}
-                accessibilityLabel="Your private profile photo"
-                style={{ width: 104, height: 132, borderRadius: 14, backgroundColor: c.card }}
-              />
+            {photoUrls.map((uri, index) => (
+              <View key={photoPaths[index] ?? uri} style={{ gap: 4 }}>
+                <Image
+                  source={{ uri }}
+                  accessibilityLabel="Your private profile photo"
+                  style={{ width: 104, height: 132, borderRadius: 14, backgroundColor: c.card }}
+                />
+                <Button
+                  label={index === 0 ? "Main photo" : "Make main"}
+                  kind={index === 0 ? "plain" : "primary"}
+                  disabled={photoBusy || index === 0}
+                  onPress={() => {
+                    const next = [...photoPaths];
+                    const [selected] = next.splice(index, 1);
+                    next.unshift(selected);
+                    setPhotoBusy(true);
+                    void savePhotoPaths(next)
+                      .then(() => setMessage("Main photo updated."))
+                      .catch((e) => setPhotoError(e instanceof Error ? e.message : "Could not reorder photos."))
+                      .finally(() => setPhotoBusy(false));
+                  }}
+                />
+                <Button
+                  label="Remove"
+                  kind="plain"
+                  disabled={photoBusy}
+                  onPress={() => void removePhoto(photoPaths[index])}
+                />
+              </View>
             ))}
           </View>
         ) : (
           <Body muted>No profile photos have been added yet.</Body>
         )}
+        {photoError ? <Notice kind="error">{photoError}</Notice> : null}
+        <Button
+          label={photoBusy ? "Please wait…" : "Add a photo"}
+          onPress={() => void addPhoto()}
+          busy={photoBusy}
+          disabled={photoBusy || photoPaths.length >= 6 || loading}
+        />
         <Notice kind="info">
-          Your photos are stored in the private photos bucket and displayed with short-lived signed links.
-          Photo selection and upload need the Expo image-picker native module, which is not yet installed in
-          this app build.
+          Photos are resized to at most 1080 pixels on the longest edge, re-encoded as JPEG to remove location
+          metadata, and uploaded to your own folder in private Supabase Storage. Signed links expire after 10 minutes.
         </Notice>
       </View>
 
