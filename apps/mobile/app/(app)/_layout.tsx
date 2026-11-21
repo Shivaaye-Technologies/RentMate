@@ -2,8 +2,8 @@ import { Tabs } from "expo-router";
 import { Text } from "react-native";
 import { usePalette } from "../../src/ui";
 
-function TabIcon({ symbol, color }: { symbol: string; color: string | null | undefined }) {
-  return <Text style={{ color: color ?? "#888888", fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
+function TabIcon({ symbol, color }: { symbol: string; color: string }) {
+  return <Text style={{ color, fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
 }
 
 export default function AppLayout() {
@@ -24,12 +24,12 @@ export default function AppLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
-      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarIcon: ({ color }) => <TabIcon symbol="⌕" color={color} /> }} />
-      <Tabs.Screen name="vibes" options={{ title: "Vibes", tabBarIcon: ({ color }) => <TabIcon symbol="◉" color={color} /> }} />
+      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarIcon: ({ focused }) => <TabIcon symbol="⌕" color={focused ? c.accent : c.muted} /> }} />
+      <Tabs.Screen name="vibes" options={{ title: "Vibes", tabBarIcon: ({ focused }) => <TabIcon symbol="◉" color={focused ? c.accent : c.muted} /> }} />
       <Tabs.Screen name="wallet" options={{ href: null, title: "Wallet" }} />
-      <Tabs.Screen name="likes" options={{ title: "Likes", tabBarIcon: ({ color }) => <TabIcon symbol="♡" color={color} /> }} />
-      <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: ({ color }) => <TabIcon symbol="▤" color={color} /> }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color }) => <TabIcon symbol="◎" color={color} /> }} />
+      <Tabs.Screen name="likes" options={{ title: "Likes", tabBarIcon: ({ focused }) => <TabIcon symbol="♡" color={focused ? c.accent : c.muted} /> }} />
+      <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: ({ focused }) => <TabIcon symbol="▤" color={focused ? c.accent : c.muted} /> }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ focused }) => <TabIcon symbol="◎" color={focused ? c.accent : c.muted} /> }} />
       <Tabs.Screen name="home" options={{ href: null }} />
       <Tabs.Screen name="live" options={{ href: null, title: "Live social" }} />
       <Tabs.Screen name="companions" options={{ href: null, title: "Companionship" }} />
