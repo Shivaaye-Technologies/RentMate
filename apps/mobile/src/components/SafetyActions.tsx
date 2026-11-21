@@ -16,9 +16,7 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function report(
-    reason: "fake" | "inappropriate" | "harassment" | "underage" | "scam" | "other",
-  ) {
+  async function report(reason: "fake" | "inappropriate" | "harassment" | "underage" | "scam" | "other") {
     if (!supabase || busy) return;
     setBusy(true);
     setError(null);
@@ -92,14 +90,10 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
 
   function confirmUnmatch() {
     if (!matchId) return;
-    Alert.alert(
-      "Unmatch this member?",
-      "Your match and its conversation will be removed.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Unmatch", style: "destructive", onPress: () => void unmatch() },
-      ],
-    );
+    Alert.alert("Unmatch this member?", "Your match and its conversation will be removed.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unmatch", style: "destructive", onPress: () => void unmatch() },
+    ]);
   }
 
   async function unmatch() {
@@ -123,28 +117,10 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
       {error ? <Notice kind="error">{error}</Notice> : null}
       {message ? <Notice kind="info">{message}</Notice> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        <Button
-          label="Report"
-          kind="plain"
-          busy={busy}
-          disabled={busy}
-          onPress={chooseReportReason}
-        />
-        <Button
-          label="Block"
-          kind="plain"
-          busy={busy}
-          disabled={busy}
-          onPress={confirmBlock}
-        />
+        <Button label="Report" kind="plain" busy={busy} disabled={busy} onPress={chooseReportReason} />
+        <Button label="Block" kind="plain" busy={busy} disabled={busy} onPress={confirmBlock} />
         {matchId ? (
-          <Button
-            label="Unmatch"
-            kind="plain"
-            busy={busy}
-            disabled={busy}
-            onPress={confirmUnmatch}
-          />
+          <Button label="Unmatch" kind="plain" busy={busy} disabled={busy} onPress={confirmUnmatch} />
         ) : null}
       </View>
     </View>
