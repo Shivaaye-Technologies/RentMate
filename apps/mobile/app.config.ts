@@ -51,7 +51,7 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission: "Allow RentMate to choose profile photos.",
-        cameraPermission: "Allow RentMate to take profile photos.",
+        cameraPermission: false,
         microphonePermission: false,
       },
     ],
