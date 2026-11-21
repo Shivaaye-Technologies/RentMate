@@ -37,7 +37,6 @@ const config: ExpoConfig = {
       "android.permission.ACCESS_FINE_LOCATION",
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_BACKGROUND_LOCATION",
-      "android.permission.CAMERA",
       "android.permission.RECORD_AUDIO",
       "android.permission.READ_CONTACTS",
       "android.permission.READ_EXTERNAL_STORAGE",
@@ -50,8 +49,8 @@ const config: ExpoConfig = {
     [
       "expo-image-picker",
       {
-        photosPermission: "Allow RentMate to let you choose profile photos.",
-        cameraPermission: false,
+        photosPermission: "Allow RentMate to choose profile photos.",
+        cameraPermission: "Allow RentMate to take profile photos.",
         microphonePermission: false,
       },
     ],
