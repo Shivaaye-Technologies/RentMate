@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
@@ -11,6 +11,8 @@ type Message = { id: string; match_id: string; sender_id: string; body: string; 
 type Thread = { matchId: string; personId: string; name: string; age: number; photo: string | null; last: Message | null };
 export default function Chat() {
   const c = usePalette();
+  const params = useLocalSearchParams<{ matchId?: string | string[] }>();
+  const requestedMatchId = Array.isArray(params.matchId) ? params.matchId[0] : params.matchId;
   const [threads, setThreads] = useState<Thread[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [active, setActive] = useState<Thread | null>(null);
@@ -49,6 +51,14 @@ export default function Chat() {
     finally { setBusy(false); }
   }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => {
+    if (!requestedMatchId) return;
+    const thread = threads.find(item => item.matchId === requestedMatchId);
+    if (!thread) return;
+    setError(null);
+    setMessages([]);
+    setActive(thread);
+  }, [requestedMatchId, threads]);
   useEffect(() => {
     if (!active || !supabase) return;
     let cancelled = false;

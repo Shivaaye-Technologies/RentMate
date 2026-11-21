@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
@@ -15,6 +15,7 @@ type Tile = { id: string; name: string; age: number; photo: string | null; verif
 
 export default function Likes() {
   const c = usePalette();
+  const router = useRouter();
   const [tab, setTab] = useState<"received" | "sent" | "matches">("received");
   const [received, setReceived] = useState<Tile[]>([]);
   const [sent, setSent] = useState<Tile[]>([]);
@@ -76,13 +77,17 @@ export default function Likes() {
     </View>
     {error ? <Notice kind="error">{error}</Notice> : null}
     {!busy && !error && rows.length === 0 ? <Body muted>{empty}</Body> : null}
-    {rows.map(person => <View key={person.matchId ?? person.id} style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 12, borderRadius: 18, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}>
+    {rows.map(person => <Pressable key={person.matchId ?? person.id} onPress={() => {
+      if (tab === "matches" && person.matchId) {
+        router.push({ pathname: "/(app)/chat", params: { matchId: person.matchId } });
+      }
+    }} style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 12, borderRadius: 18, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}>
       {person.photo ? <Image source={{ uri: person.photo }} style={{ width: 72, height: 84, borderRadius: 12 }} /> : <View style={{ width: 72, height: 84, borderRadius: 12, backgroundColor: c.border, alignItems: "center", justifyContent: "center" }}><Text style={{ color: c.text, fontSize: 28 }}>{person.name.slice(0,1).toUpperCase()}</Text></View>}
       <View style={{ flex: 1, gap: 5 }}>
         <Text style={{ color: c.text, fontSize: 17, fontWeight: "700" }}>{person.name}, {person.age} {person.verified ? "✓" : ""}</Text>
         <Text style={{ color: c.muted }}>{person.online ? "Active now" : person.super ? "Super Like" : tab === "matches" ? "It's a match" : "Like"}</Text>
         {person.message ? <Text style={{ color: c.text }} numberOfLines={2}>“{person.message}”</Text> : null}
       </View>
-    </View>)}
+    </Pressable>)}
   </Screen>;
 }
