@@ -19,8 +19,14 @@ export default function AuthCallback() {
   }, []);
 
   if (state === "done") return <Redirect href="/home" />;
-  return <Screen>
-    <Title>Signing you in</Title>
-    {state === "working" ? <Body muted>Completing secure Google sign-in…</Body> : <Notice kind="error">{state.error}</Notice>}
-  </Screen>;
+  return (
+    <Screen>
+      <Title>Signing you in</Title>
+      {state === "working" ? (
+        <Body muted>Completing secure Google sign-in…</Body>
+      ) : (
+        <Notice kind="error">{state.error}</Notice>
+      )}
+    </Screen>
+  );
 }

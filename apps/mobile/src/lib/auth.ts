@@ -52,7 +52,8 @@ export async function completeOAuthLink(
   const linkError = one(params.error_description);
   if (linkError) return fail({ message: linkError });
   const code = one(params.code);
-  if (!code) return { ok: false, message: "Google sign-in was cancelled or the link expired. Please try again." };
+  if (!code)
+    return { ok: false, message: "Google sign-in was cancelled or the link expired. Please try again." };
   try {
     const { error } = await client.auth.exchangeCodeForSession(code);
     return error ? fail(error) : { ok: true };

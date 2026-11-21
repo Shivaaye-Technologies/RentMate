@@ -31,10 +31,15 @@ export default function SignIn() {
   return (
     <Screen>
       <Title>Welcome to RentMate</Title>
-      <Body muted>Sign in securely with your Google account. RentMate is for adults (18+) meeting in non-sexual public and social settings.</Body>
+      <Body muted>
+        Sign in securely with your Google account. RentMate is for adults (18+) meeting in non-sexual public
+        and social settings.
+      </Body>
       {error ? <Notice kind="error">{error}</Notice> : null}
       <Button label="Continue with Google" onPress={() => void continueWithGoogle()} busy={busy} />
-      <Body muted>We use Google to verify your sign-in. Your Google password is never shared with RentMate.</Body>
+      <Body muted>
+        We use Google to verify your sign-in. Your Google password is never shared with RentMate.
+      </Body>
     </Screen>
   );
 }

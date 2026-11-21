@@ -3,7 +3,10 @@ import { completeOAuthLink, signInWithGoogle, type AuthClient } from "../lib/aut
 
 function fakeAuth(over: Partial<AuthClient["auth"]> = {}) {
   const auth = {
-    signInWithOAuth: vi.fn(async () => ({ data: { url: "https://example.supabase.co/auth/v1/authorize?provider=google" }, error: null })),
+    signInWithOAuth: vi.fn(async () => ({
+      data: { url: "https://example.supabase.co/auth/v1/authorize?provider=google" },
+      error: null,
+    })),
     exchangeCodeForSession: vi.fn(async () => ({ error: null })),
     ...over,
   };
