@@ -203,7 +203,7 @@ export default function Likes() {
           key={person.matchId ?? person.id}
           onPress={() => {
             if (tab === "matches" && person.matchId) {
-              router.push({ pathname: "/(app)/chat", params: { matchId: person.matchId } });
+              router.push({ pathname: "/chat", params: { matchId: person.matchId } });
             }
           }}
           style={{
