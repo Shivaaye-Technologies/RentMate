@@ -113,7 +113,7 @@ export default function Profile() {
     setSaving(true);
     try {
       await apiRequest({
-        base: apiBaseUrl,
+        base: apiBaseUrl(),
         token: session.access_token,
         method: "PUT",
         path: API_ROUTES.profile,
