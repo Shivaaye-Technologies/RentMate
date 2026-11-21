@@ -26,6 +26,7 @@ export default function AppLayout() {
     >
       <Tabs.Screen name="discover" options={{ title: "Discover", tabBarIcon: ({ color }) => <TabIcon symbol="⌕" color={color} /> }} />
       <Tabs.Screen name="vibes" options={{ title: "Vibes", tabBarIcon: ({ color }) => <TabIcon symbol="◉" color={color} /> }} />
+      <Tabs.Screen name="wallet" options={{ href: null, title: "Wallet" }} />
       <Tabs.Screen name="likes" options={{ title: "Likes", tabBarIcon: ({ color }) => <TabIcon symbol="♡" color={color} /> }} />
       <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: ({ color }) => <TabIcon symbol="▤" color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color }) => <TabIcon symbol="◎" color={color} /> }} />
