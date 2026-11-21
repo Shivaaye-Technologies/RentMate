@@ -3,19 +3,13 @@ import { Body, Button, Screen, Title } from "../../src/ui";
 export default function Profile() {
   return (
     <Screen>
-      <Title>My RentMate profile</Title>
-      <Body>Manage the information people see when they discover you.</Body>
-      <Body>
-        Next profile milestone: editable photos, introduction, interests, languages, activities, dating
-        preferences and companion availability.
-      </Body>
-      <Body>
-        Verification must be clearly distinguished from the 18+ self-declaration. A date-of-birth declaration
-        is not identity verification.
-      </Body>
-      <Link href="/settings" asChild>
-        <Button label="Account and privacy settings" onPress={() => undefined} />
-      </Link>
+      <Title>Your profile</Title>
+      <Body>Show people what makes you, you. Add a friendly introduction, interests and the activities you enjoy.</Body>
+      <Title>Profile completion</Title>
+      <Body muted>Photo management and profile editing will be enabled when the mobile profile editor is connected to the existing secure profile API.</Body>
+      <Link href="/(app)/companions" asChild><Button label="Companionship options" onPress={() => undefined} /></Link>
+      <Link href="/(app)/nearby" asChild><Button label="Nearby and activities" kind="plain" onPress={() => undefined} /></Link>
+      <Link href="/(app)/settings" asChild><Button label="Settings and safety" kind="plain" onPress={() => undefined} /></Link>
     </Screen>
   );
 }
