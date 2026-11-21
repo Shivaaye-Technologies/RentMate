@@ -4,27 +4,24 @@ import { profileDb } from "../../src/lib/data";
 import { declarationStatus, type DeclarationStatus } from "../../src/lib/shared";
 import { Body, Button, Notice, Screen, Title } from "../../src/ui";
 
-/**
- * Signed-in home. Before anything else the member must have recorded their date of birth and 18+ declaration
- * (shared declarationStatus → my_age_attestation). If that cannot be checked, the app stops here (fails closed) and
- * offers a retry.
- */
+/** Signed-in staging home. Age declaration is checked before any member feature is shown. */
 export default function Home() {
   const [gate, setGate] = useState<DeclarationStatus | "checking">("checking");
-
   const check = useCallback(() => {
     if (!profileDb) return;
     setGate("checking");
     void declarationStatus(profileDb).then(setGate);
   }, []);
-
   useFocusEffect(check);
 
-  if (gate === "missing") return <Redirect href="/declare-age" />;
+  if (gate === "missing") return <Redirect href="/(app)/declare-age" />;
+
   return (
     <Screen>
-      <Title>Welcome to RentMate</Title>
-      {gate === "checking" ? <Body muted>Checking your account…</Body> : null}
+      <Title>RentMate</Title>
+      <Title>Nobody should have to feel alone.</Title>
+      <Body>Meet people, make friends, find lawful companionship and join live social conversations.</Body>
+      {gate === "checking" ? <Body muted>Checking your 18+ declaration…</Body> : null}
       {typeof gate === "object" ? (
         <>
           <Notice kind="error">{gate.error}</Notice>
@@ -33,18 +30,30 @@ export default function Home() {
       ) : null}
       {gate === "declared" ? (
         <>
-          <Body>
-            This is an early Android build. Profiles, discovery, messages, calls and public bookings are being
-            added step by step.
-          </Body>
           <Body muted>
-            Meetings on RentMate are non-sexual and happen in public, social places. 18+ only.
+            Adults 18+ only. Companionship is non-sexual and limited to lawful social activities.
           </Body>
+          <Title>Explore RentMate</Title>
+          <Link href="/(app)/discover" asChild>
+            <Button label="Discover people" onPress={() => undefined} />
+          </Link>
+          <Link href="/(app)/companions" asChild>
+            <Button label="Find or offer companionship" onPress={() => undefined} />
+          </Link>
+          <Link href="/(app)/live" asChild>
+            <Button label="Live social rooms" onPress={() => undefined} />
+          </Link>
+          <Link href="/(app)/nearby" asChild>
+            <Button label="Nearby and activities" kind="plain" onPress={() => undefined} />
+          </Link>
+          <Link href="/(app)/profile" asChild>
+            <Button label="My profile" kind="plain" onPress={() => undefined} />
+          </Link>
+          <Link href="/(app)/settings" asChild>
+            <Button label="Settings and safety" kind="plain" onPress={() => undefined} />
+          </Link>
         </>
       ) : null}
-      <Link href="/settings" asChild>
-        <Button label="Settings" kind="plain" onPress={() => undefined} />
-      </Link>
     </Screen>
   );
 }

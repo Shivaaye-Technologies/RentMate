@@ -1,6 +1,5 @@
 /**
- * Supabase client for Android: the same project and Auth as the web, with the session kept in Android Keystore
- * (expo-secure-store, chunked), PKCE for email links, and token refresh paused while the app is in the background.
+ * Supabase client for Android. Sessions are stored in Android Keystore using SecureStore and PKCE is used for Google OAuth.
  */
 import "react-native-url-polyfill/auto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -24,7 +23,6 @@ const storage = createChunkedStorage({
   deleteItemAsync: (k) => SecureStore.deleteItemAsync(k),
 });
 
-/** Null when the build is missing its public configuration (the app then shows a configuration message). */
 export const supabase: SupabaseClient | null = configResult.ok
   ? createClient(configResult.config.supabaseUrl, configResult.config.supabaseKey, {
       auth: {
@@ -39,7 +37,6 @@ export const supabase: SupabaseClient | null = configResult.ok
 
 export const apiBaseUrl = configResult.ok ? configResult.config.apiUrl : "";
 
-// Refresh tokens only while the app is in the foreground (Supabase's guidance for React Native).
 if (supabase) {
   AppState.addEventListener("change", (state) => {
     if (state === "active") void supabase.auth.startAutoRefresh();
