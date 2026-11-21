@@ -183,20 +183,34 @@ export default function Profile() {
     await refreshPhotoUrls(unique);
   }
 
-  async function addPhoto() {
+  async function addPhoto(source: "camera" | "library") {
     const client = supabase;
     if (photoBusy || photoPaths.length >= 6 || !client || !session?.user?.id) return;
     setPhotoBusy(true);
     setPhotoError(null);
     let uploadedPath: string | null = null;
     try {
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 1,
-        exif: false,
-        selectionLimit: 1,
-      });
+      let picked: ImagePicker.ImagePickerResult;
+      if (source === "camera") {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error("Camera access is needed to take a profile photo. Allow it in Android Settings.");
+        }
+        picked = await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          allowsEditing: false,
+          quality: 1,
+          exif: false,
+        });
+      } else {
+        picked = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: false,
+          quality: 1,
+          exif: false,
+          selectionLimit: 1,
+        });
+      }
       if (picked.canceled || !picked.assets[0]) return;
       const asset = picked.assets[0];
       if (asset.fileSize && asset.fileSize > 25 * 1024 * 1024) {
@@ -212,12 +226,12 @@ export default function Profile() {
         format: ImageManipulator.SaveFormat.JPEG,
       });
       const response = await fetch(processed.uri);
-      if (!response.ok) throw new Error("Couldn't read the selected photo.");
+      if (!response.ok) throw new Error("Could not read the selected photo.");
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (bytes.byteLength > 5 * 1024 * 1024) {
         throw new Error("Photo is too large after processing. Choose a smaller image.");
       }
-      const path = `${session.user.id}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}.jpg`;
+      const path = session.user.id + "/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + ".jpg";
       const { error: uploadError } = await client.storage.from("photos").upload(path, bytes, {
         contentType: "image/jpeg",
         upsert: false,
@@ -328,37 +342,43 @@ export default function Profile() {
         <Title>Profile photos</Title>
         <Body muted>{photoPaths.length} of 6 photos. The first photo is your main photo.</Body>
         {photoUrls.length ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {photoUrls.map((uri, index) => (
-              <View key={photoPaths[index] ?? uri} style={{ gap: 4 }}>
+              <View key={photoPaths[index] ?? uri} style={{ width: 148, gap: 6 }}>
                 <Image
                   source={{ uri }}
                   accessibilityLabel="Your private profile photo"
-                  style={{ width: 104, height: 132, borderRadius: 14, backgroundColor: c.card }}
+                  style={{ width: "100%", height: 176, borderRadius: 14, backgroundColor: c.card }}
                 />
-                <Button
-                  label={index === 0 ? "Main photo" : "Make main"}
-                  kind={index === 0 ? "plain" : "primary"}
-                  disabled={photoBusy || index === 0}
-                  onPress={() => {
-                    const next = [...photoPaths];
-                    const [selected] = next.splice(index, 1);
-                    next.unshift(selected);
-                    setPhotoBusy(true);
-                    void savePhotoPaths(next)
-                      .then(() => setMessage("Main photo updated."))
-                      .catch((e) =>
-                        setPhotoError(e instanceof Error ? e.message : "Could not reorder photos."),
-                      )
-                      .finally(() => setPhotoBusy(false));
-                  }}
-                />
-                <Button
-                  label="Remove"
-                  kind="plain"
-                  disabled={photoBusy}
-                  onPress={() => void removePhoto(photoPaths[index])}
-                />
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      label={index === 0 ? "Main" : "Make main"}
+                      kind={index === 0 ? "plain" : "primary"}
+                      disabled={photoBusy || index === 0}
+                      onPress={() => {
+                        const next = [...photoPaths];
+                        const [selected] = next.splice(index, 1);
+                        next.unshift(selected);
+                        setPhotoBusy(true);
+                        void savePhotoPaths(next)
+                          .then(() => setMessage("Main photo updated."))
+                          .catch((e) =>
+                            setPhotoError(e instanceof Error ? e.message : "Could not reorder photos."),
+                          )
+                          .finally(() => setPhotoBusy(false));
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      label="Remove"
+                      kind="plain"
+                      disabled={photoBusy}
+                      onPress={() => void removePhoto(photoPaths[index])}
+                    />
+                  </View>
+                </View>
               </View>
             ))}
           </View>
@@ -366,12 +386,24 @@ export default function Profile() {
           <Body muted>No profile photos have been added yet.</Body>
         )}
         {photoError ? <Notice kind="error">{photoError}</Notice> : null}
-        <Button
-          label={photoBusy ? "Please wait…" : "Add a photo"}
-          onPress={() => void addPhoto()}
-          busy={photoBusy}
-          disabled={photoBusy || photoPaths.length >= 6 || loading}
-        />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Take a photo"
+              onPress={() => void addPhoto("camera")}
+              busy={photoBusy}
+              disabled={photoBusy || photoPaths.length >= 6 || loading}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Choose from gallery"
+              kind="plain"
+              onPress={() => void addPhoto("library")}
+              disabled={photoBusy || photoPaths.length >= 6 || loading}
+            />
+          </View>
+        </View>
         <Notice kind="info">
           Photos are resized to at most 1080 pixels on the longest edge, re-encoded as JPEG to remove location
           metadata, and uploaded to your own folder in private Supabase Storage. Signed links expire after 10
