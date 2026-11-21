@@ -84,7 +84,7 @@ export default function Discover() {
               .insert({ liker_id: me, liked_id: person.id, is_super: false, message: null });
       if (result.error) throw new Error(result.error.message);
       setFeedback(kind === "like" ? "Like sent." : "Profile passed.");
-      setIndex((v) => Math.min(v + 1, Math.max(0, items.length - 1)));
+      setIndex((v) => v + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That action could not be saved.");
     } finally {
