@@ -53,10 +53,14 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
   }
 
   function confirmBlock() {
-    Alert.alert("Block this member?", "They will no longer appear in discovery or your match conversations.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Block member", style: "destructive", onPress: () => void block() },
-    ]);
+    Alert.alert(
+      "Block this member?",
+      "They will no longer appear in discovery or your match conversations.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Block member", style: "destructive", onPress: () => void block() },
+      ],
+    );
   }
 
   async function block() {

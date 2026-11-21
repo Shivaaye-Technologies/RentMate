@@ -39,11 +39,7 @@ export default function AppLayout() {
   if (gate === "checking") {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
-        <ActivityIndicator
-          accessibilityLabel="Checking your age declaration"
-          color={c.accent}
-          size="large"
-        />
+        <ActivityIndicator accessibilityLabel="Checking your age declaration" color={c.accent} size="large" />
       </View>
     );
   }
