@@ -16,8 +16,14 @@ export interface AuthClient {
   };
 }
 
-export type AuthResult = { ok: true } | { ok: false; message?: string };
-const fail = (e: unknown): AuthResult => ({ ok: false, message: classifyAuthError(e as AuthErr).message });
+export const AUTH_CALLBACK_PATH = "auth/callback";
+
+export type AuthFailure = { ok: false; message?: string };
+export type AuthResult = { ok: true } | AuthFailure;
+const fail = (e: unknown): AuthFailure => ({
+  ok: false,
+  message: classifyAuthError(e as AuthErr).message,
+});
 
 /** Starts Google OAuth. The caller opens the returned Supabase authorization URL in the system browser. */
 export async function signInWithGoogle(
