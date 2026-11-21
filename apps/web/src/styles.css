@@ -4188,6 +4188,7 @@ li.unread {
 }
 
 /* ---------- RentMate warm, Happn-inspired visual refresh ---------- */
+:root { --display: "DM Serif Display", Georgia, serif; --body: "DM Sans", system-ui, sans-serif; }
 :root:not([data-theme="dark"]) {
   --bg: #fff8f6; --surface: #ffffff; --surface-2: #fff0ed; --surface-3: #ffe1dc;
   --text: #262020; --text-muted: #827574; --line: #f1dfdc; --line-strong: #e8c9c4;
