@@ -95,7 +95,7 @@ export default function Chat() {
       </Pressable>)}
     </> : <>
       <View style={{ minHeight: 260, gap: 10 }}>
-        {messages.map(m => <View key={m.id} style={{ alignSelf: m.sender_id === myId ? "flex-end" : "flex-start", maxWidth: "88%", padding: 12, borderRadius: 16, backgroundColor: m.sender_id === active.personId ? c.card : c.accent }}>
+        {messages.map(m => <View key={m.id} style={{ alignSelf: m.sender_id === myId ? "flex-end" : "flex-start", maxWidth: "88%", padding: 12, borderRadius: 16, backgroundColor: m.sender_id === myId ? c.accent : c.card }}>
           <Text style={{ color: m.sender_id === myId ? c.onAccent : c.text }}>{m.body}</Text>
           <Text style={{ color: m.sender_id === myId ? c.onAccent : c.muted, fontSize: 10, marginTop: 4 }}>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
         </View>)}
