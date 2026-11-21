@@ -3,8 +3,8 @@
    (html[data-theme="light"|"dark"]). */
 :root {
   --radius: 22px;
-  --display: "Cormorant Garamond", Georgia, serif;
-  --body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "DM Serif Display", Georgia, serif;
+  --body: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Legacy names kept so older rules keep working */
   --cream: var(--bg);
   --paper: var(--surface);
@@ -17,23 +17,23 @@
   --yellow: var(--accent);
   --sky: var(--info-tint);
   --coral: var(--rose);
-  --bg: #f6f6f4;
+  --bg: #fff8f6;
   --surface: #ffffff;
-  --surface-2: #efefec;
-  --surface-3: #e2e2de;
-  --text: #121212;
-  --text-muted: #5c5c58;
-  --line: #e2e2de;
-  --line-strong: #c4c4bf;
-  --accent: #121212;
-  --accent-strong: #000000;
-  --accent-deep: #3d3d3d;
+  --surface-2: #fff0ed;
+  --surface-3: #ffe1dc;
+  --text: #262020;
+  --text-muted: #827574;
+  --line: #f1dfdc;
+  --line-strong: #e8c9c4;
+  --accent: #f45168;
+  --accent-strong: #df3552;
+  --accent-deep: #b92e49;
   --on-accent: #ffffff;
-  --accent-tint: #e9e9e6;
+  --accent-tint: #fff0f2;
   --success: #1f8a43;
   --success-tint: #e3f3e8;
   --info-tint: #e8eef5;
-  --rose: #d6455e;
+  --rose: #f45168;
   --danger: #c8283f;
   --info-bg: #e8eef5;
   --info-ink: #1d4c80;
@@ -4188,147 +4188,3 @@ li.unread {
 }
 
 
-/* ---------- RentMate warm, Happn-inspired visual refresh ---------- */
-:root {
-  --display: "DM Serif Display", Georgia, serif;
-  --body: "DM Sans", system-ui, sans-serif;
-}
-
-:root:not([data-theme="dark"]) {
-  --bg: #fff8f6;
-  --surface: #ffffff;
-  --surface-2: #fff0ed;
-  --surface-3: #ffe1dc;
-  --text: #262020;
-  --text-muted: #827574;
-  --line: #f1dfdc;
-  --line-strong: #e8c9c4;
-  --accent: #f45168;
-  --accent-strong: #df3552;
-  --accent-deep: #b92e49;
-  --on-accent: #ffffff;
-  --accent-tint: #fff0f2;
-  --rose: #f45168;
-  --shadow: rgba(92, 39, 42, 0.12);
-}
-
-:root:not([data-theme="dark"]) body {
-  background: var(--bg);
-}
-
-.brand {
-  letter-spacing: -0.035em;
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.brand .logo-mark {
-  border-radius: 12px;
-  box-shadow: 0 5px 14px rgba(244, 81, 104, 0.24);
-}
-
-.topbar {
-  padding: 14px 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
-}
-
-.topbar .btn.small {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 9px 14px;
-  font-size: 12px;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 3px 10px rgba(92, 39, 42, 0.04);
-}
-
-.topbar .btn.small:first-of-type {
-  border-color: #ffd0d7;
-  color: #d83d58;
-  background: #fff0f2;
-}
-
-.tabbar {
-  border: 1px solid rgba(241, 223, 220, 0.9);
-  box-shadow: 0 12px 34px rgba(92, 39, 42, 0.14);
-  backdrop-filter: blur(18px);
-}
-
-.tabbar button {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.tabbar button.active {
-  background: linear-gradient(135deg, #f45168, #e83e60);
-  color: #fff;
-}
-
-.btn.dark {
-  background: linear-gradient(135deg, #f45168, #e83e60);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 7px 18px rgba(244, 81, 104, 0.2);
-}
-
-.btn {
-  border-radius: 999px;
-}
-
-.panel,
-.crush-card,
-.tile {
-  border-radius: 24px;
-}
-
-.crush-card {
-  overflow: hidden;
-  box-shadow: 0 12px 34px rgba(92, 39, 42, 0.09);
-  border: 1px solid var(--line);
-}
-
-.crush-head {
-  padding: 14px 4px;
-}
-
-.crush-photo {
-  border-radius: 22px;
-  overflow: hidden;
-}
-
-.action-bar .act {
-  box-shadow: 0 7px 20px rgba(92, 39, 42, 0.12);
-}
-
-.action-bar .act.like {
-  background: linear-gradient(135deg, #f45168, #e83e60);
-  color: #fff;
-}
-
-.tile {
-  overflow: hidden;
-  box-shadow: 0 6px 18px rgba(92, 39, 42, 0.08);
-}
-
-.mood.active,
-.chip.toggle.on {
-  background: #fff0f2;
-  color: #d83d58;
-  border-color: #ffd0d7;
-}
-
-@media (max-width: 520px) {
-  .topbar {
-    padding: 12px 14px;
-  }
-
-  .shell {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .tabbar {
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    width: calc(100% - 20px);
-  }
-}
