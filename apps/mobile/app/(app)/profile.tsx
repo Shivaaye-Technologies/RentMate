@@ -102,7 +102,14 @@ export default function Profile() {
     const max = Number(ageMax.trim());
     const nameValue = name.trim();
     const bioValue = bio.trim();
-    const interestValues = [...new Set(interests.split(",").map((v) => v.trim()).filter(Boolean))];
+    const interestValues = [
+      ...new Set(
+        interests
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean),
+      ),
+    ];
     if (nameValue.length < 2 || nameValue.length > 40) return setError("Name must be 2–40 characters.");
     if (!Number.isInteger(parsedAge) || parsedAge < 18 || parsedAge > 100)
       return setError("Your profile age must be between 18 and 100.");
@@ -157,13 +164,7 @@ export default function Profile() {
       <View style={{ gap: 12 }}>
         <Title>About you</Title>
         <Field label="Display name" value={name} onChangeText={setName} maxLength={40} />
-        <Field
-          label="Age"
-          value={age}
-          onChangeText={setAge}
-          keyboardType="number-pad"
-          maxLength={3}
-        />
+        <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
         <Field
           label="Introduction"
           value={bio}
@@ -237,8 +238,8 @@ export default function Profile() {
         )}
         <Notice kind="info">
           Your photos are stored in the private photos bucket and displayed with short-lived signed links.
-          Photo selection and upload need the Expo image-picker native module, which is not yet installed in this
-          app build.
+          Photo selection and upload need the Expo image-picker native module, which is not yet installed in
+          this app build.
         </Notice>
       </View>
 
