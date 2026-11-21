@@ -119,14 +119,8 @@ export default function Discover() {
               justifyContent: "center",
             }}
           >
-            {person.photoPath || person.photos?.[0] ? (
-              <View style={{ alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 64 }}>♡</Text>
-                <Text style={{ color: "#6D294B", fontWeight: "700" }}>Profile photo</Text>
-                <Text style={{ color: "#6D294B", fontSize: 12 }}>
-                  Private photo access will be connected here
-                </Text>
-              </View>
+            {photoUrl ? (
+              <Image source={{ uri: photoUrl }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
             ) : (
               <Text style={{ fontSize: 84, color: "#9D426D" }}>
                 {(person.displayName ?? "R").slice(0, 1).toUpperCase()}
@@ -180,7 +174,7 @@ export default function Discover() {
             )}
             <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
               <Pressable
-                onPress={() => void advance("pass")}
+                disabled={actionBusy}\n                onPress={() => void advance("pass")}
                 style={{
                   flex: 1,
                   borderWidth: 1,
@@ -194,7 +188,7 @@ export default function Discover() {
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: "700" }}>× Pass</Text>
               </Pressable>
               <Pressable
-                onPress={() => void advance("like")}
+                disabled={actionBusy}\n                onPress={() => void advance("like")}
                 style={{
                   flex: 1,
                   backgroundColor: c.accent,
