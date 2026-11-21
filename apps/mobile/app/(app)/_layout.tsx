@@ -1,6 +1,10 @@
-import { Tabs } from "expo-router";
-import { Text } from "react-native";
-import { usePalette } from "../../src/ui";
+import { useCallback, useEffect, useState } from "react";
+import { Redirect, Tabs } from "expo-router";
+import { ActivityIndicator, Text, View } from "react-native";
+import { useSession } from "../../src/session";
+import { profileDb } from "../../src/lib/data";
+import { declarationStatus, type DeclarationStatus } from "../../src/lib/shared";
+import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 function TabIcon({ symbol, color }: { symbol: string; color: string }) {
   return <Text style={{ color, fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
@@ -8,6 +12,54 @@ function TabIcon({ symbol, color }: { symbol: string; color: string }) {
 
 export default function AppLayout() {
   const c = usePalette();
+  const { ready, session } = useSession();
+  const [gate, setGate] = useState<DeclarationStatus | "checking">("checking");
+
+  const checkDeclaration = useCallback(async () => {
+    if (!profileDb || !session) return;
+    setGate("checking");
+    setGate(await declarationStatus(profileDb));
+  }, [session]);
+
+  useEffect(() => {
+    if (!ready || !session) return;
+    let active = true;
+    setGate("checking");
+    void declarationStatus(profileDb!).then((result) => {
+      if (active) setGate(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ready, session?.user.id]);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
+        <ActivityIndicator accessibilityLabel="Loading RentMate" color={c.accent} size="large" />
+      </View>
+    );
+  }
+  if (!session) return <Redirect href="/sign-in" />;
+  if (gate === "checking") {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
+        <ActivityIndicator accessibilityLabel="Checking your age declaration" color={c.accent} size="large" />
+      </View>
+    );
+  }
+  if (gate === "missing") return <Redirect href="/declare-age" />;
+  if (typeof gate === "object") {
+    return (
+      <Screen>
+        <Title>We couldn't verify your declaration</Title>
+        <Notice kind="error">{gate.error}</Notice>
+        <Body>Access stays locked until RentMate can confirm your 18+ declaration.</Body>
+        <Button label="Try again" onPress={() => void checkDeclaration()} />
+      </Screen>
+    );
+  }
+
   return (
     <Tabs
       screenOptions={{
