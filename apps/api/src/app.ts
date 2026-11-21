@@ -16,7 +16,7 @@ import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
-export const SERVICE_NAME = "soulmate-api";
+export const SERVICE_NAME = "rentmate-api";
 
 /** Public route documentation served at GET /. Keep in sync with the routes below. */
 export const ROUTES = [
