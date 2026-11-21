@@ -33,6 +33,22 @@
         "buildType": "apk"
       },
       "environment": "development"
+    },
+    "staging": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "environment": "development"
+    },
+    "Staging": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "environment": "development"
     }
   },
   "submit": {
