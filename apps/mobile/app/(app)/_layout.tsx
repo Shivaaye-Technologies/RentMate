@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Stack, Tabs, useSegments } from "expo-router";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useSession } from "../../src/session";
 import { profileDb } from "../../src/lib/data";
@@ -13,6 +13,8 @@ function TabIcon({ symbol, color }: { symbol: string; color: string }) {
 export default function AppLayout() {
   const c = usePalette();
   const { ready, session } = useSession();
+  const segments = useSegments();
+  const isDeclarationRoute = segments[segments.length - 1] === "declare-age";
   const [gate, setGate] = useState<DeclarationStatus | "checking">("checking");
 
   const checkDeclaration = useCallback(async () => {
@@ -40,16 +42,20 @@ export default function AppLayout() {
       </View>
     );
   }
-  if (gate === "missing") return <Redirect href="/declare-age" />;
-  if (typeof gate === "object") {
+  if (gate === "missing" && !isDeclarationRoute) return <Redirect href="/declare-age" />;
+  if (typeof gate === "object" && !isDeclarationRoute) {
     return (
       <Screen>
         <Title>We couldn't verify your declaration</Title>
         <Notice kind="error">{gate.error}</Notice>
         <Body>Access stays locked until RentMate can confirm your 18+ declaration.</Body>
         <Button label="Try again" onPress={() => void checkDeclaration()} />
+        <Button label="Continue to date-of-birth declaration" kind="plain" onPress={() => undefined} />
       </Screen>
     );
+  }
+  if (gate !== "declared") {
+    return <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="declare-age" /></Stack>;
   }
 
   return (
