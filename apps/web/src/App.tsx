@@ -689,6 +689,12 @@ function Home({ session }: { session: Session }) {
           RentMate
         </span>
         <span className="topbar-actions">
+          <a className="btn small" href="#live" aria-label="Open live streams">
+            Live
+          </a>
+          <a className="btn small" href="#companions" aria-label="Find companions">
+            Meet
+          </a>
           <button
             className={noticesOpen ? "bell-btn active" : "bell-btn"}
             aria-label={unseen > 0 ? `Notifications, ${unseen} new` : "Notifications"}
