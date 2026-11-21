@@ -24,12 +24,42 @@ export default function AppLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
-      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarIcon: ({ focused }) => <TabIcon symbol="⌕" color={focused ? c.accent : c.muted} /> }} />
-      <Tabs.Screen name="vibes" options={{ title: "Vibes", tabBarIcon: ({ focused }) => <TabIcon symbol="◉" color={focused ? c.accent : c.muted} /> }} />
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: "Discover",
+          tabBarIcon: ({ focused }) => <TabIcon symbol="⌕" color={focused ? c.accent : c.muted} />,
+        }}
+      />
+      <Tabs.Screen
+        name="vibes"
+        options={{
+          title: "Vibes",
+          tabBarIcon: ({ focused }) => <TabIcon symbol="◉" color={focused ? c.accent : c.muted} />,
+        }}
+      />
       <Tabs.Screen name="wallet" options={{ href: null, title: "Wallet" }} />
-      <Tabs.Screen name="likes" options={{ title: "Likes", tabBarIcon: ({ focused }) => <TabIcon symbol="♡" color={focused ? c.accent : c.muted} /> }} />
-      <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: ({ focused }) => <TabIcon symbol="▤" color={focused ? c.accent : c.muted} /> }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ focused }) => <TabIcon symbol="◎" color={focused ? c.accent : c.muted} /> }} />
+      <Tabs.Screen
+        name="likes"
+        options={{
+          title: "Likes",
+          tabBarIcon: ({ focused }) => <TabIcon symbol="♡" color={focused ? c.accent : c.muted} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          tabBarIcon: ({ focused }) => <TabIcon symbol="▤" color={focused ? c.accent : c.muted} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ focused }) => <TabIcon symbol="◎" color={focused ? c.accent : c.muted} />,
+        }}
+      />
       <Tabs.Screen name="home" options={{ href: null }} />
       <Tabs.Screen name="live" options={{ href: null, title: "Live social" }} />
       <Tabs.Screen name="companions" options={{ href: null, title: "Companionship" }} />
