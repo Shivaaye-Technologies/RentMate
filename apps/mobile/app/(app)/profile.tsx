@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, type Href, useFocusEffect } from "expo-router";
 import { Image, Text, View } from "react-native";
 import { useSession } from "../../src/session";
 import { apiRequest, API_ROUTES, ApiError } from "../../src/lib/api";
@@ -51,10 +51,11 @@ export default function Profile() {
       setError("Please sign in again to manage your profile.");
       return;
     }
+    const client = supabase;
     setLoading(true);
     setError(null);
     try {
-      const { data, error: queryError } = await supabase.rpc("get_my_profile").maybeSingle();
+      const { data, error: queryError } = await client.rpc("get_my_profile").maybeSingle();
       if (queryError) throw new Error("We couldn't load your profile. Check your connection and try again.");
       const row = (data as ProfileRow | null) ?? emptyProfile;
       setName(row.display_name ?? "");
@@ -71,7 +72,7 @@ export default function Profile() {
       );
       const signed = await Promise.all(
         paths.slice(0, 6).map(async (path) => {
-          const { data: urlData, error: urlError } = await supabase.storage
+          const { data: urlData, error: urlError } = await client.storage
             .from("photos")
             .createSignedUrl(path, 60 * 30);
           if (urlError) return null;
@@ -113,7 +114,7 @@ export default function Profile() {
     setSaving(true);
     try {
       await apiRequest({
-        base: apiBaseUrl(),
+        base: apiBaseUrl,
         token: session.access_token,
         method: "PUT",
         path: API_ROUTES.profile,
@@ -241,7 +242,7 @@ export default function Profile() {
         </Notice>
       </View>
 
-      <Link href="/(app)/wallet" asChild>
+      <Link href={"/(app)/wallet" as Href} asChild>
         <Button label="Wallet & tokens" onPress={() => undefined} />
       </Link>
       <Link href="/(app)/companions" asChild>
