@@ -79,7 +79,7 @@ export default function Profile() {
         paths.slice(0, 6).map(async (path) => {
           const { data: urlData, error: urlError } = await client.storage
             .from("photos")
-            .createSignedUrl(path, 60 * 30);
+            .createSignedUrl(path, 10 * 60);
           if (urlError) return null;
           return urlData.signedUrl;
         }),
