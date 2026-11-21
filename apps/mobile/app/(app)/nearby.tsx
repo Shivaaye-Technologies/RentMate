@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, type Href } from "expo-router";
 import { View, Text } from "react-native";
 import { Body, Button, Screen, Title, usePalette } from "../../src/ui";
 export default function Nearby() {
@@ -17,7 +17,7 @@ export default function Nearby() {
       <Body>• Location is optional and off until you choose to share it.</Body>
       <Body>• Approximate distance only. Exact coordinates are never shown to other members.</Body>
       <Body>• No background tracking or automatic location history.</Body>
-      <Link href="/(app)/vibes" asChild><Button label="Explore community vibes" onPress={() => undefined} /></Link>
+      <Link href={"/(app)/vibes" as Href} asChild><Button label="Explore community vibes" onPress={() => undefined} /></Link>
     </Screen>
   );
 }
