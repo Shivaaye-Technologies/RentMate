@@ -1,21 +1,42 @@
-import { Body, Screen, Title } from "../../src/ui";
+import { Link, type Href } from "expo-router";
+import { View, Text } from "react-native";
+import { Body, Button, Screen, Title, usePalette } from "../../src/ui";
 export default function Nearby() {
+  const c = usePalette();
   return (
     <Screen>
-      <Title>Nearby</Title>
+      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>AROUND YOU</Text>
+      <Title>Nearby & activities</Title>
       <Body>
-        Discover public activities and people in your chosen area, with location sharing under your control.
+        Discover public activities and people in your chosen area, while keeping your exact location private.
       </Body>
-      <Title>Your privacy comes first</Title>
-      <Body>
-        Location permission will be optional. RentMate should show approximate distance only, never expose
-        exact coordinates, and allow you to pause visibility.
-      </Body>
-      <Body>Recent crossings require mutual opt-in. Background tracking is not enabled in this build.</Body>
-      <Body muted>
-        Nearby map and activity discovery are still being connected. No location is being collected on this
-        screen.
-      </Body>
+      <View
+        style={{
+          minHeight: 190,
+          borderRadius: 24,
+          backgroundColor: c.card,
+          borderColor: c.border,
+          borderWidth: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 22,
+          gap: 8,
+        }}
+      >
+        <Text style={{ fontSize: 42 }}>⌖</Text>
+        <Text style={{ color: c.text, fontSize: 18, fontWeight: "700" }}>Your map is waiting</Text>
+        <Text style={{ color: c.muted, textAlign: "center" }}>
+          Map tiles and nearby activity results will appear after optional location permission and the
+          privacy-safe nearby API are connected.
+        </Text>
+      </View>
+      <Title>Privacy first</Title>
+      <Body>• Location is optional and off until you choose to share it.</Body>
+      <Body>• Approximate distance only. Exact coordinates are never shown to other members.</Body>
+      <Body>• No background tracking or automatic location history.</Body>
+      <Link href={"/(app)/vibes" as Href} asChild>
+        <Button label="Explore community vibes" onPress={() => undefined} />
+      </Link>
     </Screen>
   );
 }

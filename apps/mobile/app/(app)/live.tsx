@@ -1,10 +1,18 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
+import { View, Text } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
-import { Body, Button, Notice, Screen, Title } from "../../src/ui";
-
-type Stream = { id: string; title?: string; status?: string; category?: string; viewerCount?: number };
+import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
+type Stream = {
+  id: string;
+  title?: string;
+  stageName?: string;
+  status?: string;
+  category?: string;
+  explicit?: boolean;
+};
 export default function Live() {
+  const c = usePalette();
   const [rooms, setRooms] = useState<Stream[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -20,16 +28,10 @@ export default function Live() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const body = await response.json();
-      if (!response.ok)
-        throw new Error(
-          body.error ??
-            (response.status === 503
-              ? "Live rooms are not enabled on this staging server yet."
-              : "Could not load live rooms."),
-        );
-      setRooms(Array.isArray(body.streams) ? body.streams : []);
-      if (!Array.isArray(body.streams) || body.streams.length === 0)
-        setMessage("No live rooms are available right now.");
+      if (!response.ok) throw new Error(body.error ?? "Could not load live rooms.");
+      const safe = Array.isArray(body.streams) ? body.streams.filter((x: Stream) => !x.explicit) : [];
+      setRooms(safe);
+      if (!safe.length) setMessage("No live rooms are available right now. Check back later.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not load live rooms.");
     } finally {
@@ -43,23 +45,38 @@ export default function Live() {
   );
   return (
     <Screen>
-      <Title>Live social</Title>
-      <Body>
-        Join moderated conversations about music, travel, hobbies, sport and everyday life. You can listen
-        without speaking.
+      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>RENTMATE LIVE</Text>
+      <Title>Live social rooms</Title>
+      <Body>Real conversations, shared interests and positive community energy.</Body>
+      <Body muted>
+        Only permitted, non-explicit social rooms are shown. Joining is subject to server-side safety checks.
       </Body>
-      <Body muted>Voice and video participation is opt-in. No recording by default.</Body>
       {message ? <Notice kind="info">{message}</Notice> : null}
       {rooms.map((room) => (
-        <Body key={room.id}>
-          {room.title ?? "Live room"} · {room.status ?? "Available"}
-        </Body>
+        <View
+          key={room.id}
+          style={{
+            padding: 18,
+            borderRadius: 20,
+            backgroundColor: c.card,
+            borderColor: c.border,
+            borderWidth: 1,
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: c.text, fontSize: 18, fontWeight: "700" }}>
+            {room.title || "Community room"}
+          </Text>
+          <Text style={{ color: c.muted }}>
+            {room.stageName || "RentMate host"} · {room.category || "Social"} · {room.status || "Scheduled"}
+          </Text>
+          <Body muted>
+            Room discovery is available. Media join is only enabled after the native LiveKit client and
+            permissions are configured.
+          </Body>
+        </View>
       ))}
-      <Button label="Refresh live rooms" onPress={() => void load()} busy={busy} />
-      <Body muted>
-        Hosting, speaker requests and video joining will be enabled only after the provider and moderation
-        controls pass staging tests.
-      </Body>
+      <Button label="Refresh rooms" onPress={() => void load()} busy={busy} />
     </Screen>
   );
 }

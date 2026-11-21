@@ -47,6 +47,14 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Allow RentMate to let you choose profile photos.",
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     // Keystore-encrypted session values cannot be decrypted after a restore, so they are excluded from backups.
     ["expo-secure-store", { configureAndroidBackup: true }],
     [
