@@ -1,6 +1,4 @@
-import { Link } from "expo-router";
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { Link, useCallback, useFocusEffect, useState } from "expo-router";
 import { Image, Text, View } from "react-native";
 import { useSession } from "../../src/session";
 import { apiRequest, API_ROUTES, ApiError } from "../../src/lib/api";
@@ -34,7 +32,6 @@ const emptyProfile: ProfileRow = {
 export default function Profile() {
   const c = usePalette();
   const { session } = useSession();
-  const [profile, setProfile] = useState<ProfileRow>(emptyProfile);
   const [name, setName] = useState("");
   const [age, setAge] = useState("18");
   const [bio, setBio] = useState("");
@@ -59,7 +56,6 @@ export default function Profile() {
       const { data, error: queryError } = await supabase.rpc("get_my_profile").maybeSingle();
       if (queryError) throw new Error("We couldn't load your profile. Check your connection and try again.");
       const row = (data as ProfileRow | null) ?? emptyProfile;
-      setProfile(row);
       setName(row.display_name ?? "");
       setAge(String(row.age ?? 18));
       setBio(row.bio ?? "");
@@ -130,16 +126,6 @@ export default function Profile() {
           ageMax: max,
         },
       });
-      setProfile((current) => ({
-        ...current,
-        display_name: nameValue,
-        age: parsedAge,
-        bio: bioValue,
-        interests: interestValues,
-        looking_for: lookingFor,
-        age_min: min,
-        age_max: max,
-      }));
       setMessage("Your profile has been saved.");
     } catch (e) {
       const failure = e instanceof ApiError ? e.failure : null;
