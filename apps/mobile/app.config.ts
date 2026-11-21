@@ -34,6 +34,7 @@ const config: ExpoConfig = {
     // Calls will add CAMERA and RECORD_AUDIO; push will add POST_NOTIFICATIONS; location stays optional.
     permissions: [],
     blockedPermissions: [
+      "android.permission.CAMERA",
       "android.permission.ACCESS_FINE_LOCATION",
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_BACKGROUND_LOCATION",
