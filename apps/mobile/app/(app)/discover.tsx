@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { Image, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
