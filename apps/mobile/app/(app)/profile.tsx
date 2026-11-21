@@ -160,7 +160,9 @@ export default function Profile() {
     if (!client) throw new Error("Please sign in again to manage your photos.");
     const signed = await Promise.all(
       paths.map(async (path) => {
-        const { data, error: signedError } = await client.storage.from("photos").createSignedUrl(path, 10 * 60);
+        const { data, error: signedError } = await client.storage
+          .from("photos")
+          .createSignedUrl(path, 10 * 60);
         return signedError ? null : { path, url: data.signedUrl };
       }),
     );
@@ -342,7 +344,9 @@ export default function Profile() {
                     setPhotoBusy(true);
                     void savePhotoPaths(next)
                       .then(() => setMessage("Main photo updated."))
-                      .catch((e) => setPhotoError(e instanceof Error ? e.message : "Could not reorder photos."))
+                      .catch((e) =>
+                        setPhotoError(e instanceof Error ? e.message : "Could not reorder photos."),
+                      )
                       .finally(() => setPhotoBusy(false));
                   }}
                 />
@@ -367,7 +371,8 @@ export default function Profile() {
         />
         <Notice kind="info">
           Photos are resized to at most 1080 pixels on the longest edge, re-encoded as JPEG to remove location
-          metadata, and uploaded to your own folder in private Supabase Storage. Signed links expire after 10 minutes.
+          metadata, and uploaded to your own folder in private Supabase Storage. Signed links expire after 10
+          minutes.
         </Notice>
       </View>
 
