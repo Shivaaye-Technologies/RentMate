@@ -1,60 +1,40 @@
-import { Link } from "expo-router";
 import { useState } from "react";
-import { signIn, type FieldErrors } from "../../src/lib/auth";
-import { authClient } from "../../src/lib/authClient";
-import { Body, Button, Field, Notice, Screen, Title } from "../../src/ui";
+import { Linking } from "react-native";
+import { signInWithGoogle } from "../../src/lib/auth";
+import { authClient, callbackUrl } from "../../src/lib/authClient";
+import { Body, Button, Notice, Screen, Title } from "../../src/ui";
 
 export default function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [fields, setFields] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (!authClient) return;
+  async function continueWithGoogle() {
+    if (!authClient || busy) return;
     setBusy(true);
     setError(null);
-    const r = await signIn(authClient, email, password);
-    setBusy(false);
-    // On success the session listener moves the member into the app.
-    if (!r.ok) {
-      setFields(r.fields ?? {});
-      setError(r.message ?? null);
+    const result = await signInWithGoogle(authClient, callbackUrl());
+    if (!result.ok) {
+      setError(result.message ?? "Unable to start Google sign-in.");
+      setBusy(false);
+      return;
     }
+    try {
+      await Linking.openURL(result.url);
+    } catch {
+      setError("Could not open Google sign-in. Check your browser and try again.");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
   }
 
   return (
     <Screen>
-      <Title>Welcome back</Title>
-      <Body muted>RentMate is for adults (18+) who want to meet people in public, social settings.</Body>
-      <Field
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        error={fields.email}
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        textContentType="emailAddress"
-      />
-      <Field
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        error={fields.password}
-        secureTextEntry
-        autoComplete="current-password"
-        textContentType="password"
-      />
+      <Title>Welcome to RentMate</Title>
+      <Body muted>Sign in securely with your Google account. RentMate is for adults (18+) meeting in non-sexual public and social settings.</Body>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <Button label="Sign in" onPress={() => void submit()} busy={busy} />
-      <Link href="/forgot-password" asChild>
-        <Button label="Forgot your password?" kind="plain" onPress={() => undefined} />
-      </Link>
-      <Link href="/sign-up" asChild>
-        <Button label="Create an account" kind="plain" onPress={() => undefined} />
-      </Link>
+      <Button label="Continue with Google" onPress={() => void continueWithGoogle()} busy={busy} />
+      <Body muted>We use Google to verify your sign-in. Your Google password is never shared with RentMate.</Body>
     </Screen>
   );
 }

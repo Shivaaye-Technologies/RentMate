@@ -1,9 +1,8 @@
-/** The Android Supabase client as the auth flows' client, plus the app-link URLs for email links. */
+/** Supabase client for Google OAuth and the app-link callback. */
 import * as Linking from "expo-linking";
-import { AUTH_CALLBACK_PATH, AUTH_RESET_PATH, type AuthClient } from "./auth";
+import { AUTH_CALLBACK_PATH, type AuthClient } from "./auth";
 import { supabase } from "./supabase";
 
 export const authClient: AuthClient | null = supabase;
-/** rentmate://auth/callback (release builds); development builds use their own scheme automatically. */
+/** rentmate://auth/callback; registered as a Supabase Auth redirect URL. */
 export const callbackUrl = () => Linking.createURL(AUTH_CALLBACK_PATH);
-export const resetUrl = () => Linking.createURL(AUTH_RESET_PATH);

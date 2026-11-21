@@ -4,11 +4,7 @@ import { useSession } from "../../src/session";
 export default function AuthLayout() {
   const { ready, session } = useSession();
   if (ready && session) return <Redirect href="/home" />;
-  return (
-    <Stack screenOptions={{ headerTitleAlign: "center" }}>
-      <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
-      <Stack.Screen name="sign-up" options={{ title: "Create account" }} />
-      <Stack.Screen name="forgot-password" options={{ title: "Reset password" }} />
-    </Stack>
-  );
+  return <Stack screenOptions={{ headerTitleAlign: "center" }}>
+    <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
+  </Stack>;
 }

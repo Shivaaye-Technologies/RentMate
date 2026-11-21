@@ -1,28 +1,26 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { completeEmailLink } from "../../src/lib/auth";
+import { completeOAuthLink } from "../../src/lib/auth";
 import { authClient } from "../../src/lib/authClient";
 import { Body, Notice, Screen, Title } from "../../src/ui";
 
-/** rentmate://auth/callback?code=… from a confirmation email (PKCE): signs the member in on this device. */
+/** OAuth callback: exchanges Supabase's one-time PKCE code for the Google-authenticated session. */
 export default function AuthCallback() {
   const params = useLocalSearchParams<{ code?: string; error_description?: string }>();
   const [state, setState] = useState<"working" | "done" | { error: string }>("working");
 
   useEffect(() => {
     if (!authClient) return;
-    void completeEmailLink(authClient, params).then((r) =>
-      setState(r.ok ? "done" : { error: r.message ?? "Please sign in instead." }),
+    void completeOAuthLink(authClient, params).then((r) =>
+      setState(r.ok ? "done" : { error: r.message ?? "Please try Google sign-in again." }),
     );
-    // The link's parameters are read once.
+    // OAuth callback parameters are handled once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (state === "done") return <Redirect href="/home" />;
-  return (
-    <Screen>
-      <Title>Confirming your email</Title>
-      {state === "working" ? <Body muted>One moment…</Body> : <Notice kind="error">{state.error}</Notice>}
-    </Screen>
-  );
+  return <Screen>
+    <Title>Signing you in</Title>
+    {state === "working" ? <Body muted>Completing secure Google sign-in…</Body> : <Notice kind="error">{state.error}</Notice>}
+  </Screen>;
 }
