@@ -170,7 +170,7 @@ export function Notice({ children, kind }: { children: ReactNode; kind: "error" 
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: 20, gap: 16, flexGrow: 1 },
+  screen: { padding: 20, paddingBottom: 44, gap: 16, flexGrow: 1 },
   title: { fontSize: 26, fontWeight: "700" },
   body: { fontSize: 16, lineHeight: 22 },
   field: { gap: 6 },
