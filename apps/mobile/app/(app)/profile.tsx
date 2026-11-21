@@ -155,6 +155,101 @@ export default function Profile() {
     }
   }
 
+  async function refreshPhotoUrls(paths: string[]) {
+    const client = supabase;
+    if (!client) throw new Error("Please sign in again to manage your photos.");
+    const signed = await Promise.all(
+      paths.map(async (path) => {
+        const { data, error: signedError } = await client.storage.from("photos").createSignedUrl(path, 10 * 60);
+        return signedError ? null : { path, url: data.signedUrl };
+      }),
+    );
+    const visible = signed.flatMap((item) => (item ? [item] : []));
+    setPhotoPaths(visible.map((item) => item.path));
+    setPhotoUrls(visible.map((item) => item.url));
+  }
+
+  async function savePhotoPaths(next: string[]) {
+    const client = supabase;
+    if (!client || !session?.user?.id) throw new Error("Please sign in again to manage your photos.");
+    const unique = [...new Set(next)].slice(0, 6);
+    const { error: updateError } = await client
+      .from("profiles")
+      .update({ photo_path: unique[0] ?? null, photos: unique })
+      .eq("id", session.user.id);
+    if (updateError) throw new Error(updateError.message);
+    await refreshPhotoUrls(unique);
+  }
+
+  async function addPhoto() {
+    const client = supabase;
+    if (photoBusy || photoPaths.length >= 6 || !client || !session?.user?.id) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    let uploadedPath: string | null = null;
+    try {
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 1,
+        exif: false,
+        selectionLimit: 1,
+      });
+      if (picked.canceled || !picked.assets[0]) return;
+      const asset = picked.assets[0];
+      if (asset.fileSize && asset.fileSize > 25 * 1024 * 1024) {
+        throw new Error("That photo is over 25 MB. Choose a smaller image.");
+      }
+      const longest = Math.max(asset.width, asset.height);
+      const actions =
+        longest > 1080
+          ? [{ resize: asset.width >= asset.height ? { width: 1080 } : { height: 1080 } }]
+          : [];
+      const processed = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+        compress: 0.85,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+      const response = await fetch(processed.uri);
+      if (!response.ok) throw new Error("Couldn't read the selected photo.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > 5 * 1024 * 1024) {
+        throw new Error("Photo is too large after processing. Choose a smaller image.");
+      }
+      const path = `${session.user.id}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}.jpg`;
+      const { error: uploadError } = await client.storage.from("photos").upload(path, bytes, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+      if (uploadError) throw new Error(uploadError.message);
+      uploadedPath = path;
+      await savePhotoPaths([...photoPaths, path]);
+      uploadedPath = null;
+      setMessage("Photo uploaded. Location metadata was removed before upload.");
+    } catch (e) {
+      if (uploadedPath) void client.storage.from("photos").remove([uploadedPath]);
+      setPhotoError(e instanceof Error ? e.message : "Photo upload failed.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto(path: string) {
+    const client = supabase;
+    if (!client || photoBusy) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      await savePhotoPaths(photoPaths.filter((item) => item !== path));
+      const { error: removeError } = await client.storage.from("photos").remove([path]);
+      if (removeError) setPhotoError("Photo was removed from your profile, but storage cleanup needs retry.");
+      else setMessage("Photo removed.");
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Could not remove photo.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   return (
     <Screen>
       <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>YOUR SPACE</Text>
