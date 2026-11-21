@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
+import { SafetyActions } from "../../src/components/SafetyActions";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 type Candidate = {
@@ -221,6 +222,13 @@ export default function Discover() {
                 <Text style={{ color: c.onAccent, fontSize: 16, fontWeight: "700" }}>♡ Like</Text>
               </Pressable>
             </View>
+            <SafetyActions
+              userId={person.id}
+              onBlocked={() => {
+                setFeedback("Member blocked.");
+                setIndex((v) => v + 1);
+              }}
+            />
           </View>
         </View>
       ) : null}
