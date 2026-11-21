@@ -6,6 +6,7 @@ Target: Android staging only. No production deploy, merge, payment activation or
 ## Product promise
 
 RentMate combines:
+
 1. Dating and friendship discovery.
 2. A two-sided, lawful non-sexual companionship marketplace where adults may offer or request time for public social activities.
 3. Live social connection through moderated voice rooms, consensual video calls and community moments.
@@ -15,6 +16,7 @@ Positioning: "Nobody should have to feel alone." RentMate is a social connection
 ## User intents and roles
 
 During onboarding, allow members to select any combination:
+
 - Find companionship / someone to talk to.
 - Offer companionship / make time available.
 - Make friends.
@@ -26,6 +28,7 @@ A member may both request and offer companionship. Gender must not determine mar
 ## Companionship scope
 
 Allowed listing categories:
+
 - Conversation over coffee or a meal in a public venue.
 - Public walks, sightseeing and city exploration.
 - Events, museums, sports, music and other public activities.

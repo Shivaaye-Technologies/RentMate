@@ -30,14 +30,28 @@ export default function Home() {
       ) : null}
       {gate === "declared" ? (
         <>
-          <Body muted>Adults 18+ only. Companionship is non-sexual and limited to lawful social activities.</Body>
+          <Body muted>
+            Adults 18+ only. Companionship is non-sexual and limited to lawful social activities.
+          </Body>
           <Title>Explore RentMate</Title>
-          <Link href="/discover" asChild><Button label="Discover people" onPress={() => undefined} /></Link>
-          <Link href="/companions" asChild><Button label="Find or offer companionship" onPress={() => undefined} /></Link>
-          <Link href="/live" asChild><Button label="Live social rooms" onPress={() => undefined} /></Link>
-          <Link href="/nearby" asChild><Button label="Nearby and activities" kind="plain" onPress={() => undefined} /></Link>
-          <Link href="/profile" asChild><Button label="My profile" kind="plain" onPress={() => undefined} /></Link>
-          <Link href="/settings" asChild><Button label="Settings and safety" kind="plain" onPress={() => undefined} /></Link>
+          <Link href="/discover" asChild>
+            <Button label="Discover people" onPress={() => undefined} />
+          </Link>
+          <Link href="/companions" asChild>
+            <Button label="Find or offer companionship" onPress={() => undefined} />
+          </Link>
+          <Link href="/live" asChild>
+            <Button label="Live social rooms" onPress={() => undefined} />
+          </Link>
+          <Link href="/nearby" asChild>
+            <Button label="Nearby and activities" kind="plain" onPress={() => undefined} />
+          </Link>
+          <Link href="/profile" asChild>
+            <Button label="My profile" kind="plain" onPress={() => undefined} />
+          </Link>
+          <Link href="/settings" asChild>
+            <Button label="Settings and safety" kind="plain" onPress={() => undefined} />
+          </Link>
         </>
       ) : null}
     </Screen>
