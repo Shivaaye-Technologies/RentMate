@@ -183,34 +183,20 @@ export default function Profile() {
     await refreshPhotoUrls(unique);
   }
 
-  async function addPhoto(source: "camera" | "library") {
+  async function addPhoto() {
     const client = supabase;
     if (photoBusy || photoPaths.length >= 6 || !client || !session?.user?.id) return;
     setPhotoBusy(true);
     setPhotoError(null);
     let uploadedPath: string | null = null;
     try {
-      let picked: ImagePicker.ImagePickerResult;
-      if (source === "camera") {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          throw new Error("Camera access is needed to take a profile photo. Allow it in Android Settings.");
-        }
-        picked = await ImagePicker.launchCameraAsync({
-          mediaTypes: ["images"],
-          allowsEditing: false,
-          quality: 1,
-          exif: false,
-        });
-      } else {
-        picked = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: false,
-          quality: 1,
-          exif: false,
-          selectionLimit: 1,
-        });
-      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 1,
+        exif: false,
+        selectionLimit: 1,
+      });
       if (picked.canceled || !picked.assets[0]) return;
       const asset = picked.assets[0];
       if (asset.fileSize && asset.fileSize > 25 * 1024 * 1024) {
@@ -392,24 +378,12 @@ export default function Profile() {
           <Body muted>No profile photos have been added yet.</Body>
         )}
         {photoError ? <Notice kind="error">{photoError}</Notice> : null}
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Take a photo"
-              onPress={() => void addPhoto("camera")}
-              busy={photoBusy}
-              disabled={photoBusy || photoPaths.length >= 6 || loading}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Choose from gallery"
-              kind="plain"
-              onPress={() => void addPhoto("library")}
-              disabled={photoBusy || photoPaths.length >= 6 || loading}
-            />
-          </View>
-        </View>
+        <Button
+          label="Choose from gallery"
+          onPress={() => void addPhoto()}
+          busy={photoBusy}
+          disabled={photoBusy || photoPaths.length >= 6 || loading}
+        />
         <Notice kind="info">
           Photos are resized to at most 1080 pixels on the longest edge, re-encoded as JPEG to remove location
           metadata, and uploaded to your own folder in private Supabase Storage. Signed links expire after 10
