@@ -54,28 +54,42 @@ export default function Discover() {
     }, [load]),
   );
   const person = items[index];
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    setPhotoUrl(null);
-    if (person?.photoPath) void signedPhotoUrl(person.photoPath).then(url => { if (active) setPhotoUrl(url); });
-    return () => { active = false; };
-  }, [person?.id, person?.photoPath]));
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setPhotoUrl(null);
+      if (person?.photoPath)
+        void signedPhotoUrl(person.photoPath).then((url) => {
+          if (active) setPhotoUrl(url);
+        });
+      return () => {
+        active = false;
+      };
+    }, [person?.id, person?.photoPath]),
+  );
   const advance = async (kind: "like" | "pass") => {
     if (!person || !supabase || actionBusy) return;
-    setActionBusy(true); setError(null); setFeedback(null);
+    setActionBusy(true);
+    setError(null);
+    setFeedback(null);
     try {
       const { data: auth } = await supabase.auth.getUser();
       const me = auth.user?.id;
       if (!me) throw new Error("Please sign in again.");
-      const result = kind === "pass"
-        ? await supabase.from("passes").insert({ passer_id: me, passed_id: person.id })
-        : await supabase.from("likes").insert({ liker_id: me, liked_id: person.id, is_super: false, message: null });
+      const result =
+        kind === "pass"
+          ? await supabase.from("passes").insert({ passer_id: me, passed_id: person.id })
+          : await supabase
+              .from("likes")
+              .insert({ liker_id: me, liked_id: person.id, is_super: false, message: null });
       if (result.error) throw new Error(result.error.message);
       setFeedback(kind === "like" ? "Like sent." : "Profile passed.");
-      setIndex(v => Math.min(v + 1, Math.max(0, items.length - 1)));
+      setIndex((v) => Math.min(v + 1, Math.max(0, items.length - 1)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "That action could not be saved.");
-    } finally { setActionBusy(false); }
+    } finally {
+      setActionBusy(false);
+    }
   };
   return (
     <Screen>
@@ -120,7 +134,11 @@ export default function Discover() {
             }}
           >
             {photoUrl ? (
-              <Image source={{ uri: photoUrl }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
+              <Image
+                source={{ uri: photoUrl }}
+                resizeMode="cover"
+                style={{ width: "100%", height: "100%" }}
+              />
             ) : (
               <Text style={{ fontSize: 84, color: "#9D426D" }}>
                 {(person.displayName ?? "R").slice(0, 1).toUpperCase()}

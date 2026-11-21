@@ -231,7 +231,13 @@ export default function Profile() {
       if (bytes.byteLength > 5 * 1024 * 1024) {
         throw new Error("Photo is too large after processing. Choose a smaller image.");
       }
-      const path = session.user.id + "/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + ".jpg";
+      const path =
+        session.user.id +
+        "/" +
+        Date.now().toString(36) +
+        "-" +
+        Math.random().toString(36).slice(2, 12) +
+        ".jpg";
       const { error: uploadError } = await client.storage.from("photos").upload(path, bytes, {
         contentType: "image/jpeg",
         upsert: false,
