@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
+import { signedPhotoUrl } from "../../src/lib/photos";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 type Candidate = {
@@ -23,6 +24,8 @@ export default function Discover() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const load = useCallback(async () => {
     if (!supabase) return setError("App configuration is missing.");
     setBusy(true);
@@ -51,9 +54,28 @@ export default function Discover() {
     }, [load]),
   );
   const person = items[index];
-  const advance = (label: string) => {
-    setFeedback(`${label} preview selected. This action is not yet saved to your account.`);
-    if (items.length > 1) setIndex((v) => (v + 1) % items.length);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setPhotoUrl(null);
+    if (person?.photoPath) void signedPhotoUrl(person.photoPath).then(url => { if (active) setPhotoUrl(url); });
+    return () => { active = false; };
+  }, [person?.id, person?.photoPath]));
+  const advance = async (kind: "like" | "pass") => {
+    if (!person || !supabase || actionBusy) return;
+    setActionBusy(true); setError(null); setFeedback(null);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const me = auth.user?.id;
+      if (!me) throw new Error("Please sign in again.");
+      const result = kind === "pass"
+        ? await supabase.from("passes").insert({ passer_id: me, passed_id: person.id })
+        : await supabase.from("likes").insert({ liker_id: me, liked_id: person.id, is_super: false, message: null });
+      if (result.error) throw new Error(result.error.message);
+      setFeedback(kind === "like" ? "Like sent." : "Profile passed.");
+      setIndex(v => Math.min(v + 1, Math.max(0, items.length - 1)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That action could not be saved.");
+    } finally { setActionBusy(false); }
   };
   return (
     <Screen>
@@ -158,7 +180,7 @@ export default function Discover() {
             )}
             <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
               <Pressable
-                onPress={() => advance("Pass")}
+                onPress={() => void advance("pass")}
                 style={{
                   flex: 1,
                   borderWidth: 1,
@@ -172,7 +194,7 @@ export default function Discover() {
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: "700" }}>× Pass</Text>
               </Pressable>
               <Pressable
-                onPress={() => advance("Like")}
+                onPress={() => void advance("like")}
                 style={{
                   flex: 1,
                   backgroundColor: c.accent,
