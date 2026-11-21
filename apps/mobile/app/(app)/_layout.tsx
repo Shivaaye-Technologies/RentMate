@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Redirect, Stack, Tabs, useSegments } from "expo-router";
+import { Redirect, Stack, Tabs, useRouter, useSegments } from "expo-router";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useSession } from "../../src/session";
 import { profileDb } from "../../src/lib/data";
@@ -14,6 +14,7 @@ export default function AppLayout() {
   const c = usePalette();
   const { ready, session } = useSession();
   const segments = useSegments();
+  const router = useRouter();
   const isDeclarationRoute = segments[segments.length - 1] === "declare-age";
   const [gate, setGate] = useState<DeclarationStatus | "checking">("checking");
 
@@ -25,7 +26,7 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (ready && session) void checkDeclaration();
-  }, [checkDeclaration, ready, session]);
+  }, [checkDeclaration, isDeclarationRoute, ready, session]);
 
   if (!ready) {
     return (
@@ -50,7 +51,7 @@ export default function AppLayout() {
         <Notice kind="error">{gate.error}</Notice>
         <Body>Access stays locked until RentMate can confirm your 18+ declaration.</Body>
         <Button label="Try again" onPress={() => void checkDeclaration()} />
-        <Button label="Continue to date-of-birth declaration" kind="plain" onPress={() => undefined} />
+        <Button label="Continue to date-of-birth declaration" kind="plain" onPress={() => router.replace("/declare-age")} />
       </Screen>
     );
   }
