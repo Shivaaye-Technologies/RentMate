@@ -14,7 +14,7 @@ export default function Home() {
   }, []);
   useFocusEffect(check);
 
-  if (gate === "missing") return <Redirect href="/declare-age" />;
+  if (gate === "missing") return <Redirect href="/(app)/declare-age" />;
 
   return (
     <Screen>
@@ -34,22 +34,22 @@ export default function Home() {
             Adults 18+ only. Companionship is non-sexual and limited to lawful social activities.
           </Body>
           <Title>Explore RentMate</Title>
-          <Link href="/discover" asChild>
+          <Link href="/(app)/discover" asChild>
             <Button label="Discover people" onPress={() => undefined} />
           </Link>
-          <Link href="/companions" asChild>
+          <Link href="/(app)/companions" asChild>
             <Button label="Find or offer companionship" onPress={() => undefined} />
           </Link>
-          <Link href="/live" asChild>
+          <Link href="/(app)/live" asChild>
             <Button label="Live social rooms" onPress={() => undefined} />
           </Link>
-          <Link href="/nearby" asChild>
+          <Link href="/(app)/nearby" asChild>
             <Button label="Nearby and activities" kind="plain" onPress={() => undefined} />
           </Link>
-          <Link href="/profile" asChild>
+          <Link href="/(app)/profile" asChild>
             <Button label="My profile" kind="plain" onPress={() => undefined} />
           </Link>
-          <Link href="/settings" asChild>
+          <Link href="/(app)/settings" asChild>
             <Button label="Settings and safety" kind="plain" onPress={() => undefined} />
           </Link>
         </>
