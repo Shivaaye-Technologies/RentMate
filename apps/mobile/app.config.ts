@@ -34,10 +34,10 @@ const config: ExpoConfig = {
     // Calls will add CAMERA and RECORD_AUDIO; push will add POST_NOTIFICATIONS; location stays optional.
     permissions: [],
     blockedPermissions: [
+      "android.permission.CAMERA",
       "android.permission.ACCESS_FINE_LOCATION",
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_BACKGROUND_LOCATION",
-      "android.permission.CAMERA",
       "android.permission.RECORD_AUDIO",
       "android.permission.READ_CONTACTS",
       "android.permission.READ_EXTERNAL_STORAGE",
@@ -47,6 +47,14 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Allow RentMate to choose profile photos.",
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     // Keystore-encrypted session values cannot be decrypted after a restore, so they are excluded from backups.
     ["expo-secure-store", { configureAndroidBackup: true }],
     [
