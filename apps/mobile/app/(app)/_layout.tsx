@@ -2,8 +2,8 @@ import { Tabs } from "expo-router";
 import { Text } from "react-native";
 import { usePalette } from "../../src/ui";
 
-function TabIcon({ symbol, color }: { symbol: string; color: string }) {
-  return <Text style={{ color, fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
+function TabIcon({ symbol, color }: { symbol: string; color: string | null | undefined }) {
+  return <Text style={{ color: color ?? "#888888", fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
 }
 
 export default function AppLayout() {
