@@ -12,6 +12,7 @@ type Thread = { matchId: string; personId: string; name: string; age: number; ph
 export default function Chat() {
   const c = usePalette();
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [myId, setMyId] = useState<string | null>(null);
   const [active, setActive] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -24,6 +25,7 @@ export default function Chat() {
     try {
       const { data: auth } = await supabase.auth.getUser(); const me = auth.user?.id;
       if (!me) throw new Error("Please sign in again.");
+      setMyId(me);
       const { data: rows, error: matchError } = await supabase.from("matches").select("id,user_a,user_b,created_at").order("created_at", { ascending: false });
       if (matchError) throw new Error(matchError.message);
       const matches = (rows ?? []) as MatchRow[];
@@ -93,9 +95,9 @@ export default function Chat() {
       </Pressable>)}
     </> : <>
       <View style={{ minHeight: 260, gap: 10 }}>
-        {messages.map(m => <View key={m.id} style={{ alignSelf: m.sender_id === active.personId ? "flex-start" : "flex-end", maxWidth: "88%", padding: 12, borderRadius: 16, backgroundColor: m.sender_id === active.personId ? c.card : c.accent }}>
-          <Text style={{ color: m.sender_id === active.personId ? c.text : c.onAccent }}>{m.body}</Text>
-          <Text style={{ color: m.sender_id === active.personId ? c.muted : c.onAccent, fontSize: 10, marginTop: 4 }}>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+        {messages.map(m => <View key={m.id} style={{ alignSelf: m.sender_id === myId ? "flex-end" : "flex-start", maxWidth: "88%", padding: 12, borderRadius: 16, backgroundColor: m.sender_id === active.personId ? c.card : c.accent }}>
+          <Text style={{ color: m.sender_id === myId ? c.onAccent : c.text }}>{m.body}</Text>
+          <Text style={{ color: m.sender_id === myId ? c.onAccent : c.muted, fontSize: 10, marginTop: 4 }}>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
         </View>)}
         {!messages.length ? <Body muted>Your conversation starts here. Keep it respectful and stay safe.</Body> : null}
       </View>
