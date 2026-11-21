@@ -22,16 +22,8 @@ export default function AppLayout() {
   }, [session]);
 
   useEffect(() => {
-    if (!ready || !session) return;
-    let active = true;
-    setGate("checking");
-    void declarationStatus(profileDb!).then((result) => {
-      if (active) setGate(result);
-    });
-    return () => {
-      active = false;
-    };
-  }, [ready, session?.user.id]);
+    if (ready && session) void checkDeclaration();
+  }, [checkDeclaration, ready, session]);
 
   if (!ready) {
     return (
