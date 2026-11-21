@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
+import { SafetyActions } from "../../src/components/SafetyActions";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 type MatchRow = { id: string; user_a: string; user_b: string; created_at: string };
@@ -198,6 +199,22 @@ export default function Chat() {
         )}
       </View>
       {error ? <Notice kind="error">{error}</Notice> : null}
+      {active ? (
+        <SafetyActions
+          userId={active.personId}
+          matchId={active.matchId}
+          onBlocked={() => {
+            setActive(null);
+            setMessages([]);
+            void load();
+          }}
+          onUnmatched={() => {
+            setActive(null);
+            setMessages([]);
+            void load();
+          }}
+        />
+      ) : null}
       {!active ? (
         <>
           <Body muted>Chats are available after a mutual match.</Body>
