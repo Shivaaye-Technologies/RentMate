@@ -174,7 +174,8 @@ export default function Discover() {
             )}
             <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
               <Pressable
-                disabled={actionBusy}\n                onPress={() => void advance("pass")}
+                disabled={actionBusy}
+                onPress={() => void advance("pass")}
                 style={{
                   flex: 1,
                   borderWidth: 1,
@@ -188,7 +189,8 @@ export default function Discover() {
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: "700" }}>× Pass</Text>
               </Pressable>
               <Pressable
-                disabled={actionBusy}\n                onPress={() => void advance("like")}
+                disabled={actionBusy}
+                onPress={() => void advance("like")}
                 style={{
                   flex: 1,
                   backgroundColor: c.accent,
