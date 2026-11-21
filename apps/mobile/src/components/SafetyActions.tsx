@@ -59,7 +59,7 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
       "Block this member?",
       "They will no longer appear in discovery or your match conversations.",
       [
-      { text: "Cancel", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         { text: "Block member", style: "destructive", onPress: () => void block() },
       ],
     );
@@ -96,7 +96,7 @@ export function SafetyActions({ userId, matchId, onBlocked, onUnmatched }: Props
       "Unmatch this member?",
       "Your match and its conversation will be removed.",
       [
-      { text: "Cancel", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         { text: "Unmatch", style: "destructive", onPress: () => void unmatch() },
       ],
     );
