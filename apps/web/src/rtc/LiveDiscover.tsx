@@ -51,6 +51,9 @@ export function LiveDiscover({ me, onExit }: { me: string; onExit: () => void })
           ← Back
         </button>
         <strong>Live</strong>
+        <a className="btn small dark" href="#creator" aria-label="Open creator studio">
+          Start a live
+        </a>
       </header>
       {invites.length > 0 && (
         <section className="panel">
