@@ -39,7 +39,11 @@ export default function AppLayout() {
   if (gate === "checking") {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
-        <ActivityIndicator accessibilityLabel="Checking your age declaration" color={c.accent} size="large" />
+        <ActivityIndicator
+          accessibilityLabel="Checking your age declaration"
+          color={c.accent}
+          size="large"
+        />
       </View>
     );
   }
@@ -51,12 +55,20 @@ export default function AppLayout() {
         <Notice kind="error">{gate.error}</Notice>
         <Body>Access stays locked until RentMate can confirm your 18+ declaration.</Body>
         <Button label="Try again" onPress={() => void checkDeclaration()} />
-        <Button label="Continue to date-of-birth declaration" kind="plain" onPress={() => router.replace("/declare-age")} />
+        <Button
+          label="Continue to date-of-birth declaration"
+          kind="plain"
+          onPress={() => router.replace("/declare-age")}
+        />
       </Screen>
     );
   }
   if (gate !== "declared") {
-    return <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="declare-age" /></Stack>;
+    return (
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="declare-age" />
+      </Stack>
+    );
   }
 
   return (
