@@ -28,9 +28,12 @@ create table public.payment_provider_accounts (
     (
       payment_method = 'upi'
       and upi_vpa is not null
-      and upi_vpa ~ '^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$'
+      and position('@' in upi_vpa) > 1
+      and position('@' in substring(upi_vpa from position('@' in upi_vpa) + 1)) = 0
       and char_length(split_part(upi_vpa, '@', 1)) between 2 and 255
       and char_length(split_part(upi_vpa, '@', 2)) between 2 and 64
+      and translate(split_part(upi_vpa, '@', 1), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-', '') = ''
+      and translate(split_part(upi_vpa, '@', 2), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-', '') = ''
     )
     or (payment_method = 'card' and upi_vpa is null)
   )
@@ -132,9 +135,12 @@ begin
     or (
       p_payment_method = 'upi'
       and (
-        coalesce(p_upi_vpa, '') !~ '^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$'
+        position('@' in coalesce(p_upi_vpa, '')) <= 1
+        or position('@' in substring(coalesce(p_upi_vpa, '') from position('@' in coalesce(p_upi_vpa, '')) + 1)) > 0
         or char_length(split_part(coalesce(p_upi_vpa, ''), '@', 1)) not between 2 and 255
         or char_length(split_part(coalesce(p_upi_vpa, ''), '@', 2)) not between 2 and 64
+        or translate(split_part(coalesce(p_upi_vpa, ''), '@', 1), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-', '') <> ''
+        or translate(split_part(coalesce(p_upi_vpa, ''), '@', 2), 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-', '') <> ''
       )
     )
     or (p_payment_method = 'card' and p_upi_vpa is not null)
