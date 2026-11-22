@@ -114,14 +114,15 @@ export default function Chat() {
     setMessages([]);
     setActive(thread);
   }, [requestedMatchId, threads]);
+  const activeMatchId = active?.matchId;
   useEffect(() => {
-    if (!active || !supabase) return;
+    if (!activeMatchId || !supabase) return;
     let cancelled = false;
     const loadMessages = async () => {
       const { data, error: queryError } = await supabase!
         .from("messages")
         .select("id,match_id,sender_id,body,created_at")
-        .eq("match_id", active.matchId)
+        .eq("match_id", activeMatchId)
         .order("created_at", { ascending: true })
         .limit(300);
       if (cancelled) return;
@@ -132,16 +133,16 @@ export default function Chat() {
         await supabase!
           .from("match_reads")
           .upsert(
-            { match_id: active.matchId, user_id: auth.user.id, read_at: new Date().toISOString() },
+            { match_id: activeMatchId, user_id: auth.user.id, read_at: new Date().toISOString() },
             { onConflict: "match_id,user_id" },
           );
     };
     void loadMessages();
     const channel = supabase
-      .channel("mobile-chat:" + active.matchId)
+      .channel("mobile-chat:" + activeMatchId)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: "match_id=eq." + active.matchId },
+        { event: "INSERT", schema: "public", table: "messages", filter: "match_id=eq." + activeMatchId },
         (payload) => {
           const next = payload.new as Message;
           setMessages((old) => (old.some((x) => x.id === next.id) ? old : [...old, next]));
