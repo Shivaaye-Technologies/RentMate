@@ -8,7 +8,8 @@ declare
   pricing_id uuid;
   tax_id uuid;
   n int;
-  status text;
+  config_status text;
+  balance_before bigint;
   r text := '';
 begin
   insert into auth.users (id, email, aud, role)
@@ -19,6 +20,7 @@ begin
   from unnest(array[proposer, approver, modr, member_id]) u;
   insert into private.user_roles(user_id, role)
   values (proposer, 'admin'), (approver, 'admin'), (modr, 'moderator');
+  select balance into balance_before from public.token_wallets where user_id = member_id;
 
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', proposer, 'role', 'authenticated', 'aal', 'aal2')::text, true);
@@ -52,8 +54,8 @@ begin
   perform public.admin_approve_financial_config(tax_id, 'approved', 'Independent tax review');
   select count(*) into n from public.admin_list_financial_configs() where id in (pricing_id, tax_id) and approval_count = 1;
   r := r || case when n = 2 then 'ok independent admin approvals are recorded; ' else 'FAIL approval history; ' end;
-  select status into status from public.admin_list_financial_configs() where id = pricing_id;
-  r := r || case when status = 'scheduled' then 'ok future-effective approved pricing is scheduled; ' else 'FAIL scheduled state; ' end;
+  select c.status into config_status from public.admin_list_financial_configs() c where c.id = pricing_id;
+  r := r || case when config_status = 'scheduled' then 'ok future-effective approved pricing is scheduled; ' else 'FAIL scheduled state; ' end;
   reset role;
 
   set local role authenticated;
@@ -81,7 +83,7 @@ begin
   end;
   reset role;
 
-  select count(*) into n from public.token_wallets where user_id = member_id;
-  r := r || case when n = 0 then 'ok pricing changes do not create or alter member token balances; ' else 'FAIL token wallet changed; ' end;
+  select balance into n from public.token_wallets where user_id = member_id;
+  r := r || case when n = balance_before then 'ok pricing changes do not alter member token balances; ' else 'FAIL token wallet changed; ' end;
   raise exception 'ROLLED BACK. RESULTS: %', r;
 end $$;
