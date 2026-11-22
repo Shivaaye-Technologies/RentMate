@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { useAction } from "../live/useAction";
+import { FinancialConfigAdmin } from "./FinancialConfigAdmin";
 import type { Booking, Review } from "./marketData";
 import { BOOKING_STATUS, COMPANION_STATUS, formatINR, marketError } from "./marketText";
 
-type Section = "overview" | "companions" | "bookings" | "reviews" | "accounts" | "payments";
+type Section = "overview" | "companions" | "bookings" | "reviews" | "accounts" | "payments" | "pricing";
 const SECTIONS: { key: Section; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "companions", label: "Companions" },
@@ -12,6 +13,7 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "reviews", label: "Reviews" },
   { key: "accounts", label: "Suspensions & appeals" },
   { key: "payments", label: "Payment accounts" },
+  { key: "pricing", label: "Token pricing & tax" },
 ];
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
@@ -83,6 +85,8 @@ export function MarketAdmin({ onExit }: { onExit: () => void }) {
             {section === "accounts" && <Accounts />}
             {section === "payments" && isAdmin && <PaymentAccounts />}
             {section === "payments" && !isAdmin && <p className="alert error">Payment configuration is restricted to administrators.</p>}
+            {section === "pricing" && isAdmin && <FinancialConfigAdmin />}
+            {section === "pricing" && !isAdmin && <p className="alert error">Financial configuration is restricted to administrators.</p>}
           </>
         )}
       </main>
