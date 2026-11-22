@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { useAction } from "../live/useAction";
 import { FinancialConfigAdmin } from "./FinancialConfigAdmin";
+import { PaymentAccounts } from "./PaymentAccounts";
 import type { Booking, Review } from "./marketData";
 import { BOOKING_STATUS, COMPANION_STATUS, formatINR, marketError } from "./marketText";
 
