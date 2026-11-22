@@ -162,13 +162,13 @@ The founder has specified that token deposits/purchases and creator withdrawals 
 
 ### 11.1 Admin-managed payment methods
 
-Admins with a dedicated finance-configuration permission can publish and pause payment instructions:
-- Bank transfer: beneficiary/account name, bank, account number, IFSC and any required reference format.
-- UPI: UPI ID and QR image.
-- Payment link: HTTPS URL on an approved provider domain.
-- Crypto: explicitly approved network, asset, receiving wallet address and QR image.
+Only two customer token-purchase methods are in scope: **Card** and **UPI**. Do not show bank-transfer or crypto options in the member token-purchase UI.
 
-Never accept a crypto address without its network/asset being explicit. Show network warnings and require the user to confirm the selected network before submission. Do not store private keys, seed phrases or signing credentials. Treat public receiving addresses and QR images as sensitive operational configuration; changes must be versioned and audited. A payment method can be disabled without deleting its historical instructions.
+Admins with dedicated finance-configuration permission can configure multiple active or paused payment channels:
+- **Card gateway links:** one or more approved card payment gateway/provider accounts, each with a display name, provider identifier, merchant/account reference, hosted checkout URL or server-created checkout-session configuration, supported currency, environment (test/live), and active status. The member is redirected to the provider's hosted checkout. The platform must never collect, log, or store raw card numbers, CVV, PIN, or other card authentication secrets.
+- **UPI:** multiple merchant UPI IDs/VPA records and corresponding QR images. Support a static merchant QR and, where the connected PSP/acquirer supports it, a server-generated order-specific dynamic UPI QR/intent containing a unique order reference and exact amount. Never trust a client-edited amount or user-uploaded QR as the merchant's payment destination.
+
+The admin portal is RentMate's **payment orchestration and reconciliation layer**, not a new card network or acquiring bank. Card processing must be performed by an approved gateway/acquirer through its hosted checkout or compliant SDK/API. Do not build a homemade card processor or handle card credentials. Admins can add, test, activate, pause and rotate multiple gateway/UPI configurations; configuration changes are versioned, permission-checked and audited. Payment credentials and signing secrets belong only in encrypted server-side secrets/configuration, never in database plaintext, mobile bundles or repository files. A payment method can be disabled without deleting historical instructions.
 
 ### 11.2 Customer token top-up request
 
@@ -181,6 +181,10 @@ Never accept a crypto address without its network/asset being explicit. Show net
 7. The member sees pending/approved/rejected status and a receipt/reference, but never sees admin-only notes or another member's data.
 
 The token conversion rate is a versioned admin setting with effective dates. It is not editable per request by the client. The final amount credited is calculated server-side using the approved rate and explicit rounding rules.
+
+For card checkout, create a server-side order with a unique reference and fixed amount, then create a hosted checkout session using the selected active gateway account. Verify the gateway's signed webhook (and, where needed, independently fetch the transaction status) before marking the payment as received. A browser redirect or success screen is not proof of payment. The initial manual operations mode may place verified gateway events into an admin review queue; only the authorized approval action issues tokens.
+
+For UPI, create a pending order before displaying its QR/intent. Bind the amount and unique order reference to the server-side order. Where only a static QR is supported, the member enters the UTR/reference and the admin verifies settlement in the merchant account before approving. Never issue tokens solely because the user uploads a screenshot. Deduplicate by gateway transaction ID or a provider-scoped normalized UTR/reference, and reconcile amount, currency, merchant account and order reference.
 
 ### 11.3 Creator withdrawal request and manual release
 
@@ -207,7 +211,7 @@ A staff member may only receive the minimum permissions required. A person who c
 
 ### 11.5 Required records and invariants
 
-Additive schema should include payment-method versions, top-up requests, verified payment receipts, withdrawal requests, payout release records and an append-only finance audit trail. Enforce uniqueness for normalized provider/bank/chain transaction references where possible, while allowing documented provider-specific reference scope. Store all fiat amounts as integer minor units (INR paise); crypto quantities as exact decimal strings plus asset/network metadata, never floating-point numbers.
+Additive schema should include payment-method/account versions, card gateway configurations, UPI merchant/VPA configurations, top-up orders/requests, gateway checkout-session references, verified payment receipts, withdrawal requests, payout release records and an append-only finance audit trail. Enforce uniqueness for provider-scoped gateway transaction IDs and normalized UPI UTR/reference values, while allowing documented provider-specific reference scope. Store all fiat amounts as integer minor units (INR paise); never use floating-point arithmetic for money.
 
 A top-up approval and token ledger credit must commit atomically. A payout release and payable/settlement posting must commit atomically. Neither action may be performed by direct client table writes. The API must expose purpose-specific functions, not a generic arbitrary-amount ledger endpoint.
 
