@@ -36,7 +36,7 @@ grant select on public.payment_provider_accounts to authenticated;
 
 create policy "admins read payment account metadata"
   on public.payment_provider_accounts for select to authenticated
-  using (private.has_role((select auth.uid()), 'admin'));
+  using (private.has_role('admin'));
 
 create function public.admin_list_payment_accounts()
 returns table (
