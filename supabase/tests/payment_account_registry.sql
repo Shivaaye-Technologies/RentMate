@@ -44,7 +44,7 @@ begin
       100, 500000, null, false
     );
     r := r || 'FAIL incompatible card provider accepted; ';
-  exception when raise_exception then
+  exception when invalid_parameter_value then
     r := r || 'ok incompatible payment adapter is rejected; ';
   end;
 
