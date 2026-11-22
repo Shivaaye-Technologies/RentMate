@@ -7,6 +7,7 @@ declare
   member_id uuid := gen_random_uuid();
   acct uuid;
   n int;
+  account_status text;
   r text := '';
 begin
   insert into auth.users (id, email, aud, role)
@@ -48,8 +49,8 @@ begin
   end;
 
   perform public.admin_set_payment_account_status(acct, 'paused');
-  select status into strict r from public.payment_provider_accounts where id = acct;
-  r := case when r = 'paused' then 'ok admin can pause account; ' else 'FAIL pause status; ' end;
+  select status into strict account_status from public.payment_provider_accounts where id = acct;
+  r := r || case when account_status = 'paused' then 'ok admin can pause account; ' else 'FAIL pause status; ' end;
   begin
     perform public.admin_set_payment_account_status(acct, 'active');
     r := r || 'FAIL account activated without provider test; ';
