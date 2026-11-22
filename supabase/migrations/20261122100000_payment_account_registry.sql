@@ -23,7 +23,7 @@ create table public.payment_provider_accounts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint payment_account_method_config check (
-    (payment_method = 'upi' and upi_vpa is not null and upi_vpa ~ '^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$')
+    (payment_method = 'upi' and upi_vpa is not null and upi_vpa ~ '^[A-Za-z0-9._-]{2,255}@[A-Za-z0-9.-]{2,64}$')
     or (payment_method = 'card' and upi_vpa is null)
   )
 );
@@ -80,7 +80,7 @@ begin
     or p_min_amount_paise <= 0 or p_max_amount_paise < p_min_amount_paise
     or char_length(btrim(coalesce(p_display_name, ''))) not between 2 and 80
     or char_length(btrim(coalesce(p_merchant_reference, ''))) not between 2 and 120
-    or (p_payment_method = 'upi' and coalesce(p_upi_vpa, '') !~ '^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$')
+    or (p_payment_method = 'upi' and coalesce(p_upi_vpa, '') !~ '^[A-Za-z0-9._-]{2,255}@[A-Za-z0-9.-]{2,64}$')
     or (p_payment_method = 'card' and p_upi_vpa is not null)
     or (p_payment_method = 'card' and p_provider_key = 'upi_psp')
     or (p_payment_method = 'upi' and p_provider_key not in ('razorpay', 'cashfree', 'upi_psp'))
