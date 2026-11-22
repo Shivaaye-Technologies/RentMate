@@ -29,11 +29,11 @@ import { alertsFor, buildNotices, loadMatches, type Counts, type Notice } from "
 import { showAlert } from "./notify";
 import { saveProfileFields, type ProfilePatch } from "./profileApi";
 import { DemoMode } from "./demoMode/DemoMode";
-import { CreatorStudio } from "./live/CreatorStudio";
-import { AdminConsole } from "./live/AdminConsole";
-import { Marketplace } from "./market/Marketplace";
-import { CompanionDashboard } from "./market/CompanionDashboard";
-import { MarketAdmin } from "./market/MarketAdmin";
+const CreatorStudio = lazy(() => import("./live/CreatorStudio").then((m) => ({ default: m.CreatorStudio })));
+const AdminConsole = lazy(() => import("./live/AdminConsole").then((m) => ({ default: m.AdminConsole })));
+const Marketplace = lazy(() => import("./market/Marketplace").then((m) => ({ default: m.Marketplace })));
+const CompanionDashboard = lazy(() => import("./market/CompanionDashboard").then((m) => ({ default: m.CompanionDashboard })));
+const MarketAdmin = lazy(() => import("./market/MarketAdmin").then((m) => ({ default: m.MarketAdmin })));
 import { IncomingCall } from "./rtc/IncomingCall";
 import { AdminGate, MfaSettings } from "./security/AdminGate";
 
@@ -197,12 +197,16 @@ export function App() {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
       setMarket(null);
     };
-    if (market === "companions") return <Marketplace me={session.user.id} onExit={exit} />;
-    if (market === "companion") return <CompanionDashboard me={session.user.id} onExit={exit} />;
     return (
-      <AdminGate onExit={exit}>
-        <MarketAdmin onExit={exit} />
-      </AdminGate>
+      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+        {market === "companions" && <Marketplace me={session.user.id} onExit={exit} />}
+        {market === "companion" && <CompanionDashboard me={session.user.id} onExit={exit} />}
+        {market === "market-admin" && (
+          <AdminGate onExit={exit}>
+            <MarketAdmin onExit={exit} />
+          </AdminGate>
+        )}
+      </Suspense>
     );
   }
   if (admin) {
@@ -211,21 +215,25 @@ export function App() {
       setAdmin(false);
     };
     return (
-      <AdminGate onExit={exitAdmin}>
-        <MfaSettings />
-        <AdminConsole onExit={exitAdmin} />
-      </AdminGate>
+      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+        <AdminGate onExit={exitAdmin}>
+          <MfaSettings />
+          <AdminConsole onExit={exitAdmin} />
+        </AdminGate>
+      </Suspense>
     );
   }
   if (creator) {
     return (
-      <CreatorStudio
-        me={session.user.id}
-        onExit={() => {
-          window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          setCreator(false);
-        }}
-      />
+      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+        <CreatorStudio
+          me={session.user.id}
+          onExit={() => {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            setCreator(false);
+          }}
+        />
+      </Suspense>
     );
   }
   return (
