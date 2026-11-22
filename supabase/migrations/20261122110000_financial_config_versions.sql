@@ -61,7 +61,7 @@ declare
   item jsonb;
 begin
   perform private.require_role('admin');
-  if p_config_type not in ('token_pricing', 'tax_rule')
+  if p_config_type is null or p_config_type not in ('token_pricing', 'tax_rule')
     or p_payload is null or jsonb_typeof(p_payload) <> 'object'
     or p_effective_at is null or p_effective_at < now()
     or char_length(btrim(coalesce(p_reason, ''))) not between 5 and 1000
@@ -71,10 +71,12 @@ begin
 
   if p_config_type = 'token_pricing' then
     if coalesce(p_payload->>'currency', '') !~ '^[A-Z]{3}$'
-      or jsonb_typeof(p_payload->'packages') <> 'array'
-      or jsonb_array_length(p_payload->'packages') = 0
+      or jsonb_typeof(p_payload->'packages') is distinct from 'array'
     then
       raise exception 'Token pricing requires a currency and at least one package.' using errcode = '22023';
+    end if;
+    if jsonb_array_length(p_payload->'packages') = 0 then
+      raise exception 'Token pricing requires at least one package.' using errcode = '22023';
     end if;
     for item in select value from jsonb_array_elements(p_payload->'packages')
     loop
@@ -168,7 +170,7 @@ begin
   perform private.require_role('admin');
   return query
     select c.id, c.config_type, c.payload, c.effective_at, c.reason, c.created_by, c.created_at,
-      count(a.id), max(a.approver_id), max(a.decision),
+      count(a.id), max(a.approver_id::text)::uuid, max(a.decision),
       case
         when max(a.decision) = 'rejected' then 'rejected'
         when count(a.id) = 0 then 'awaiting_approval'
