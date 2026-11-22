@@ -117,6 +117,7 @@ export function PaymentAccounts() {
               <p className="small muted">Limits: ₹{(a.min_amount_paise / 100).toFixed(2)}–₹{(a.max_amount_paise / 100).toFixed(2)} · Dynamic QR: {a.dynamic_qr_supported ? "provider capability declared" : "not configured"} · Credentials: {a.secret_configured ? "secret reference present" : "not connected"}</p>
               {a.last_tested_at && <p className="small muted">Last test: {a.last_test_status ?? "unknown"} · {new Date(a.last_tested_at).toLocaleString()}</p>}
               <div className="row-wrap">
+                <button className="btn small" disabled={busy} onClick={() => edit(a)}>Edit</button>
                 <button className="btn small" disabled={busy || a.status === "paused" || a.status === "disabled"} onClick={() => updateStatus(a.id, "paused")}>Pause</button>
                 <button className="btn small danger" disabled={busy || a.status === "disabled"} onClick={() => updateStatus(a.id, "disabled")}>Disable</button>
               </div>
