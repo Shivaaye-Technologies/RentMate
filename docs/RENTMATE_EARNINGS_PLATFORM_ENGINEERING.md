@@ -234,3 +234,55 @@ The first code slice is committed on `feature/earnings-platform-foundation`:
 - `apps/web/src/market/MarketAdmin.tsx` exposes the screen only to the `admin` role.
 
 This is deliberately a **configuration registry, not a completed live payment integration**. No credential-entry or secret-vault flow, provider connectivity test, hosted card checkout, dynamic UPI QR API, webhook verification, payment reconciliation, token-credit approval queue or payout release is implemented by this slice. Accounts remain drafts and cannot be activated from the UI. Do not describe a provider as connected or accept live payments until those later layers are implemented and tested. The migration has not been applied to staging or production.
+
+
+## 12. Admin-controlled token pricing and tax configuration
+
+This capability is implemented as an additive, versioned configuration workflow. It does not authorize live purchases, deposits, withdrawals, cash redemption or payouts.
+
+### 12.1 Token package pricing
+
+An administrator proposes an immutable `token_pricing` version containing:
+- ISO currency code;
+- one or more package entries with stable package code, integer token quantity, price in integer minor units (paise for INR), and optional bonus token quantity;
+- an explicit `tax_inclusive` boolean;
+- effective timestamp and mandatory business reason.
+
+The database validates package fields and stores the full payload as a version. The client cannot set a price at checkout or mutate an existing version. Any correction is a new proposal.
+
+### 12.2 Jurisdiction tax configuration
+
+An administrator proposes an immutable `tax_rule` version with explicit country code, optional state/province code, tax category, tax display name, rate in basis points and inclusive/exclusive treatment. No rate is assumed or pre-populated as legally applicable. A zero rate is accepted only when explicitly supplied in the proposal; it is not a default.
+
+Tax configuration is a technical rules registry, not a tax determination. Before activation, a qualified tax adviser must confirm the supply classification, place/time of supply, customer type, registration status, exemptions, invoicing and applicable local rules for the relevant jurisdiction. Configuration must not be used to imply legal compliance by itself.
+
+### 12.3 Two-person approval and audit
+
+- A proposer must be an administrator.
+- A different administrator must approve or reject the proposal; self-approval is rejected by the database.
+- The proposal and decision are immutable. Changes require a new version.
+- Effective dates support future scheduling; an approved future version remains scheduled until its effective timestamp.
+- Every proposal and decision is written to the existing administrative action log.
+- Moderator and member roles cannot read or mutate the configuration through the admin RPCs.
+
+### 12.4 Historical financial snapshots
+
+The migration adds a restricted, append-only transaction snapshot table for future purchase/refund/earning integration. It stores references to the pricing and tax versions plus the exact currency, token quantity, subtotal, tax, total, and JSON snapshots used for the transaction. Browser roles have no direct access. Corrections must be represented by compensating records, not updates to historical snapshots.
+
+Changing a future token package or tax rule never changes existing token wallet balances, past earning entries, refunds or transaction snapshots. Refund logic must reference the original transaction snapshot.
+
+### 12.5 API and admin surface
+
+The authenticated Supabase RPC API exposes:
+- `admin_propose_financial_config` — validate and submit a pricing or tax proposal;
+- `admin_approve_financial_config` — independent administrator approval or rejection;
+- `admin_list_financial_configs` — administrator-only version and approval history.
+
+The marketplace admin includes a Token pricing & tax section for JSON-backed package and jurisdiction configuration, effective dates, reasons and approval history. Server-side validation remains authoritative; UI validation is only convenience.
+
+### 12.6 Safety and release gates
+
+- Existing wallet registration bonuses and metering rates are not silently rewritten by pricing configuration.
+- No token purchase, payment capture, payout, withdrawal or cash conversion path is enabled by this feature.
+- Do not activate a tax rule or collect tax until legal/accounting review and the relevant provider/founder approvals are documented.
+- Before merge, run formatting, lint, API/web typechecks, all unit tests, database migration tests and mobile bundle-secret checks. Do not deploy or mutate production.
