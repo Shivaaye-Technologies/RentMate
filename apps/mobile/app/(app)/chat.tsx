@@ -153,7 +153,7 @@ export default function Chat() {
       cancelled = true;
       void supabase!.removeChannel(channel);
     };
-  }, [active?.matchId]);
+  }, [activeMatchId]);
   async function send() {
     const body = draft.trim();
     if (!body || !active || sending || !supabase) return;
