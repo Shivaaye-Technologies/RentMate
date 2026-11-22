@@ -224,3 +224,13 @@ A top-up approval and token ledger credit must commit atomically. A payout relea
 ### 11.6 Current staging database discovery
 
 On 2026-11-22, the connected Supabase project `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`, Mumbai) was confirmed active/healthy, but its public schema returned zero tables and its migration history returned zero entries. Therefore this project is currently an empty staging database. Do not apply a feature migration to it until the complete canonical migration chain has been reviewed and the staging bootstrap plan is prepared. No database writes were performed during this discovery.
+
+
+## 12. Implementation progress — 2026-11-22
+
+The first code slice is committed on `feature/earnings-platform-foundation`:
+- `supabase/migrations/20261122100000_payment_account_registry.sql` adds an admin-only registry for multiple card and UPI merchant account metadata, routing priority, INR limits, environment, VPA and pause/disable status.
+- `apps/web/src/market/PaymentAccounts.tsx` adds the admin payment-account management screen.
+- `apps/web/src/market/MarketAdmin.tsx` exposes the screen only to the `admin` role.
+
+This is deliberately a **configuration registry, not a completed live payment integration**. No credential-entry or secret-vault flow, provider connectivity test, hosted card checkout, dynamic UPI QR API, webhook verification, payment reconciliation, token-credit approval queue or payout release is implemented by this slice. Accounts remain drafts and cannot be activated from the UI. Do not describe a provider as connected or accept live payments until those later layers are implemented and tested. The migration has not been applied to staging or production.
