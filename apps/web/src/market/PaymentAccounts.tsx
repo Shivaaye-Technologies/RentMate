@@ -45,6 +45,7 @@ async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
 export function PaymentAccounts() {
   const [rows, setRows] = useState<PaymentAccount[] | null>(null);
   const [form, setForm] = useState(empty);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
@@ -60,7 +61,7 @@ export function PaymentAccounts() {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     await run(() => rpc<string>("admin_upsert_payment_account", {
-      p_id: null,
+      p_id: editingId,
       p_payment_method: form.payment_method,
       p_provider_key: form.provider_key,
       p_display_name: form.display_name.trim(),
@@ -73,6 +74,23 @@ export function PaymentAccounts() {
       p_dynamic_qr_supported: form.payment_method === "upi" && form.dynamic_qr_supported,
     }), "Payment account metadata saved. Connect and test provider credentials before activation.");
     setForm(empty);
+    setEditingId(null);
+  };
+
+  const edit = (a: PaymentAccount) => {
+    setEditingId(a.id);
+    setForm({
+      payment_method: a.payment_method,
+      provider_key: a.provider_key,
+      display_name: a.display_name,
+      merchant_reference: a.merchant_reference,
+      environment: a.environment,
+      priority: String(a.priority),
+      min_amount: (a.min_amount_paise / 100).toFixed(2),
+      max_amount: (a.max_amount_paise / 100).toFixed(2),
+      upi_vpa: a.upi_vpa ?? "",
+      dynamic_qr_supported: a.dynamic_qr_supported,
+    });
   };
 
   const updateStatus = (id: string, status: "paused" | "disabled") =>
@@ -108,7 +126,7 @@ export function PaymentAccounts() {
       </div>
 
       <form className="panel form" onSubmit={(e) => void save(e)}>
-        <h3>Add payment account</h3>
+        <h3>{editingId ? "Edit payment account" : "Add payment account"}</h3>
         <label className="field"><span>Payment method</span>
           <select value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value as Method, provider_key: e.target.value === "card" ? "razorpay" : "razorpay" })}>
             <option value="upi">UPI</option><option value="card">Card gateway</option>
@@ -133,7 +151,7 @@ export function PaymentAccounts() {
         {form.payment_method === "upi" && <label className="check-row"><input type="checkbox" checked={form.dynamic_qr_supported} onChange={(e) => setForm({ ...form, dynamic_qr_supported: e.target.checked })} /><span>Provider supports order-specific dynamic UPI QR (capability declaration only; provider verification still required)</span></label>}
         <p className="alert info small">This first registry screen stores account metadata only. It does not collect API secrets, activate payments, generate QR codes or credit tokens. Secure credential onboarding and provider connectivity tests are the next adapter layer.</p>
         {messages}
-        <button className="btn dark" disabled={busy}>Save draft account</button>
+        <div className="row-wrap"><button className="btn dark" disabled={busy}>Save {editingId ? "changes" : "draft account"}</button>{editingId && <button type="button" className="btn" disabled={busy} onClick={() => { setEditingId(null); setForm(empty); }}>Cancel edit</button>}</div>
       </form>
     </section>
   );
