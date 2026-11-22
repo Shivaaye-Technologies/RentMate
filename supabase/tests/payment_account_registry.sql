@@ -1,4 +1,4 @@
--- Payment account registry test (migration 20261122100000_payment_account_registry.sql). Always rolls back.
+-- Payment account registry test (migration 20261123150000_payment_account_registry.sql). Always rolls back.
 -- No provider secrets or live payment operations are used.
 do $$
 declare
