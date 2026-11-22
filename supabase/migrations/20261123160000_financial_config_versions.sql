@@ -72,6 +72,7 @@ declare
   price_paise numeric;
   bonus_count numeric;
   tax_rate numeric;
+  reviewed_date date;
 begin
   perform private.require_role('admin');
 
@@ -87,6 +88,14 @@ begin
   end if;
 
   if p_config_type = 'token_pricing' then
+    if exists (
+      select 1
+      from jsonb_object_keys(p_payload) as k(key)
+      where key not in ('currency', 'tax_inclusive', 'packages')
+    ) then
+      raise exception 'Unknown token pricing configuration property.'
+        using errcode = '22023';
+    end if;
     if coalesce(p_payload->>'currency', '') !~ '^[A-Z]+$'
       or char_length(p_payload->>'currency') <> 3
       or jsonb_typeof(p_payload->'packages') is distinct from 'array'
@@ -100,6 +109,16 @@ begin
       raise exception 'Token pricing requires at least one package.' using errcode = '22023';
     end if;
 
+    if exists (
+      select 1
+      from jsonb_array_elements(p_payload->'packages') as package(item)
+      group by lower(btrim(package.item->>'code'))
+      having count(*) > 1
+    ) then
+      raise exception 'Token package codes must be unique within a pricing version.'
+        using errcode = '22023';
+    end if;
+
     for item in select value from jsonb_array_elements(p_payload->'packages')
     loop
       if jsonb_typeof(item) <> 'object'
@@ -109,6 +128,15 @@ begin
         or (item ? 'bonus_tokens' and jsonb_typeof(item->'bonus_tokens') is distinct from 'number')
       then
         raise exception 'Each package requires code, tokens, price_paise and optional bonus_tokens.'
+          using errcode = '22023';
+      end if;
+
+      if exists (
+        select 1
+        from jsonb_object_keys(item) as k(key)
+        where key not in ('code', 'tokens', 'price_paise', 'bonus_tokens')
+      ) then
+        raise exception 'Unknown token package property.'
           using errcode = '22023';
       end if;
 
@@ -131,6 +159,18 @@ begin
       end if;
     end loop;
   else
+    if exists (
+      select 1
+      from jsonb_object_keys(p_payload) as k(key)
+      where key not in (
+        'country_code', 'state_code', 'tax_category',
+        'tax_name', 'rate_bps', 'treatment', 'tax_review'
+      )
+    ) then
+      raise exception 'Unknown tax configuration property.'
+        using errcode = '22023';
+    end if;
+
     if jsonb_typeof(p_payload->'country_code') is distinct from 'string'
       or jsonb_typeof(p_payload->'tax_category') is distinct from 'string'
       or jsonb_typeof(p_payload->'tax_name') is distinct from 'string'
@@ -155,6 +195,61 @@ begin
       raise exception 'Tax rate must be a non-negative integer in basis points.'
         using errcode = '22023';
     end if;
+
+    if jsonb_typeof(p_payload->'tax_review') is distinct from 'object' then
+      raise exception 'Tax rules require documented professional review evidence.'
+        using errcode = '22023';
+    end if;
+
+    if exists (
+      select 1
+      from jsonb_object_keys(p_payload->'tax_review') as k(key)
+      where key not in (
+        'reviewer_name', 'qualification', 'organization', 'reviewed_on',
+        'jurisdiction', 'supply_scope', 'customer_scope', 'evidence_reference'
+      )
+    ) then
+      raise exception 'Unknown tax review evidence property.'
+        using errcode = '22023';
+    end if;
+
+    if jsonb_typeof(p_payload->'tax_review'->'reviewer_name') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'qualification') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'organization') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'reviewed_on') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'jurisdiction') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'supply_scope') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'customer_scope') is distinct from 'string'
+      or jsonb_typeof(p_payload->'tax_review'->'evidence_reference') is distinct from 'string'
+      or char_length(btrim(p_payload->'tax_review'->>'reviewer_name')) < 2
+      or char_length(btrim(p_payload->'tax_review'->>'qualification')) < 3
+      or char_length(btrim(p_payload->'tax_review'->>'organization')) < 2
+      or char_length(btrim(p_payload->'tax_review'->>'jurisdiction')) < 2
+      or char_length(btrim(p_payload->'tax_review'->>'supply_scope')) < 10
+      or char_length(btrim(p_payload->'tax_review'->>'customer_scope')) < 10
+      or char_length(btrim(p_payload->'tax_review'->>'evidence_reference')) < 3
+    then
+      raise exception 'Tax review evidence fields are incomplete.'
+        using errcode = '22023';
+    end if;
+
+    if p_payload->'tax_review'->>'reviewed_on' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
+      raise exception 'Tax review date must use YYYY-MM-DD.'
+        using errcode = '22023';
+    end if;
+
+    begin
+      reviewed_date := (p_payload->'tax_review'->>'reviewed_on')::date;
+    exception when others then
+      raise exception 'Tax review date is invalid.'
+        using errcode = '22023';
+    end;
+
+    if reviewed_date > current_date then
+      raise exception 'Tax review date cannot be in the future.'
+        using errcode = '22023';
+    end if;
+
 
     if p_payload ? 'state_code'
       and (jsonb_typeof(p_payload->'state_code') is distinct from 'string'
@@ -195,22 +290,37 @@ as $$
 declare
   proposer uuid;
   config_kind text;
+  config_effective_at timestamptz;
 begin
   perform private.require_role('admin');
 
-  if p_decision not in ('approved', 'rejected')
+  if p_decision is null
+    or p_decision not in ('approved', 'rejected')
     or (p_note is not null and char_length(p_note) > 1000)
   then
     raise exception 'Invalid approval decision.' using errcode = '22023';
   end if;
 
-  select created_by, config_type
-    into proposer, config_kind
+  select created_by, config_type, effective_at
+    into proposer, config_kind, config_effective_at
   from public.financial_config_versions
-  where id = p_config_id;
+  where id = p_config_id
+  for update;
 
   if proposer is null then
     raise exception 'Financial configuration not found.' using errcode = 'P0002';
+  end if;
+
+  if config_kind = 'tax_rule'
+    and char_length(btrim(coalesce(p_note, ''))) < 20 then
+    raise exception 'Tax decisions require a meaningful review note of at least 20 characters.'
+      using errcode = '22023';
+  end if;
+
+  if p_decision = 'approved' and config_effective_at <= now() then
+    raise exception
+      'This proposal has reached or passed its effective date. Create a new proposal.'
+      using errcode = '22023';
   end if;
 
   if proposer = (select auth.uid()) then

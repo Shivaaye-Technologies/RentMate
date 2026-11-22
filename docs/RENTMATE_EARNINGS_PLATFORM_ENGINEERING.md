@@ -11,10 +11,10 @@ RentMate is an India-focused online services and creator platform for adults (18
 
 The founder's proposed commercial values are configuration inputs, not yet approved production payout instructions:
 
-| Value | Proposed amount |
-|---|---:|
-| Customer token purchase price | INR 15–20 per token |
-| Eligible livestream creator earning | INR 6.50 per eligible token |
+| Value                                           |              Proposed amount |
+| ----------------------------------------------- | ---------------------------: |
+| Customer token purchase price                   |          INR 15–20 per token |
+| Eligible livestream creator earning             |  INR 6.50 per eligible token |
 | Eligible RentMate booked-service worker earning | INR 10.00 per eligible token |
 
 The final interpretation of gross/net, GST, tax withholding, refunds, payment fees, commissions and settlement timing is supplied by the founder's lawyer, CA and banking/payment partners. Do not hard-code tax rates or assume these proposed values are net payouts.
@@ -106,6 +106,7 @@ Every route needs Zod validation, authentication, authorization, rate limits, re
 ## 8. Delivery sequence and acceptance gates
 
 ### Phase A — staging foundation
+
 - Reconfirm current branch, schema and migration history.
 - Preserve the existing wallet as historical baseline; do not rewrite old migrations.
 - Add rate-version and earning-account schema additively.
@@ -113,6 +114,7 @@ Every route needs Zod validation, authentication, authorization, rate limits, re
 - Keep purchase/payout provider adapters in sandbox/mock mode.
 
 ### Phase B — livestream gifts
+
 - Gift catalogue and UI.
 - Server-authorized gift endpoint.
 - Atomic token spend plus earner payable accrual.
@@ -120,18 +122,21 @@ Every route needs Zod validation, authentication, authorization, rate limits, re
 - Tests: replay, concurrent gift, forged sender, forged recipient, self-gift, blocked/suspended user, stale room, insufficient balance and provider retry.
 
 ### Phase C — booking earnings
+
 - Complete booking state machine and evidence.
 - Dispute/cancellation/refund handling.
 - Rate snapshot and payable accrual only after eligible completion.
 - Tests for double completion, race conditions, cancellation and disputes.
 
 ### Phase D — payout operations
+
 - KYC/payout verification adapter.
 - Payout request, review, provider sandbox, callbacks and reconciliation.
 - Configurable tax/fee/deduction fields; no assumed tax rates.
 - Tests for duplicate payout, provider timeout, webhook replay, partial failure and reversal.
 
 ### Phase E — production readiness
+
 - Independent security review and penetration test.
 - Load and soak tests with documented targets.
 - Backup restore and disaster recovery drill.
@@ -155,7 +160,6 @@ The current API has a basic `/health` liveness endpoint and per-IP API rate limi
 
 This document records an engineering design direction only. It is not a payment, tax, legal or production authorization.
 
-
 ## 11. Founder-confirmed manual payment and payout operations
 
 The founder has specified that token deposits/purchases and creator withdrawals are to be operated manually from the admin portal. This is the required first delivery model; do not integrate automatic payment capture or automatic bank/crypto payouts in this phase.
@@ -165,6 +169,7 @@ The founder has specified that token deposits/purchases and creator withdrawals 
 Only two customer token-purchase methods are in scope: **Card** and **UPI**. Do not show bank-transfer or crypto options in the member token-purchase UI.
 
 Admins with dedicated finance-configuration permission can configure multiple active or paused payment channels:
+
 - **Card gateway links:** one or more approved card payment gateway/provider accounts, each with a display name, provider identifier, merchant/account reference, hosted checkout URL or server-created checkout-session configuration, supported currency, environment (test/live), and active status. The member is redirected to the provider's hosted checkout. The platform must never collect, log, or store raw card numbers, CVV, PIN, or other card authentication secrets.
 - **UPI:** multiple company-owned merchant UPI IDs/VPAs and linked merchant accounts, each with its own verified display name, provider/PSP, account reference, status, limits and reconciliation configuration. For every token-purchase order, generate a **fresh, unique, order-specific dynamic UPI QR** from the selected active company merchant account whenever its PSP/acquirer supports dynamic QR creation. The QR must be bound to that single order, exact server-calculated amount, merchant VPA/account, currency and unique order reference/expiry. Display the new QR to that buyer for that purchase only; do not reuse another buyer's QR or treat a static QR as a unique transaction QR. If the provider only supports static merchant QR, clearly label it as static and require the buyer's UTR/reference plus admin-side settlement verification; do not claim it is a newly generated dynamic QR. Never trust a client-edited amount or user-uploaded QR as the merchant's payment destination.
 
@@ -205,6 +210,7 @@ For each UPI checkout, create a pending order and payment attempt, select an act
 ### 11.4 Admin roles and audit requirements
 
 Separate permissions for:
+
 - payment-method configuration;
 - token top-up review and approval;
 - token ledger adjustments;
@@ -225,16 +231,15 @@ A top-up approval and token ledger credit must commit atomically. A payout relea
 
 On 2026-11-22, the connected Supabase project `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`, Mumbai) was confirmed active/healthy, but its public schema returned zero tables and its migration history returned zero entries. Therefore this project is currently an empty staging database. Do not apply a feature migration to it until the complete canonical migration chain has been reviewed and the staging bootstrap plan is prepared. No database writes were performed during this discovery.
 
-
 ## 12. Implementation progress — 2026-11-22
 
 The first code slice is committed on `feature/earnings-platform-foundation`:
+
 - `supabase/migrations/20261122100000_payment_account_registry.sql` adds an admin-only registry for multiple card and UPI merchant account metadata, routing priority, INR limits, environment, VPA and pause/disable status.
 - `apps/web/src/market/PaymentAccounts.tsx` adds the admin payment-account management screen.
 - `apps/web/src/market/MarketAdmin.tsx` exposes the screen only to the `admin` role.
 
 This is deliberately a **configuration registry, not a completed live payment integration**. No credential-entry or secret-vault flow, provider connectivity test, hosted card checkout, dynamic UPI QR API, webhook verification, payment reconciliation, token-credit approval queue or payout release is implemented by this slice. Accounts remain drafts and cannot be activated from the UI. Do not describe a provider as connected or accept live payments until those later layers are implemented and tested. The migration has not been applied to staging or production.
-
 
 ## 12. Admin-controlled token pricing and tax configuration
 
@@ -243,6 +248,7 @@ This capability is implemented as an additive, versioned configuration workflow.
 ### 12.1 Token package pricing
 
 An administrator proposes an immutable `token_pricing` version containing:
+
 - ISO currency code;
 - one or more package entries with stable package code, integer token quantity, price in integer minor units (paise for INR), and optional bonus token quantity;
 - an explicit `tax_inclusive` boolean;
@@ -274,6 +280,7 @@ Changing a future token package or tax rule never changes existing token wallet 
 ### 12.5 API and admin surface
 
 The authenticated Supabase RPC API exposes:
+
 - `admin_propose_financial_config` — validate and submit a pricing or tax proposal;
 - `admin_approve_financial_config` — independent administrator approval or rejection;
 - `admin_list_financial_configs` — administrator-only version and approval history.

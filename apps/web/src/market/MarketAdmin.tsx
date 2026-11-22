@@ -85,9 +85,13 @@ export function MarketAdmin({ onExit }: { onExit: () => void }) {
             {section === "reviews" && <Reviews />}
             {section === "accounts" && <Accounts />}
             {section === "payments" && isAdmin && <PaymentAccounts />}
-            {section === "payments" && !isAdmin && <p className="alert error">Payment configuration is restricted to administrators.</p>}
+            {section === "payments" && !isAdmin && (
+              <p className="alert error">Payment configuration is restricted to administrators.</p>
+            )}
             {section === "pricing" && isAdmin && <FinancialConfigAdmin />}
-            {section === "pricing" && !isAdmin && <p className="alert error">Financial configuration is restricted to administrators.</p>}
+            {section === "pricing" && !isAdmin && (
+              <p className="alert error">Financial configuration is restricted to administrators.</p>
+            )}
           </>
         )}
       </main>

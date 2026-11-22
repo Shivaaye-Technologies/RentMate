@@ -32,7 +32,9 @@ import { DemoMode } from "./demoMode/DemoMode";
 const CreatorStudio = lazy(() => import("./live/CreatorStudio").then((m) => ({ default: m.CreatorStudio })));
 const AdminConsole = lazy(() => import("./live/AdminConsole").then((m) => ({ default: m.AdminConsole })));
 const Marketplace = lazy(() => import("./market/Marketplace").then((m) => ({ default: m.Marketplace })));
-const CompanionDashboard = lazy(() => import("./market/CompanionDashboard").then((m) => ({ default: m.CompanionDashboard })));
+const CompanionDashboard = lazy(() =>
+  import("./market/CompanionDashboard").then((m) => ({ default: m.CompanionDashboard })),
+);
 const MarketAdmin = lazy(() => import("./market/MarketAdmin").then((m) => ({ default: m.MarketAdmin })));
 import { IncomingCall } from "./rtc/IncomingCall";
 import { AdminGate, MfaSettings } from "./security/AdminGate";
@@ -198,7 +200,13 @@ export function App() {
       setMarket(null);
     };
     return (
-      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+      <Suspense
+        fallback={
+          <main className="empty full">
+            <div className="spinner" aria-hidden="true" />
+          </main>
+        }
+      >
         {market === "companions" && <Marketplace me={session.user.id} onExit={exit} />}
         {market === "companion" && <CompanionDashboard me={session.user.id} onExit={exit} />}
         {market === "market-admin" && (
@@ -215,7 +223,13 @@ export function App() {
       setAdmin(false);
     };
     return (
-      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+      <Suspense
+        fallback={
+          <main className="empty full">
+            <div className="spinner" aria-hidden="true" />
+          </main>
+        }
+      >
         <AdminGate onExit={exitAdmin}>
           <MfaSettings />
           <AdminConsole onExit={exitAdmin} />
@@ -225,7 +239,13 @@ export function App() {
   }
   if (creator) {
     return (
-      <Suspense fallback={<main className="empty full"><div className="spinner" aria-hidden="true" /></main>}>
+      <Suspense
+        fallback={
+          <main className="empty full">
+            <div className="spinner" aria-hidden="true" />
+          </main>
+        }
+      >
         <CreatorStudio
           me={session.user.id}
           onExit={() => {

@@ -35,22 +35,87 @@ begin
 
   tax_id := public.admin_propose_financial_config(
     'tax_rule',
-    '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Applicable indirect tax","rate_bps":0,"treatment":"exclusive"}',
+    '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Applicable indirect tax","rate_bps":0,"treatment":"exclusive","tax_review":{"reviewer_name":"Qualified tax adviser","qualification":"Chartered tax professional","organization":"Independent Tax Advisory LLP","reviewed_on":"2026-11-20","jurisdiction":"India - Delhi","supply_scope":"Platform token package supply and related services","customer_scope":"Individual platform customers in the reviewed jurisdiction","evidence_reference":"TAX-REVIEW-2026-001"}}',
     now() + interval '1 day',
     'Tax adviser review reference'
   );
-  r := r || case when tax_id is not null then 'ok explicit jurisdiction tax rule can be proposed without a hardcoded rate; ' else 'FAIL tax proposal; ' end;
+  r := r || case when tax_id is not null then 'ok tax rule proposal includes recorded professional review evidence; ' else 'FAIL tax proposal; ' end;
 
   begin
     perform public.admin_propose_financial_config(
       'tax_rule',
-      '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","treatment":"exclusive"}',
+      '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","treatment":"exclusive","tax_review":{"reviewer_name":"Qualified tax adviser","qualification":"Chartered tax professional","organization":"Independent Tax Advisory LLP","reviewed_on":"2026-11-20","jurisdiction":"India - Delhi","supply_scope":"Platform token package supply and related services","customer_scope":"Individual platform customers in the reviewed jurisdiction","evidence_reference":"TAX-REVIEW-2026-001"}}',
       now() + interval '1 day',
       'Tax proposal missing required rate'
     );
     r := r || 'FAIL tax rule without an explicit rate accepted; ';
   exception when invalid_parameter_value then
     r := r || 'ok tax rule requires an explicit rate; ';
+  end;
+  begin
+    perform public.admin_propose_financial_config(
+      'tax_rule',
+      '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","rate_bps":0,"treatment":"exclusive"}',
+      now() + interval '1 day',
+      'Missing tax review evidence regression test'
+    );
+    r := r || 'FAIL tax rule without review evidence accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok tax rule requires review evidence; ';
+  end;
+
+
+
+  -- Reject duplicate package codes, ignoring case.
+  begin
+    perform public.admin_propose_financial_config(
+      'token_pricing',
+      '{"currency":"INR","tax_inclusive":false,"packages":[{"code":"starter","tokens":100,"price_paise":15000},{"code":"STARTER","tokens":200,"price_paise":25000}]}',
+      now() + interval '1 day',
+      'Duplicate package regression test'
+    );
+    r := r || 'FAIL case-insensitive duplicate package codes accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok case-insensitive duplicate package codes rejected; ';
+  end;
+
+  -- Reject unknown top-level pricing properties.
+  begin
+    perform public.admin_propose_financial_config(
+      'token_pricing',
+      '{"currency":"INR","tax_inclusive":false,"unexpected":true,"packages":[{"code":"extra","tokens":100,"price_paise":15000}]}',
+      now() + interval '1 day',
+      'Unknown pricing property regression test'
+    );
+    r := r || 'FAIL unknown pricing property accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok unknown pricing property rejected; ';
+  end;
+
+  -- Reject unknown package properties.
+  begin
+    perform public.admin_propose_financial_config(
+      'token_pricing',
+      '{"currency":"INR","tax_inclusive":false,"packages":[{"code":"extra","tokens":100,"price_paise":15000,"unexpected":true}]}',
+      now() + interval '1 day',
+      'Unknown package property regression test'
+    );
+    r := r || 'FAIL unknown package property accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok unknown package property rejected; ';
+  end;
+
+  -- Reject unknown tax properties.
+  begin
+    perform public.admin_propose_financial_config(
+      'tax_rule',
+      '{"country_code":"IN","tax_category":"review_required","tax_name":"Tax","rate_bps":0,"treatment":"exclusive","unexpected":true}',
+      now() + interval '1 day',
+      'Unknown tax property regression test'
+    );
+    r := r || 'FAIL unknown tax property accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok unknown tax property rejected; ';
   end;
 
   begin
@@ -63,8 +128,22 @@ begin
 
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', approver, 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  begin
+    perform public.admin_approve_financial_config(pricing_id, null, 'Null decision test');
+    r := r || 'FAIL null approval decision accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok null approval decision rejected; ';
+  end;
+
   perform public.admin_approve_financial_config(pricing_id, 'approved', 'Independent finance review');
-  perform public.admin_approve_financial_config(tax_id, 'approved', 'Independent tax review');
+  begin
+    perform public.admin_approve_financial_config(tax_id, 'approved', 'Looks fine');
+    r := r || 'FAIL short tax approval note accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok tax approval requires a meaningful note; ';
+  end;
+
+  perform public.admin_approve_financial_config(tax_id, 'approved', 'Reviewed the adviser evidence and confirmed the stated jurisdiction and supply scope.');
   select count(*) into n from public.admin_list_financial_configs() where id in (pricing_id, tax_id) and approval_count = 1;
   r := r || case when n = 2 then 'ok independent admin approvals are recorded; ' else 'FAIL approval history; ' end;
   select c.status into config_status from public.admin_list_financial_configs() c where c.id = pricing_id;

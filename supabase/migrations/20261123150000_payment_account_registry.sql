@@ -193,7 +193,10 @@ begin
       max_amount_paise = p_max_amount_paise,
       upi_vpa = nullif(btrim(p_upi_vpa), ''),
       dynamic_qr_supported = coalesce(p_dynamic_qr_supported, false),
-      status = case when status = 'active' then 'paused' else status end,
+      status = 'draft',
+      secret_reference = null,
+      last_tested_at = null,
+      last_test_status = null,
       updated_by = me,
       updated_at = now()
     where id = p_id
@@ -229,7 +232,9 @@ as $$
 begin
   perform private.require_role('admin');
 
-  if p_status not in ('paused', 'disabled', 'test_pending') then
+  if p_status is null
+    or p_status not in ('paused', 'disabled', 'test_pending')
+  then
     raise exception
       'Only pause, disable, or test-pending transitions are available until provider credentials are securely connected and tested.'
       using errcode = '22023';
