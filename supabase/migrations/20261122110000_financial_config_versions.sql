@@ -192,7 +192,7 @@ $$;
 -- It is intentionally not writable by browser roles. Purchase flows remain disabled.
 create table public.financial_transaction_snapshots (
   id bigint generated always as identity primary key,
-  user_id uuid not null references auth.users(id),
+  user_id uuid references auth.users(id) on delete set null,
   source_type text not null check (source_type in ('token_purchase', 'refund', 'earning', 'adjustment')),
   source_reference text not null check (char_length(source_reference) between 1 and 160),
   pricing_config_id uuid references public.financial_config_versions(id),
