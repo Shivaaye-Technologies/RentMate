@@ -4,13 +4,14 @@ import { useAction } from "../live/useAction";
 import type { Booking, Review } from "./marketData";
 import { BOOKING_STATUS, COMPANION_STATUS, formatINR, marketError } from "./marketText";
 
-type Section = "overview" | "companions" | "bookings" | "reviews" | "accounts";
+type Section = "overview" | "companions" | "bookings" | "reviews" | "accounts" | "payments";
 const SECTIONS: { key: Section; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "companions", label: "Companions" },
   { key: "bookings", label: "Bookings & disputes" },
   { key: "reviews", label: "Reviews" },
   { key: "accounts", label: "Suspensions & appeals" },
+  { key: "payments", label: "Payment accounts" },
 ];
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
@@ -80,6 +81,8 @@ export function MarketAdmin({ onExit }: { onExit: () => void }) {
             {section === "bookings" && <Bookings />}
             {section === "reviews" && <Reviews />}
             {section === "accounts" && <Accounts />}
+            {section === "payments" && isAdmin && <PaymentAccounts />}
+            {section === "payments" && !isAdmin && <p className="alert error">Payment configuration is restricted to administrators.</p>}
           </>
         )}
       </main>
