@@ -10,6 +10,7 @@ declare
   n int;
   config_status text;
   balance_before bigint;
+  balance_after bigint;
   r text := '';
 begin
   insert into auth.users (id, email, aud, role)
@@ -39,6 +40,18 @@ begin
     'Tax adviser review reference'
   );
   r := r || case when tax_id is not null then 'ok explicit jurisdiction tax rule can be proposed without a hardcoded rate; ' else 'FAIL tax proposal; ' end;
+
+  begin
+    perform public.admin_propose_financial_config(
+      'tax_rule',
+      '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","treatment":"exclusive"}',
+      now() + interval '1 day',
+      'Tax proposal missing required rate'
+    );
+    r := r || 'FAIL tax rule without an explicit rate accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok tax rule requires an explicit rate; ';
+  end;
 
   begin
     perform public.admin_approve_financial_config(pricing_id, 'approved', 'self approval');
@@ -83,7 +96,7 @@ begin
   end;
   reset role;
 
-  select balance into n from public.token_wallets where user_id = member_id;
-  r := r || case when n = balance_before then 'ok pricing changes do not alter member token balances; ' else 'FAIL token wallet changed; ' end;
+  select balance into balance_after from public.token_wallets where user_id = member_id;
+  r := r || case when balance_after = balance_before then 'ok pricing changes do not alter member token balances; ' else 'FAIL token wallet changed; ' end;
   raise exception 'ROLLED BACK. RESULTS: %', r;
 end $$;
