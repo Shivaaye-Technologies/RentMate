@@ -1,6 +1,7 @@
 /**
- * Small accessible building blocks. Touch targets are at least 48 dp, text scales with the system
- * font size, and colours follow the system light/dark setting.
+ * Small accessible building blocks. Touch targets are at least 48 dp, text
+ * scales with the system font size, and colours follow the system light/dark
+ * setting.
  */
 import type { ReactNode } from "react";
 import {
@@ -131,7 +132,11 @@ export function Button(props: {
   const kind = props.kind ?? "primary";
   const disabled = props.disabled || props.busy;
   const bg =
-    kind === "primary" ? c.accent : kind === "danger" ? c.danger : "transparent";
+    kind === "primary"
+      ? c.accent
+      : kind === "danger"
+        ? c.danger
+        : "transparent";
   const fg = kind === "plain" ? c.accent : c.onAccent;
   return (
     <Pressable
