@@ -32,7 +32,7 @@ const taxExample = JSON.stringify(
     state_code: "DL",
     tax_category: "REVIEW_WITH_TAX_ADVISER",
     tax_name: "Applicable indirect tax",
-    rate_bps: null, // Enter only the rate confirmed by the adviser.
+    rate_bps: -1, // INVALID PLACEHOLDER: replace only with adviser-confirmed basis points.
     treatment: "exclusive",
     tax_review: {
       reviewer_name: "Enter reviewer's full name",
@@ -141,6 +141,13 @@ export function FinancialConfigAdmin() {
           tax rate is preselected as a legal default. Purchases and payouts remain disabled until separately
           authorized.
         </p>
+        {configType === "tax_rule" && (
+          <p className="alert warning small" role="alert">
+            The -1 rate is an invalid placeholder, not a 0% tax rate. Replace it only with the rate confirmed
+            by a qualified tax adviser. Example reviewer details are placeholders, not evidence of an actual
+            review.
+          </p>
+        )}
         <form className="form" onSubmit={(e) => void propose(e)}>
           <label className="field">
             <span>Configuration type</span>
