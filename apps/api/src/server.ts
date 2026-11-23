@@ -56,6 +56,21 @@ const app = createApp({
   live,
   webhook: { providers, integration },
   accountFor,
+  readinessCheck: async () => {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
+    try {
+      const response = await fetch(new URL("/auth/v1/health", SUPABASE_URL), {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        signal: AbortSignal.timeout(3000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  },
 });
 
 // Remove blocked, suspended or removed people from rooms they are already in (every 3 seconds).
