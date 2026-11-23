@@ -5,9 +5,9 @@ Nothing in this guide is executed without explicit founder approval. A green CI 
 ## Canonical source
 
 - Repository: `Shivaaye-Technologies/RentMate`
-- Current earnings implementation branch: `feature/earnings-platform-foundation`
-- Current review: [PR #5](https://github.com/Shivaaye-Technologies/RentMate/pull/5), targeting `feature/android-companionship-social`
-- Keep PR #5 open and unmerged until its review and release-base decision are complete.
+- Canonical integration/release-candidate branch: `feature/android-companionship-social`
+- Earnings implementation branch: `feature/earnings-platform-foundation` (merged through [PR #5](https://github.com/Shivaaye-Technologies/RentMate/pull/5), merge commit `d6aea6051356b624238f0ff708a6468f679c9596`).
+- Staging documentation update: [PR #6](https://github.com/Shivaaye-Technologies/RentMate/pull/6) (merged; documentation only).
 - Do not use the historical `rentmate970-hue/RentMate` repository or `feature/rentmate-conversion` branch as the current source of truth.
 
 Confirm the actual Render service, deploy branch, Supabase project and environment variables in their respective dashboards before any release. This guide does not assert that existing production services have been repointed.
@@ -44,7 +44,7 @@ Use only the values required by the selected environment. Enter secrets through 
 
 ## Canonical migration inventory
 
-The following is the migration-file order currently present on `feature/earnings-platform-foundation`. It is an inventory, not permission to apply migrations. Before staging or production use, compare the target database's `supabase_migrations.schema_migrations` history with this exact chain, inspect every migration and dependency, take a restorable backup, and rehearse the full chain on a disposable database.
+The following is the migration-file order currently present on `feature/android-companionship-social` after PR #5 was merged. It is an inventory, not permission to apply migrations. Before staging or production use, compare the target database's `supabase_migrations.schema_migrations` history with this exact chain, inspect every migration and dependency, take a restorable backup, and rehearse the full chain on a disposable database.
 
 1. `20261022210236_init.sql`
 2. `20261022210317_revoke_trigger_function_execute.sql`
@@ -84,10 +84,11 @@ Run database regression SQL only through `npm run test:db` against its disposabl
 
 ## Pre-release checklist
 
-- [ ] Confirm this canonical repository and the intended release branch.
-- [ ] Review PR #5, including its base branch, migration diffs, RLS, grants, RPC permissions and test results.
-- [ ] Confirm CI is green on the exact head commit intended for release.
+- [x] Confirm this canonical repository and integration branch (`Shivaaye-Technologies/RentMate`, `feature/android-companionship-social`).
+- [x] Review and merge PR #5, including its migration changes and CI checks; retain a separate release-base review before production.
+- [ ] Confirm CI is green on the exact final release-candidate commit (the PR checks passed, but rerun/verify against the final merged candidate SHA before release).
 - [x] Confirm staging project identity and migration history; latest pending LiveKit retry migration applied and recorded.
+- [x] Merge PR #6 documentation-only staging readiness update.
 - [ ] Rehearse the complete migration chain from a fresh disposable baseline and run full staging acceptance tests.
 - [ ] Take a backup and demonstrate that it can be restored.
 - [ ] Verify Supabase Auth site/redirect URLs, SMTP, CORS and provider configuration.
@@ -97,7 +98,7 @@ Run database regression SQL only through `npm run test:db` against its disposabl
 
 ## Release and rollback
 
-1. Complete code review and CI for the exact candidate commit on `feature/android-companionship-social`.
+1. Complete code review and CI for the exact candidate commit on `feature/android-companionship-social`; a green PR check on a different SHA is not sufficient.
 2. Obtain explicit approval for the target environment, deployment and database migration separately.
 3. Back up the target database and verify the restore procedure.
 4. Reconcile migration history, then apply the reviewed chain using the approved Supabase migration workflow.
