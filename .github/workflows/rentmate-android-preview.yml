@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          CMDLINE_TOOLS="$(find "$SDK_ROOT/cmdline-tools" -mindepth 2 -maxdepth 2 -type d -name bin -printf '%h\\n' 2>/dev/null | sort -V | tail -n 1)"
+          CMDLINE_TOOLS="$(find "$SDK_ROOT/cmdline-tools" -mindepth 2 -maxdepth 2 -type d -name bin -printf '%h\n' 2>/dev/null | sort -V | tail -n 1)"
           if [ -z "$CMDLINE_TOOLS" ] || [ ! -x "$CMDLINE_TOOLS/bin/sdkmanager" ]; then
             echo "::error::Android SDK command-line tools were not found under $SDK_ROOT"
             exit 1
