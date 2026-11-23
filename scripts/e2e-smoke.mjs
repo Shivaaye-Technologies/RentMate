@@ -89,7 +89,7 @@ async function open(browser, base, viewport, handleExternal = null) {
   page.on("console", (m) => {
     if (/Content Security Policy/i.test(m.text())) errors.push(`CSP: ${m.text()}`);
   });
-  await page.route("**/*", (route) => {
+  await page.route("**/*", async (route) => {
     const url = route.request().url();
     if (url.startsWith(base)) return route.continue();
     if (handleExternal && (await handleExternal(route, url))) return;
