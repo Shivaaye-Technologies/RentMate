@@ -25,7 +25,8 @@ The staging project previously identified as `RentMate-Staging-Mumbai` (`mmopqsq
 
 - **API build:** `npm ci --include=dev && npm run build -w apps/api`
 - **API start:** `npm start -w apps/api`
-- **API health:** `GET /health` should return HTTP 200.
+- **API liveness:** `GET /health` returns HTTP 200 while the process is running; it deliberately does not probe Supabase.
+- **API readiness:** `GET /ready` returns HTTP 200 only when authentication is configured and Supabase Auth health responds successfully; it returns HTTP 503 when the dependency is unavailable. Configure the host's readiness probe to use this endpoint where supported.
 - **Web build:** `npm ci --include=dev && npm run build -w apps/web`
 - **Web publish:** Static publish from `apps/web/dist`; configure SPA fallback.
 - **Web health:** Confirm the landing page loads.
