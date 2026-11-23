@@ -38,7 +38,7 @@ const taxExample = JSON.stringify(
       reviewer_name: "Enter reviewer's full name",
       qualification: "Enter professional tax qualification",
       organization: "Enter reviewing organization",
-      reviewed_on: "2026-11-20",
+      reviewed_on: "",
       jurisdiction: "India - Delhi",
       supply_scope: "Describe the supply reviewed",
       customer_scope: "Describe the customer types reviewed",
