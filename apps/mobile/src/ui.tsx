@@ -130,7 +130,8 @@ export function Button(props: {
   const c = usePalette();
   const kind = props.kind ?? "primary";
   const disabled = props.disabled || props.busy;
-  const bg = kind === "primary" ? c.accent : kind === "danger" ? c.danger : "transparent";
+  const bg =
+    kind === "primary" ? c.accent : kind === "danger" ? c.danger : "transparent";
   const fg = kind === "plain" ? c.accent : c.onAccent;
   return (
     <Pressable
@@ -182,7 +183,9 @@ export function Checkbox(props: {
             <Text style={{ color: c.onAccent, fontWeight: "700" }}>✓</Text>
           ) : null}
         </View>
-        <Text style={[styles.body, { color: c.text, flex: 1 }]}>{props.label}</Text>
+        <Text style={[styles.body, { color: c.text, flex: 1 }]}>
+          {props.label}
+        </Text>
       </Pressable>
       {props.error ? <Notice kind="error">{props.error}</Notice> : null}
     </View>
@@ -237,7 +240,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   buttonText: { fontSize: 16, fontWeight: "700" },
-  checkRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 48,
+  },
   box: {
     width: 26,
     height: 26,
