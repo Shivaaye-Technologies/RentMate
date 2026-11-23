@@ -1,6 +1,6 @@
 /**
- * Small accessible building blocks. Touch targets are at least 48 dp, text scales with the system font size, and
- * colours follow the system light/dark setting.
+ * Small accessible building blocks. Touch targets are at least 48 dp, text scales with the system
+ * font size, and colours follow the system light/dark setting.
  */
 import type { ReactNode } from "react";
 import {
