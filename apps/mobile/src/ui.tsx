@@ -46,13 +46,22 @@ export function usePalette() {
 export function Screen({ children }: { children: ReactNode }) {
   const c = usePalette();
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: c.bg }}
+      edges={["top", "bottom", "left", "right"]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
       >
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.screen}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -175,7 +184,16 @@ export function Notice({ children, kind }: { children: ReactNode; kind: "error" 
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: 20, paddingBottom: 44, gap: 16, flexGrow: 1 },
+  screen: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 16,
+    flexGrow: 1,
+  },
   title: { fontSize: 26, fontWeight: "700" },
   body: { fontSize: 16, lineHeight: 22 },
   field: { gap: 6 },
