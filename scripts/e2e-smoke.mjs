@@ -209,7 +209,9 @@ try {
           return true;
         }
         if (
-          url.startsWith("https://e2e-placeholder.supabase.co/rest/v1/rpc/demo_mode_profiles") &&
+          url.startsWith(
+            "https://e2e-placeholder.supabase.co/rest/v1/rpc/demo_mode_profiles",
+          ) &&
           method === "POST"
         ) {
           await route.fulfill({
@@ -250,15 +252,25 @@ try {
       (await page.locator(".demo-banner").innerText()).includes("fictional and simulated"),
     );
     await page.getByRole("button", { name: "Likes" }).click();
-    check("Demo Mode exposes its simulated Likes tab", await page.getByText(/Fictional demo profiles that/).isVisible());
+    check(
+      "Demo Mode exposes its simulated Likes tab",
+      await page.getByText(/Fictional demo profiles that/).isVisible(),
+    );
     await page.getByRole("button", { name: "Chats" }).click();
-    check("Demo Mode exposes its simulated Chats tab", await page.getByText(/Simulated matches and conversations/).isVisible());
+    check(
+      "Demo Mode exposes its simulated Chats tab",
+      await page.getByText(/Simulated matches and conversations/).isVisible(),
+    );
     check(
       "Demo Mode makes no unapproved external requests or writes",
       external.size === 0,
       [...external].join(", "),
     );
-    check("Demo Mode has no uncaught JavaScript or CSP errors", errors.length === 0, errors.join(" | "));
+    check(
+      "Demo Mode has no uncaught JavaScript or CSP errors",
+      errors.length === 0,
+      errors.join(" | "),
+    );
     await context.close();
   }
 
