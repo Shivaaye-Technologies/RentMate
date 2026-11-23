@@ -14,21 +14,21 @@ Confirm the actual Render service, deploy branch, Supabase project and environme
 
 ## Environments
 
-| Environment | Intended use                               | Release gate                                                       |
-| ----------- | ----------------------------------------- | ------------------------------------------------------------------ |
-| Local       | Development and automated tests          | No shared environment changes                                     |
-| Preview     | Per-PR web/API validation where configured | Verify preview secrets and data isolation                          |
-| Staging     | Isolated Supabase project and non-production services | Confirm project identity, full migration baseline and backup first |
-| Production  | Approved public service                   | Separate founder approval for deploy and database changes          |
+- **Local:** Development and automated tests. No shared environment changes.
+- **Preview:** Per-PR web/API validation where configured. Verify preview secrets and data isolation.
+- **Staging:** Isolated Supabase project and non-production services. Confirm project identity, full migration baseline and backup first.
+- **Production:** Approved public service. Deployment and database changes require separate founder approval.
 
 The staging project previously identified as `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`) was reported empty on 2026-11-22. Recheck its current state; do not assume that an empty database can accept only the newest feature migrations. A complete canonical bootstrap and migration-history reconciliation are required first.
 
 ## Build, start and health
 
-| Service | Build command                                     | Start / publish                                                  | Health              |
-| ------- | ------------------------------------------------ | ---------------------------------------------------------------- | ------------------- |
-| API     | `npm ci --include=dev && npm run build -w apps/api` | `npm start -w apps/api`                                             | `GET /health` → 200 |
-| Web     | `npm ci --include=dev && npm run build -w apps/web` | Static publish from `apps/web/dist`; configure SPA fallback | Landing page loads  |
+- **API build:** `npm ci --include=dev && npm run build -w apps/api`
+- **API start:** `npm start -w apps/api`
+- **API health:** `GET /health` should return HTTP 200.
+- **Web build:** `npm ci --include=dev && npm run build -w apps/web`
+- **Web publish:** Static publish from `apps/web/dist`; configure SPA fallback.
+- **Web health:** Confirm the landing page loads.
 
 Run the repository's current CI workflow rather than relying only on these abbreviated commands. Confirm the workflow scripts against the checked-out `package.json`.
 
@@ -36,12 +36,10 @@ Run the repository's current CI workflow rather than relying only on these abbre
 
 Use only the values required by the selected environment. Enter secrets through the hosting provider's secret manager; never commit them or place them in browser/mobile bundles.
 
-| Where | Variable                                                | Notes                                                               |
-| ----- | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| API   | `SUPABASE_URL`, `SUPABASE_ANON_KEY`                      | Publishable/anon key only; do not expose service-role credentials   |
-| API   | `CORS_ORIGINS`                                           | Explicit allowed web origins                                       |
-| API   | `LIVEKIT_*`, `LIVE_COUNTRY_HEADER`                       | Only after provider terms and feature authorization                |
-| Web   | `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Browser-safe values only                                            |
+- **API:** `SUPABASE_URL`, `SUPABASE_ANON_KEY` — publishable/anon key only; do not expose service-role credentials.
+- **API:** `CORS_ORIGINS` — explicit allowed web origins.
+- **API:** `LIVEKIT_*`, `LIVE_COUNTRY_HEADER` — only after provider terms and feature authorization.
+- **Web:** `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — browser-safe values only.
 
 ## Canonical migration inventory
 
@@ -84,7 +82,7 @@ Do not mark migrations as applied manually to bypass execution. Do not run only 
 
 - [ ] Confirm this canonical repository and the intended release branch.
 - [ ] Review PR #5, including its base branch, migration diffs, RLS, grants, RPC permissions and test results.
-- [ ] CI green on the exact head commit intended for release.
+- [ ] Confirm CI is green on the exact head commit intended for release.
 - [ ] Confirm staging project identity and migration history; rehearse the complete chain from a known baseline.
 - [ ] Take a backup and demonstrate that it can be restored.
 - [ ] Verify Supabase Auth site/redirect URLs, SMTP, CORS and provider configuration.
