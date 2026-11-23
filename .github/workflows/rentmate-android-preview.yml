@@ -1,0 +1,90 @@
+name: RentMate Android Preview APK
+
+on:
+  push:
+    branches:
+      - chore/github-actions-eas-local-preview
+      - feature/android-companionship-social
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rentmate-android-preview
+  cancel-in-progress: false
+
+jobs:
+  build-preview-apk:
+    name: Build signed preview APK (GitHub runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/android-companionship-social
+
+      - name: Require Expo access token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add EXPO_TOKEN under Repository Settings > Secrets and variables > Actions, then rerun this workflow."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # The action's default includes the obsolete "tools" package, which is no longer published.
+          packages: platform-tools
+
+      - name: Install Android API 37 and build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Verify app configuration and bundle safety
+        run: |
+          npm run typecheck
+          npm test
+          npm run config > /tmp/rentmate-expo-config.json
+          npm run check:bundle-secrets
+          npm run check:native
+
+      - name: Build signed preview APK locally on GitHub runner
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_LOCAL_BUILD_ARTIFACTS_DIR: ${{ github.workspace }}/apps/mobile/artifacts
+        run: |
+          mkdir -p artifacts
+          npx eas-cli@latest build --platform android --profile preview --local --non-interactive --output ./artifacts/rentmate-preview.apk
+
+      - name: Upload preview APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rentmate-android-preview-apk
+          path: apps/mobile/artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 14
