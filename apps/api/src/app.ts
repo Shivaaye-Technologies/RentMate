@@ -27,6 +27,12 @@ export const ROUTES = [
     auth: false,
     description: "Liveness check: 200 while the server is running",
   },
+  {
+    method: "GET",
+    path: "/ready",
+    auth: false,
+    description: "Readiness check: 200 only when Supabase is reachable",
+  },
   { method: "PUT", path: "/api/v1/profile", auth: true, description: "Create or update your profile" },
   { method: "GET", path: "/api/v1/matches", auth: true, description: "Ranked people for you to discover" },
   {
@@ -125,9 +131,11 @@ export interface AppDeps {
   webhook?: WebhookDeps;
   /** Server-side account deletion (optional: without it DELETE /api/v1/account returns 503). */
   accountFor?: (req: Request) => AccountDeleter;
+  /** Checks the external dependency required to serve authenticated requests. */
+  readinessCheck?: () => Promise<boolean>;
 }
 
-export function createApp({ config, verifyToken, storeFor, live, webhook, accountFor }: AppDeps) {
+export function createApp({ config, verifyToken, storeFor, live, webhook, accountFor, readinessCheck }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
@@ -157,6 +165,25 @@ export function createApp({ config, verifyToken, storeFor, live, webhook, accoun
   app.get("/health", (_req, res) => {
     res.set("Cache-Control", "no-store");
     res.status(200).json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null });
+  });
+
+  // Readiness is separate from liveness: do not restart a healthy process for a
+  // temporary dependency outage, but let the platform stop routing traffic to it.
+  app.get("/ready", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!verifyToken || !readinessCheck) {
+      res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+      return;
+    }
+    try {
+      if (!(await readinessCheck())) {
+        res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+        return;
+      }
+      res.status(200).json({ status: "ready", service: SERVICE_NAME });
+    } catch {
+      res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+    }
   });
 
   const api = express.Router();
