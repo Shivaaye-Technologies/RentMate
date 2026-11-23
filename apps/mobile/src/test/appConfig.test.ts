@@ -6,6 +6,7 @@ import config, { ANDROID_PACKAGE, EAS_PROJECT_ID, EXPO_OWNER, URL_SCHEME } from 
 
 const APPROVED_PACKAGE = "com.shivaayetechnologies.rentmate";
 const eas = JSON.parse(readFileSync(new URL("../../eas.json", import.meta.url).pathname, "utf8")) as {
+  cli: { appVersionSource?: string };
   build: Record<
     string,
     { developmentClient?: boolean; distribution?: string; android?: { buildType?: string } }
@@ -34,7 +35,11 @@ describe("Android identity", () => {
     expect(URL_SCHEME).toBe("rentmate");
     expect(config.scheme).toBe("rentmate");
     expect(config.platforms).toEqual(["android"]);
-    expect(config.android?.versionCode).toBeGreaterThanOrEqual(1);
+  });
+
+  it("uses EAS remote Android versioning and does not pin a local versionCode", () => {
+    expect(eas.cli.appVersionSource).toBe("remote");
+    expect(config.android).not.toHaveProperty("versionCode");
   });
 });
 
