@@ -76,8 +76,12 @@ The following is the migration-file order currently present on `feature/earnings
 28. `20261123140000_age_attestation_enforcement.sql`
 29. `20261123150000_payment_account_registry.sql`
 30. `20261123160000_financial_config_versions.sql`
+31. `20261123170000_retry_rejected_livekit_joins.sql`
 
 Do not mark migrations as applied manually to bypass execution. Do not run only items 29–30 against an empty staging database. Resolve missing, divergent or already-applied versions before proceeding. Run Supabase security/performance advisors and the full database test suite after a staging rehearsal.
+
+
+Run database regression SQL only through `npm run test:db` against its disposable PGlite database. Do not paste the suite's test files into a real Supabase SQL editor; see `supabase/tests/README.md` for the platform-specific reason.
 
 ## Pre-release checklist
 
