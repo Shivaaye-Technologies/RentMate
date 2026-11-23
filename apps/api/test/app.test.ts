@@ -13,8 +13,11 @@ const tokens: Record<string, string> = {
 };
 const verifier: TokenVerifier = async (t) => (tokens[t] ? { id: tokens[t] } : null);
 
-const makeApp = (store = new MemoryProfileStore(), verifyToken: TokenVerifier | null = verifier) =>
-  createApp({ config, verifyToken, storeFor: () => store });
+const makeApp = (
+  store = new MemoryProfileStore(),
+  verifyToken: TokenVerifier | null = verifier,
+  readinessCheck: () => Promise<boolean> = async () => true,
+) => createApp({ config, verifyToken, storeFor: () => store, readinessCheck });
 
 const profile = {
   displayName: "Alice",
@@ -26,10 +29,38 @@ const profile = {
 };
 
 describe("API", () => {
-  it("GET /health reports ok", async () => {
-    const res = await request(makeApp()).get("/health");
+  it("GET /health reports process liveness without probing dependencies", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), verifier, async () => false)).get("/health");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "ok", authConfigured: true });
+  });
+
+  it("GET /ready reports ready when Supabase is reachable", async () => {
+    const res = await request(makeApp()).get("/ready");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: "ready", service: "rentmate-api" });
+    expect(res.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("GET /ready fails closed when Supabase is unavailable", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), verifier, async () => false)).get("/ready");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ status: "not_ready", service: "rentmate-api" });
+  });
+
+  it("GET /ready fails closed when the dependency probe throws", async () => {
+    const res = await request(
+      makeApp(new MemoryProfileStore(), verifier, async () => {
+        throw new Error("private connection detail");
+      }),
+    ).get("/ready");
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(res.body)).not.toContain("private connection detail");
+  });
+
+  it("GET /ready fails closed when authentication is not configured", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), null)).get("/ready");
+    expect(res.status).toBe(503);
   });
 
   it("rejects requests without a token", async () => {
