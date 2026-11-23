@@ -1,6 +1,10 @@
 name: RentMate Android Preview APK
 
 on:
+  push:
+    branches:
+      - chore/github-actions-eas-local-preview
+      - feature/android-companionship-social
   workflow_dispatch:
 
 permissions:
