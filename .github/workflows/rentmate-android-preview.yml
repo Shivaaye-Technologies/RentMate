@@ -59,7 +59,7 @@ jobs:
       - name: Install Android API 37 and build tools
         run: |
           yes | sdkmanager --licenses >/dev/null
-          sdkmanager --channel=3 "platforms;android-37" "build-tools;36.0.0" "ndk;27.1.12297006"
+          sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.1.12297006"
 
       - name: Install mobile dependencies
         run: npm ci
