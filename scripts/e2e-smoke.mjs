@@ -192,26 +192,20 @@ try {
       async (route, url) => {
         const method = route.request().method();
         // The app pings API liveness on startup; permit only this read-only GET.
-        if (
-          url === "https://e2e-placeholder-api.onrender.com/health" &&
-          method === "GET"
-        ) {
+        if (url === "https://e2e-placeholder-api.onrender.com/health" && method === "GET") {
           await route.abort();
           return true;
         }
         // Static fonts are optional presentation assets, not app data or writes.
         if (
-          (url.startsWith("https://fonts.googleapis.com/") ||
-            url.startsWith("https://fonts.gstatic.com/")) &&
+          (url.startsWith("https://fonts.googleapis.com/") || url.startsWith("https://fonts.gstatic.com/")) &&
           method === "GET"
         ) {
           await route.abort();
           return true;
         }
         if (
-          url.startsWith(
-            "https://e2e-placeholder.supabase.co/rest/v1/rpc/demo_mode_profiles",
-          ) &&
+          url.startsWith("https://e2e-placeholder.supabase.co/rest/v1/rpc/demo_mode_profiles") &&
           method === "POST"
         ) {
           await route.fulfill({
@@ -239,10 +233,7 @@ try {
       },
     );
     await page.goto(`${base}/#demo`, { waitUntil: "load" });
-    await page
-      .getByText("Demo Mode", { exact: true })
-      .first()
-      .waitFor({ state: "visible", timeout: 10000 });
+    await page.getByText("Demo Mode", { exact: true }).first().waitFor({ state: "visible", timeout: 10000 });
     check(
       "Demo Mode loads fictional profiles from the dedicated demo RPC",
       (await page.getByText("Demo Asha").count()) > 0,
@@ -266,11 +257,7 @@ try {
       external.size === 0,
       [...external].join(", "),
     );
-    check(
-      "Demo Mode has no uncaught JavaScript or CSP errors",
-      errors.length === 0,
-      errors.join(" | "),
-    );
+    check("Demo Mode has no uncaught JavaScript or CSP errors", errors.length === 0, errors.join(" | "));
     await context.close();
   }
 
