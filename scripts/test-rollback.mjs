@@ -63,7 +63,9 @@ const STEPS = [
   {
     migrations: ["20261121090000_calls_and_live_rooms.sql"],
     rollback: "docs/rollback/20261121_calls_and_live_rooms.rollback.sql",
-    suites: ["calls_and_live_rooms.sql"],
+    // The latest webhook regression suite runs after the dependent retry migration is re-applied
+    // in its own step above; running it here would test the intentionally restored older function.
+    suites: [],
   },
   {
     migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],
