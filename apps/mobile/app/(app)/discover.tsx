@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { Image, Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
 import { SafetyActions } from "../../src/components/SafetyActions";
@@ -20,6 +20,8 @@ type Candidate = {
 };
 export default function Discover() {
   const c = usePalette();
+  const { height: windowHeight } = useWindowDimensions();
+  const photoHeight = Math.min(420, Math.max(240, windowHeight * 0.38));
   const [items, setItems] = useState<Candidate[]>([]);
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -128,7 +130,8 @@ export default function Discover() {
         >
           <View
             style={{
-              height: 340,
+              height: photoHeight,
+              width: "100%",
               backgroundColor: "#F4C9DA",
               alignItems: "center",
               justifyContent: "center",
@@ -162,7 +165,7 @@ export default function Discover() {
             </View>
           </View>
           <View style={{ padding: 20, gap: 10 }}>
-            <Text style={{ color: c.text, fontSize: 27, fontWeight: "800" }}>
+            <Text style={{ color: c.text, fontSize: 25, fontWeight: "800", flexShrink: 1 }}>
               {person.displayName || "RentMate member"}, {person.age} {person.verified ? "✓" : ""}
             </Text>
             <Text style={{ color: c.muted }}>
