@@ -55,6 +55,17 @@ begin
   begin
     perform public.admin_propose_financial_config(
       'tax_rule',
+      '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","rate_bps":null,"treatment":"exclusive","tax_review":{"reviewer_name":"Qualified tax adviser","qualification":"Chartered tax professional","organization":"Independent Tax Advisory LLP","reviewed_on":"2026-11-20","jurisdiction":"India - Delhi","supply_scope":"Platform token package supply and related services","customer_scope":"Individual platform customers in the reviewed jurisdiction","evidence_reference":"TAX-REVIEW-2026-001"}}',
+      now() + interval '1 day',
+      'Tax proposal null rate regression test'
+    );
+    r := r || 'FAIL tax rule with null rate accepted; ';
+  exception when invalid_parameter_value then
+    r := r || 'ok tax rule rejects null rate; ';
+  end;
+  begin
+    perform public.admin_propose_financial_config(
+      'tax_rule',
       '{"country_code":"IN","state_code":"DL","tax_category":"review_required","tax_name":"Tax","rate_bps":0,"treatment":"exclusive"}',
       now() + interval '1 day',
       'Missing tax review evidence regression test'
