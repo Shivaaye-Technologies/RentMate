@@ -48,9 +48,23 @@ begin
     r := r || 'ok incompatible payment adapter is rejected; ';
   end;
 
+  -- Admin can use the masked RPC, but must not read the underlying table directly.
+  begin
+    select count(*) into n from public.payment_provider_accounts;
+    r := r || 'FAIL admin directly selected payment account table; ';
+  exception when insufficient_privilege then
+    r := r || 'ok admin direct table SELECT is revoked; ';
+  end;
+  select status into strict account_status
+    from public.admin_list_payment_accounts() where id = acct;
+  r := r || case when account_status = 'draft'
+    then 'ok admin reads metadata through the RPC; ' else 'FAIL admin RPC metadata; ' end;
+
   perform public.admin_set_payment_account_status(acct, 'paused');
-  select status into strict account_status from public.payment_provider_accounts where id = acct;
-  r := r || case when account_status = 'paused' then 'ok admin can pause account; ' else 'FAIL pause status; ' end;
+  select status into strict account_status
+    from public.admin_list_payment_accounts() where id = acct;
+  r := r || case when account_status = 'paused'
+    then 'ok admin can pause account through the RPC; ' else 'FAIL pause status; ' end;
   begin
     perform public.admin_set_payment_account_status(acct, 'active');
     r := r || 'FAIL account activated without provider test; ';
@@ -80,8 +94,12 @@ begin
 
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', member_id, 'role', 'authenticated', 'aal', 'aal2')::text, true);
-  select count(*) into n from public.payment_provider_accounts;
-  r := r || case when n = 0 then 'ok ordinary members cannot read payment account metadata; ' else 'FAIL member read metadata; ' end;
+  begin
+    select count(*) into n from public.payment_provider_accounts;
+    r := r || 'FAIL ordinary member directly selected payment account table; ';
+  exception when insufficient_privilege then
+    r := r || 'ok ordinary member has no direct table SELECT; ';
+  end;
   begin
     perform public.admin_set_payment_account_status(acct, 'disabled');
     r := r || 'FAIL member changed payment account status; ';
