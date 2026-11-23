@@ -47,10 +47,7 @@ export function usePalette() {
 export function Screen({ children }: { children: ReactNode }) {
   const c = usePalette();
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: c.bg }}
-      edges={["top", "bottom", "left", "right"]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={["top", "bottom", "left", "right"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -79,24 +76,12 @@ export function Title({ children }: { children: ReactNode }) {
   );
 }
 
-export function Body({
-  children,
-  muted,
-}: {
-  children: ReactNode;
-  muted?: boolean;
-}) {
+export function Body({ children, muted }: { children: ReactNode; muted?: boolean }) {
   const c = usePalette();
-  return (
-    <Text style={[styles.body, { color: muted ? c.muted : c.text }]}>
-      {children}
-    </Text>
-  );
+  return <Text style={[styles.body, { color: muted ? c.muted : c.text }]}>{children}</Text>;
 }
 
-export function Field(
-  props: TextInputProps & { label: string; error?: string | null },
-) {
+export function Field(props: TextInputProps & { label: string; error?: string | null }) {
   const c = usePalette();
   const { label, error, style, ...input } = props;
   return (
@@ -131,12 +116,7 @@ export function Button(props: {
   const c = usePalette();
   const kind = props.kind ?? "primary";
   const disabled = props.disabled || props.busy;
-  const bg =
-    kind === "primary"
-      ? c.accent
-      : kind === "danger"
-        ? c.danger
-        : "transparent";
+  const bg = kind === "primary" ? c.accent : kind === "danger" ? c.danger : "transparent";
   const fg = kind === "plain" ? c.accent : c.onAccent;
   return (
     <Pressable
@@ -184,26 +164,16 @@ export function Checkbox(props: {
             },
           ]}
         >
-          {props.checked ? (
-            <Text style={{ color: c.onAccent, fontWeight: "700" }}>✓</Text>
-          ) : null}
+          {props.checked ? <Text style={{ color: c.onAccent, fontWeight: "700" }}>✓</Text> : null}
         </View>
-        <Text style={[styles.body, { color: c.text, flex: 1 }]}>
-          {props.label}
-        </Text>
+        <Text style={[styles.body, { color: c.text, flex: 1 }]}>{props.label}</Text>
       </Pressable>
       {props.error ? <Notice kind="error">{props.error}</Notice> : null}
     </View>
   );
 }
 
-export function Notice({
-  children,
-  kind,
-}: {
-  children: ReactNode;
-  kind: "error" | "info";
-}) {
+export function Notice({ children, kind }: { children: ReactNode; kind: "error" | "info" }) {
   const c = usePalette();
   return (
     <Text
