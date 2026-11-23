@@ -14,7 +14,7 @@ declare
   ident text := p_event #>> '{participant,identity}';
   uid uuid;
   at timestamptz := coalesce(to_timestamp(nullif(p_event ->> 'createdAt', '')::bigint), now());
-  c public.call_sessions;
+  settled_call_id uuid;
 begin
   if not private.integration_secret_ok('livekit_webhook', p_secret) then
     raise exception 'Not allowed.' using errcode = '42501';
@@ -46,8 +46,8 @@ begin
                 order by joined_at desc limit 1);
   elsif ev = 'room_finished' then
     update private.room_presence set left_at = greatest(at, joined_at) where room_name = room and left_at is null;
-    select * into c from public.call_sessions where room_name = room;
-    if found then perform private.call_settle(c.id, at); end if;
+    select id into settled_call_id from public.call_sessions where room_name = room;
+    if settled_call_id is not null then perform private.call_settle(settled_call_id, at); end if;
   end if;
   return jsonb_build_object('duplicate', false, 'kick', false);
 end;
