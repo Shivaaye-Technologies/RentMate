@@ -22,12 +22,12 @@ describe("Android identity", () => {
 
   it("the package id is a valid Android application id", () => {
     // Two or more segments, each starting with a letter, only letters, digits and underscores; lowercase by convention.
-    expect(APPROVED_PACKAGE).toMatch(/^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$/);
+    expect(APPROVED_PACKAGE).toMatch(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/);
   });
 
   it("cannot be overridden from the environment", () => {
     const src = readFileSync(new URL("../../app.config.ts", import.meta.url).pathname, "utf8");
-    expect(src).not.toMatch(/process\\.env\\.[A-Z_]*PACKAGE/);
+    expect(src).not.toMatch(/process\.env\.[A-Z_]*PACKAGE/);
   });
 
   it("has the app name, URL scheme and Android-only platform", () => {
@@ -55,7 +55,7 @@ describe("EAS project link", () => {
   it("the project id is a UUID and is not taken from the environment", () => {
     expect(EAS_PROJECT_ID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     const src = readFileSync(new URL("../../app.config.ts", import.meta.url).pathname, "utf8");
-    expect(src).not.toMatch(/process\\.env/);
+    expect(src).not.toMatch(/process\.env/);
   });
 });
 
