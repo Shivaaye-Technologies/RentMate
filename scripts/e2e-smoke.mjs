@@ -80,7 +80,7 @@ function check(name, cond, detail = "") {
   }
 }
 
-async function open(browser, base, viewport) {
+async function open(browser, base, viewport, handleExternal = null) {
   const context = await browser.newContext({ viewport, serviceWorkers: "block" });
   const page = await context.newPage();
   const errors = [];
@@ -89,9 +89,10 @@ async function open(browser, base, viewport) {
   page.on("console", (m) => {
     if (/Content Security Policy/i.test(m.text())) errors.push(`CSP: ${m.text()}`);
   });
-  await page.route("**/*", (route) => {
+  await page.route("**/*", async (route) => {
     const url = route.request().url();
     if (url.startsWith(base)) return route.continue();
+    if (handleExternal && (await handleExternal(route, url))) return;
     external.add(new URL(url).host);
     return route.abort();
   });
@@ -179,6 +180,84 @@ try {
     await page.locator("form button.btn.block").first().click();
     await page.waitForTimeout(1500);
     check("with the 18+ confirmation, sign-up is sent", signups.length > 0);
+    await context.close();
+  }
+
+  // 2c. Demo Mode uses fictional profiles and simulated interactions only.
+  {
+    const { context, page, errors, external } = await open(
+      browser,
+      base,
+      { width: 390, height: 844 },
+      async (route, url) => {
+        const method = route.request().method();
+        // The app pings API liveness on startup; permit only this read-only GET.
+        if (url === "https://e2e-placeholder-api.onrender.com/health" && method === "GET") {
+          await route.abort();
+          return true;
+        }
+        // Static fonts are optional presentation assets, not app data or writes.
+        if (
+          (url.startsWith("https://fonts.googleapis.com/") || url.startsWith("https://fonts.gstatic.com/")) &&
+          method === "GET"
+        ) {
+          await route.abort();
+          return true;
+        }
+        if (
+          url.startsWith("https://e2e-placeholder.supabase.co/rest/v1/rpc/demo_mode_profiles") &&
+          method === "POST"
+        ) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify([
+              {
+                id: "00000000-0000-5000-8000-000000000001",
+                display_name: "Demo Asha",
+                age: 27,
+                bio: "A fictional demo profile.",
+                interests: ["Hiking", "Coffee"],
+                looking_for: "relationship",
+                photo_path: null,
+                verified: false,
+                created_at: "2026-01-01T00:00:00.000Z",
+                distance_km: 4,
+                online: true,
+              },
+            ]),
+          });
+          return true;
+        }
+        return false;
+      },
+    );
+    await page.goto(`${base}/#demo`, { waitUntil: "load" });
+    await page.getByText("Demo Mode", { exact: true }).first().waitFor({ state: "visible", timeout: 10000 });
+    check(
+      "Demo Mode loads fictional profiles from the dedicated demo RPC",
+      (await page.getByText("Demo Asha").count()) > 0,
+    );
+    check(
+      "Demo Mode clearly explains that profiles and interactions are simulated",
+      (await page.locator(".demo-banner").innerText()).includes("fictional and simulated"),
+    );
+    await page.getByRole("button", { name: "Likes" }).click();
+    check(
+      "Demo Mode exposes its simulated Likes tab",
+      await page.getByText(/Fictional demo profiles that/).isVisible(),
+    );
+    await page.getByRole("button", { name: "Chats" }).click();
+    check(
+      "Demo Mode exposes its simulated Chats tab",
+      await page.getByText(/Simulated matches and conversations/).isVisible(),
+    );
+    check(
+      "Demo Mode makes no unapproved external requests or writes",
+      external.size === 0,
+      [...external].join(", "),
+    );
+    check("Demo Mode has no uncaught JavaScript or CSP errors", errors.length === 0, errors.join(" | "));
     await context.close();
   }
 

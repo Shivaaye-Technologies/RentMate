@@ -16,6 +16,11 @@ const migrations = readdirSync(join(root, "supabase/migrations")).sort();
 /** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
 const STEPS = [
   {
+    migrations: ["20261123170000_retry_rejected_livekit_joins.sql"],
+    rollback: "docs/rollback/20261123_retry_rejected_livekit_joins.rollback.sql",
+    suites: ["calls_and_live_rooms.sql"],
+  },
+  {
     migrations: ["20261123140000_age_attestation_enforcement.sql"],
     rollback: "docs/rollback/20261123_age_attestation_enforcement.rollback.sql",
     suites: ["age_attestation.sql", "age_attestation_enforcement.sql", "age_attestation_abuse.sql"],
@@ -58,7 +63,9 @@ const STEPS = [
   {
     migrations: ["20261121090000_calls_and_live_rooms.sql"],
     rollback: "docs/rollback/20261121_calls_and_live_rooms.rollback.sql",
-    suites: ["calls_and_live_rooms.sql"],
+    // The latest webhook regression suite runs after the dependent retry migration is re-applied
+    // in its own step above; running it here would test the intentionally restored older function.
+    suites: [],
   },
   {
     migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],

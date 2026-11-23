@@ -43,6 +43,8 @@ for (const test of [
   "marketplace.sql",
   "audit_hardening.sql",
   "token_wallet.sql",
+  "payment_account_registry.sql",
+  "financial_config_versions.sql",
   "calls_and_live_rooms.sql",
   "admin_mfa.sql",
   "recovery_codes_and_retention.sql",

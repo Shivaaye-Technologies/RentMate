@@ -138,6 +138,12 @@ begin
           'createdAt', extract(epoch from t)::bigint::text, 'room', jsonb_build_object('name', room),
           'participant', jsonb_build_object('identity', x::text)));
   r := r || case when (js ->> 'kick')::boolean then 'ok an outsider who reaches a call room is removed at once; ' else 'FAIL outsider stays; ' end;
+  js := public.live_webhook_ingest(secret, jsonb_build_object('event', 'participant_joined', 'id', 'EV_X',
+          'createdAt', extract(epoch from t)::bigint::text, 'room', jsonb_build_object('name', room),
+          'participant', jsonb_build_object('identity', x::text)));
+  r := r || case when (js ->> 'duplicate')::boolean and (js ->> 'kick')::boolean
+                 then 'ok a rejected duplicate join is kicked again after a failed removal retry; '
+                 else 'FAIL rejected duplicate join was not kicked again; ' end;
   js := public.live_webhook_ingest(secret, jsonb_build_object('event', 'participant_joined', 'id', 'EV_2',
           'createdAt', extract(epoch from t + interval '5 seconds')::bigint::text, 'room', jsonb_build_object('name', room),
           'participant', jsonb_build_object('identity', b::text)));

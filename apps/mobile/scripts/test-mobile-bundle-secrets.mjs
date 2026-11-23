@@ -21,7 +21,7 @@ const control = `https://${randomBytes(6).toString("hex")}-control.onrender.com`
 
 rmSync("dist", { recursive: true, force: true });
 execFileSync("npx", ["expo", "export", "--platform", "android", "--output-dir", "dist"], {
-  stdio: "ignore",
+  stdio: "inherit",
   env: {
     ...process.env,
     ...values,

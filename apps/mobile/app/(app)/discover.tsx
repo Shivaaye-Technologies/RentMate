@@ -66,7 +66,7 @@ export default function Discover() {
       return () => {
         active = false;
       };
-    }, [person?.id, person?.photoPath]),
+    }, [person?.photoPath]),
   );
   const advance = async (kind: "like" | "pass") => {
     if (!person || !supabase || actionBusy) return;
