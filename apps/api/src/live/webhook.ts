@@ -40,7 +40,7 @@ export function webhookRouter({ providers, integration }: WebhookDeps) {
           const room = (event.room as { name?: string } | undefined)?.name;
           const identity = (event.participant as { identity?: string } | undefined)?.identity;
           if (result.kick && room && identity) {
-            await lk.removeParticipant(room, identity).catch(() => undefined);
+            await lk.removeParticipant(room, identity);
           }
           res.json({ ok: true, duplicate: result.duplicate, kicked: result.kick });
         } catch (err) {
