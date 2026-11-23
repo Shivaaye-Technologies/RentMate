@@ -135,7 +135,15 @@ export interface AppDeps {
   readinessCheck?: () => Promise<boolean>;
 }
 
-export function createApp({ config, verifyToken, storeFor, live, webhook, accountFor, readinessCheck }: AppDeps) {
+export function createApp({
+  config,
+  verifyToken,
+  storeFor,
+  live,
+  webhook,
+  accountFor,
+  readinessCheck,
+}: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
