@@ -78,12 +78,24 @@ export function Title({ children }: { children: ReactNode }) {
   );
 }
 
-export function Body({ children, muted }: { children: ReactNode; muted?: boolean }) {
+export function Body({
+  children,
+  muted,
+}: {
+  children: ReactNode;
+  muted?: boolean;
+}) {
   const c = usePalette();
-  return <Text style={[styles.body, { color: muted ? c.muted : c.text }]}>{children}</Text>;
+  return (
+    <Text style={[styles.body, { color: muted ? c.muted : c.text }]}>
+      {children}
+    </Text>
+  );
 }
 
-export function Field(props: TextInputProps & { label: string; error?: string | null }) {
+export function Field(
+  props: TextInputProps & { label: string; error?: string | null },
+) {
   const c = usePalette();
   const { label, error, style, ...input } = props;
   return (
@@ -94,7 +106,11 @@ export function Field(props: TextInputProps & { label: string; error?: string | 
         placeholderTextColor={c.muted}
         style={[
           styles.input,
-          { color: c.text, borderColor: error ? c.danger : c.border, backgroundColor: c.card },
+          {
+            color: c.text,
+            borderColor: error ? c.danger : c.border,
+            backgroundColor: c.card,
+          },
           style,
         ]}
         {...input}
@@ -162,7 +178,9 @@ export function Checkbox(props: {
             },
           ]}
         >
-          {props.checked ? <Text style={{ color: c.onAccent, fontWeight: "700" }}>✓</Text> : null}
+          {props.checked ? (
+            <Text style={{ color: c.onAccent, fontWeight: "700" }}>✓</Text>
+          ) : null}
         </View>
         <Text style={[styles.body, { color: c.text, flex: 1 }]}>{props.label}</Text>
       </Pressable>
@@ -171,7 +189,13 @@ export function Checkbox(props: {
   );
 }
 
-export function Notice({ children, kind }: { children: ReactNode; kind: "error" | "info" }) {
+export function Notice({
+  children,
+  kind,
+}: {
+  children: ReactNode;
+  kind: "error" | "info";
+}) {
   const c = usePalette();
   return (
     <Text
@@ -198,7 +222,13 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 22 },
   field: { gap: 6 },
   label: { fontSize: 15, fontWeight: "600" },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 16 },
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 16,
+  },
   button: {
     minHeight: 48,
     borderRadius: 10,
