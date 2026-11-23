@@ -29,7 +29,7 @@ const config: ExpoConfig = {
   platforms: ["android"],
   android: {
     package: ANDROID_PACKAGE,
-    versionCode: 1,
+    // EAS remote appVersionSource owns Android versionCode; do not set a local versionCode here.
     // Permissions are added only when the feature that needs them ships, and requested at the moment of use.
     // Calls will add CAMERA and RECORD_AUDIO; push will add POST_NOTIFICATIONS; location stays optional.
     permissions: [],
