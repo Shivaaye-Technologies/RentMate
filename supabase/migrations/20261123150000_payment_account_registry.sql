@@ -43,12 +43,9 @@ create index payment_provider_accounts_routing_idx
   on public.payment_provider_accounts(payment_method, environment, status, priority);
 
 alter table public.payment_provider_accounts enable row level security;
-revoke all on public.payment_provider_accounts from anon, authenticated;
-grant select on public.payment_provider_accounts to authenticated;
-
-create policy "admins read payment account metadata"
-  on public.payment_provider_accounts for select to authenticated
-  using (private.has_role('admin'));
+-- The table is intentionally inaccessible to browser roles. Admin reads go through
+-- admin_list_payment_accounts(), which masks secret_reference as a boolean.
+revoke all on public.payment_provider_accounts from public, anon, authenticated;
 
 create function public.admin_list_payment_accounts()
 returns table (
