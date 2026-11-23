@@ -238,7 +238,7 @@ try {
         return false;
       },
     );
-    await page.goto(base + "/#demo", { waitUntil: "load" });
+    await page.goto(`${base}/#demo`, { waitUntil: "load" });
     await page
       .getByText("Demo Mode", { exact: true })
       .first()
@@ -249,7 +249,9 @@ try {
     );
     check(
       "Demo Mode clearly explains that profiles and interactions are simulated",
-      (await page.locator(".demo-banner").innerText()).includes("fictional and simulated"),
+      (await page.locator(".demo-banner").innerText()).includes(
+        "fictional and simulated",
+      ),
     );
     await page.getByRole("button", { name: "Likes" }).click();
     check(
