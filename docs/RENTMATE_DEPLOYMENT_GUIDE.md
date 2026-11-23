@@ -19,7 +19,7 @@ Confirm the actual Render service, deploy branch, Supabase project and environme
 - **Staging:** Isolated Supabase project and non-production services. Confirm project identity, full migration baseline and backup first.
 - **Production:** Approved public service. Deployment and database changes require separate founder approval.
 
-The staging project previously identified as `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`) was reported empty on 2026-11-22. Recheck its current state; do not assume that an empty database can accept only the newest feature migrations. A complete canonical bootstrap and migration-history reconciliation are required first.
+Staging verification on 2026-11-23: `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`, `ap-south-1`) is `ACTIVE_HEALTHY`. Its migration history matched the canonical chain through `20261123160000_financial_config_versions`; migration `20261123170000_retry_rejected_livekit_joins.sql` was then applied to staging and verified in migration history. The `live_webhook_ingest(text,jsonb)` function was verified as `SECURITY DEFINER` with an empty `search_path`. This does not constitute a full application acceptance test or production authorization.
 
 ## Build, start and health
 
@@ -87,7 +87,8 @@ Run database regression SQL only through `npm run test:db` against its disposabl
 - [ ] Confirm this canonical repository and the intended release branch.
 - [ ] Review PR #5, including its base branch, migration diffs, RLS, grants, RPC permissions and test results.
 - [ ] Confirm CI is green on the exact head commit intended for release.
-- [ ] Confirm staging project identity and migration history; rehearse the complete chain from a known baseline.
+- [x] Confirm staging project identity and migration history; latest pending LiveKit retry migration applied and recorded.
+- [ ] Rehearse the complete migration chain from a fresh disposable baseline and run full staging acceptance tests.
 - [ ] Take a backup and demonstrate that it can be restored.
 - [ ] Verify Supabase Auth site/redirect URLs, SMTP, CORS and provider configuration.
 - [ ] Verify hosting service repository, branch, build command, runtime and environment variables.
@@ -96,7 +97,7 @@ Run database regression SQL only through `npm run test:db` against its disposabl
 
 ## Release and rollback
 
-1. Complete code review and CI for the exact candidate commit.
+1. Complete code review and CI for the exact candidate commit on `feature/android-companionship-social`.
 2. Obtain explicit approval for the target environment, deployment and database migration separately.
 3. Back up the target database and verify the restore procedure.
 4. Reconcile migration history, then apply the reviewed chain using the approved Supabase migration workflow.
