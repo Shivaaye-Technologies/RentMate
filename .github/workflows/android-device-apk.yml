@@ -45,12 +45,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          # The deprecated SDK package named "tools" is no longer published.
-          tools: ""
-          packages: "platform-tools;platforms;android-37;build-tools;36.0.0"
+      - name: Install Android SDK components
+        run: |
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null
+          "$sdkmanager" "platform-tools" "platforms;android-37" "build-tools;36.0.0"
 
       - name: Install mobile dependencies
         working-directory: apps/mobile
