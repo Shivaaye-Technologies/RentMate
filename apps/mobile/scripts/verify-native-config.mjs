@@ -64,11 +64,7 @@ try {
     granted.every((p) => allowed.has(p)),
     granted.join(", "),
   );
-  for (const p of [
-    "ACCESS_FINE_LOCATION",
-    "ACCESS_COARSE_LOCATION",
-    "READ_CONTACTS",
-  ]) {
+  for (const p of ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "READ_CONTACTS"]) {
     check(
       `${p} is removed because the feature is not enabled`,
       manifest.includes(`<uses-permission android:name="android.permission.${p}" tools:node="remove"/>`),
