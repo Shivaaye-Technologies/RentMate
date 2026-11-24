@@ -31,11 +31,7 @@ export default function Wallet() {
         if (!auth.user) throw new Error("Please sign in again.");
 
         const [wallet, entitlement] = await Promise.all([
-          supabase
-            .from("token_wallets")
-            .select("balance")
-            .eq("user_id", auth.user.id)
-            .maybeSingle(),
+          supabase.from("token_wallets").select("balance").eq("user_id", auth.user.id).maybeSingle(),
           supabase.rpc("my_subscription_entitlement"),
         ]);
         if (wallet.error) throw wallet.error;
@@ -45,10 +41,7 @@ export default function Wallet() {
         const row = Array.isArray(entitlement.data) ? entitlement.data[0] : null;
         setSubscription((row as SubscriptionRow | null) ?? null);
       } catch (e) {
-        if (active)
-          setError(
-            e instanceof Error ? e.message : "Could not load your wallet.",
-          );
+        if (active) setError(e instanceof Error ? e.message : "Could not load your wallet.");
       } finally {
         if (active) setLoading(false);
       }
@@ -84,16 +77,10 @@ export default function Wallet() {
       >
         <Text style={{ color: c.muted }}>Your token balance</Text>
         <Text style={{ color: c.text, fontSize: 34, fontWeight: "800" }}>
-          {loading
-            ? "…"
-            : balance === null
-              ? "—"
-              : balance.toLocaleString("en-IN")}
+          {loading ? "…" : balance === null ? "—" : balance.toLocaleString("en-IN")}
         </Text>
         <Text style={{ color: c.muted }}>
-          {loading
-            ? "Loading your wallet…"
-            : "Tokens are internal app credits with no cash value."}
+          {loading ? "Loading your wallet…" : "Tokens are internal app credits with no cash value."}
         </Text>
       </View>
       <Title>Subscription</Title>
@@ -122,13 +109,12 @@ export default function Wallet() {
       </View>
       <Title>Gifts & token packages</Title>
       <Body>
-        Token purchases and gift sending are currently disabled. No package can
-        be purchased and no gift transaction is simulated.
+        Token purchases and gift sending are currently disabled. No package can be purchased and no gift
+        transaction is simulated.
       </Body>
       <Body muted>
-        The maximum planned purchase is 500 tokens per transaction. Purchases,
-        transfers, cash withdrawal and redemption remain unavailable until the
-        required approvals and verified billing integration ship.
+        The maximum planned purchase is 500 tokens per transaction. Purchases, transfers, cash withdrawal and
+        redemption remain unavailable until the required approvals and verified billing integration ship.
       </Body>
     </Screen>
   );
