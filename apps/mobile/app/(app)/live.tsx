@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { View, Text } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
@@ -73,7 +73,7 @@ export default function Live() {
           </Text>
           <Button
             label="Join live room"
-            onPress={() => router.push({ pathname: "/live/[id]", params: { id: room.id } })}
+            onPress={() => router.push({ pathname: "/live/[id]" as Href, params: { id: room.id } })}
           />
         </View>
       ))}
