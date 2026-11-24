@@ -75,7 +75,9 @@ const STEPS = [
   {
     migrations: ["20261124160000_token_subscription_entitlements.sql"],
     rollback: "docs/rollback/20261124_token_subscription_entitlements.rollback.sql",
-    suites: ["token_wallet.sql", "token_subscription_entitlements.sql"],
+    // The entitlement suite now includes rewind assertions and must run only after
+    // the later rewind migration has been re-applied in its own step.
+    suites: ["token_wallet.sql"],
   },
   {
     migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],
