@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { AudioSession, LiveKitRoom, VideoTrack, useLocalParticipant, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { supabase, apiBaseUrl } from "../../src/lib/supabase";
+import { fetchWithTimeout } from "../../src/lib/fetchWithTimeout";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 type CallMode = "audio" | "video";
