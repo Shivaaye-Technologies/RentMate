@@ -83,11 +83,12 @@ begin
   select id into mid from public.matches where (user_a, user_b) = (least(t, d), greatest(t, d));
   r := r || case when mid is not null then 'ok super like to demo creates match; ' else 'FAIL no match after super like; ' end;
 
-  for i in 2..21 loop
+  -- The tester is still subject to the new 15-like free allowance.
+  for i in 2..15 loop
     insert into public.likes (liker_id, liked_id) values (t, demo_ids[i]);
   end loop;
   select count(*) into n from public.matches where t in (user_a, user_b);
-  r := r || case when n between 10 and 21 then 'ok most likes matched (' || n || ' of 21); ' else 'FAIL matches ' || n || '; ' end;
+  r := r || case when n between 8 and 15 then 'ok most likes matched (' || n || ' of 15); ' else 'FAIL matches ' || n || '; ' end;
   select count(*) into n from public.likes where liked_id = t;
   r := r || case when n = (select count(*) from public.matches where t in (user_a, user_b)) then 'ok tester sees demo likes; ' else 'FAIL likes received ' || n || '; ' end;
 

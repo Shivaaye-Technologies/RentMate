@@ -16,6 +16,11 @@ const migrations = readdirSync(join(root, "supabase/migrations")).sort();
 /** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
 const STEPS = [
   {
+    migrations: ["20261124173000_rewind_allowance.sql"],
+    rollback: "docs/rollback/20261124_rewind_allowance.rollback.sql",
+    suites: ["token_subscription_entitlements.sql"],
+  },
+  {
     migrations: ["20261123170000_retry_rejected_livekit_joins.sql"],
     rollback: "docs/rollback/20261123_retry_rejected_livekit_joins.rollback.sql",
     suites: ["calls_and_live_rooms.sql"],
@@ -68,9 +73,16 @@ const STEPS = [
     suites: [],
   },
   {
+    migrations: ["20261124160000_token_subscription_entitlements.sql"],
+    rollback: "docs/rollback/20261124_token_subscription_entitlements.rollback.sql",
+    // The entitlement suite now includes rewind assertions and must run only after
+    // the later rewind migration has been re-applied in its own step.
+    suites: ["token_wallet.sql"],
+  },
+  {
     migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],
     rollback: "docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql",
-    suites: ["audit_hardening.sql", "token_wallet.sql"],
+    suites: ["audit_hardening.sql"],
   },
 ];
 const EARLIER_SUITES = ["rls_flow.sql", "live_foundation.sql", "marketplace.sql"];
