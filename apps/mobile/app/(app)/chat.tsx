@@ -308,7 +308,7 @@ export default function Chat() {
                 router.push({
                   pathname: "/call/[id]",
                   params: { id: "new", callee: active.personId, mode: "audio" },
-                })
+                } as never)
               }
             />
           </View>
@@ -319,7 +319,7 @@ export default function Chat() {
                 router.push({
                   pathname: "/call/[id]",
                   params: { id: "new", callee: active.personId, mode: "video" },
-                })
+                } as never)
               }
             />
           </View>
