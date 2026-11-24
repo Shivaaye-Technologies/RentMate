@@ -130,6 +130,12 @@ begin
     raise exception 'Unsupported discovery action table.' using errcode = '22023';
   end if;
 
+  -- Nested writes from trusted server-side triggers (for example, demo like-back)
+  -- are system-generated actions, not a second client action to meter.
+  if pg_catalog.pg_trigger_depth() > 1 then
+    return new;
+  end if;
+
   -- SQL migrations, trusted service-role jobs and the isolated test harness may have no JWT.
   -- Enforce identity and quotas whenever this is a member-authenticated request.
   if (select auth.uid()) is not null then
