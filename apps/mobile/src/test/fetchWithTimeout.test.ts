@@ -29,7 +29,7 @@ describe("fetchWithTimeout", () => {
   });
 
   it("does not relabel ordinary network failures as timeouts", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error("network unavailable"));
+    const fetcher = vi.fn<FetchImplementation>().mockRejectedValue(new Error("network unavailable"));
 
     await expect(fetchWithTimeout("https://example.test", {}, 1000, fetcher)).rejects.toThrow(
       "network unavailable",
