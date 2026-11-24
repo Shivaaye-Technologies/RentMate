@@ -50,8 +50,8 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission: "Allow RentMate to choose profile photos.",
-        cameraPermission: false,
-        microphonePermission: false,
+        cameraPermission: "Allow RentMate to use your camera for opt-in calls and live video.",
+        microphonePermission: "Allow RentMate to use your microphone for opt-in calls and live audio.",
       },
     ],
     // Keystore-encrypted session values cannot be decrypted after a restore, so they are excluded from backups.
