@@ -54,6 +54,7 @@ begin
     raise exception 'FAIL free member exceeded the 15-dislike rolling limit';
   end if;
 
+  reset role;
   insert into public.subscription_entitlements(
     user_id, plan_key, status, provider, provider_purchase_id,
     current_period_start, current_period_end, verified_at
@@ -96,6 +97,7 @@ begin
 
   perform set_config('request.jwt.claims',
     json_build_object('sub', rewind_actor, 'role', 'authenticated')::text, true);
+  set local role authenticated;
   for i in 1..4 loop
     insert into public.passes(passer_id, passed_id)
     values (rewind_actor, rewind_targets[i]);
@@ -124,8 +126,10 @@ begin
     rewind_actor, 'monthly', 'active', 'admin', 'rewind-entitlement-' || rewind_actor,
     now() - interval '1 minute', now() + interval '30 days', now()
   );
+  set local role authenticated;
   delete from public.passes
   where passer_id = rewind_actor and passed_id = rewind_targets[4];
+  reset role;
 
   raise exception 'ROLLED BACK. RESULTS: ok free likes capped at 15; ok free dislikes capped at 15; ok verified subscriber entitlement; ok subscriber discovery actions allowed; ok own subscription status readable; ok free rewinds capped at 3; ok subscriber rewind exemption';
 end
