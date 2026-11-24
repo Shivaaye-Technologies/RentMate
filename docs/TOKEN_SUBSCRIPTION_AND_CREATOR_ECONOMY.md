@@ -5,6 +5,7 @@ Status: founder-provided product proposal captured for implementation. This docu
 ## 1. Product access tiers
 
 ### Free member
+
 - 15 likes per rolling 24 hours.
 - 15 dislikes/passes per rolling 24 hours.
 - 3 rewinds per rolling 24 hours.
@@ -16,6 +17,7 @@ Status: founder-provided product proposal captured for implementation. This docu
 - Booking requires the booking-token amount displayed by the listing creator and confirmed by the buyer.
 
 ### Monthly subscriber
+
 - Unlimited likes and dislikes, subject to anti-abuse and safety limits.
 - Unlimited rewinds.
 - View who liked them.

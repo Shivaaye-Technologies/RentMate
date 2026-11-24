@@ -14,18 +14,36 @@ function CallControls({ mode }: { mode: CallMode }) {
   const [changing, setChanging] = useState(false);
   async function toggleMicrophone() {
     setChanging(true);
-    try { await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled); }
-    finally { setChanging(false); }
+    try {
+      await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+    } finally {
+      setChanging(false);
+    }
   }
   async function toggleCamera() {
     setChanging(true);
-    try { await localParticipant.setCameraEnabled(!isCameraEnabled); }
-    finally { setChanging(false); }
+    try {
+      await localParticipant.setCameraEnabled(!isCameraEnabled);
+    } finally {
+      setChanging(false);
+    }
   }
   return (
     <View style={{ gap: 10 }}>
-      <Button label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"} kind="plain" disabled={changing} onPress={() => void toggleMicrophone()} />
-      {mode === "video" ? <Button label={isCameraEnabled ? "Turn camera off" : "Turn camera on"} kind="plain" disabled={changing} onPress={() => void toggleCamera()} /> : null}
+      <Button
+        label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
+        kind="plain"
+        disabled={changing}
+        onPress={() => void toggleMicrophone()}
+      />
+      {mode === "video" ? (
+        <Button
+          label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
+          kind="plain"
+          disabled={changing}
+          onPress={() => void toggleCamera()}
+        />
+      ) : null}
     </View>
   );
 }
@@ -127,7 +145,8 @@ export default function CallScreen() {
     return () => clearInterval(timer);
   }, [connected]);
 
-  const elapsed = String(Math.floor(duration / 60)).padStart(2, "0") + ":" + String(duration % 60).padStart(2, "0");
+  const elapsed =
+    String(Math.floor(duration / 60)).padStart(2, "0") + ":" + String(duration % 60).padStart(2, "0");
 
   return (
     <Screen>
