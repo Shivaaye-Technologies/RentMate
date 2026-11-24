@@ -12,7 +12,13 @@ function Stage() {
   const tracks = useTracks([Track.Source.Camera]);
   return (
     <View style={{ gap: 12 }}>
-      {tracks.map((track) => <VideoTrack key={track.publication.trackSid} trackRef={track} style={{ width: "100%", height: 340, backgroundColor: c.card }} />)}
+      {tracks.map((track) => (
+        <VideoTrack
+          key={track.publication.trackSid}
+          trackRef={track}
+          style={{ width: "100%", height: 340, backgroundColor: c.card }}
+        />
+      ))}
       {!tracks.length ? <Body muted>Waiting for the host to publish video…</Body> : null}
     </View>
   );
@@ -40,11 +46,17 @@ export default function LiveRoomScreen() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.reasons?.[0] || payload.error || "Could not join this room.");
-      if (!cancelled) { setRoom(payload as RoomToken); setConnected(true); }
+      if (!cancelled) {
+        setRoom(payload as RoomToken);
+        setConnected(true);
+      }
     }
-    void join().catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not join the room."))
+    void join()
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not join the room."))
       .finally(() => !cancelled && setBusy(false));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
   return (
     <Screen>
@@ -52,7 +64,14 @@ export default function LiveRoomScreen() {
       {error ? <Notice kind="error">{error}</Notice> : null}
       {busy ? <ActivityIndicator size="large" color={c.accent} /> : null}
       {room && connected ? (
-        <LiveKitRoom serverUrl={room.url} token={room.token} connect audio video={false} onDisconnected={() => setConnected(false)}>
+        <LiveKitRoom
+          serverUrl={room.url}
+          token={room.token}
+          connect
+          audio
+          video={false}
+          onDisconnected={() => setConnected(false)}
+        >
           <Stage />
           <Body>You're watching live. Keep chat kind and respectful.</Body>
         </LiveKitRoom>

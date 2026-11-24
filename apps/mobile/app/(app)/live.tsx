@@ -71,7 +71,10 @@ export default function Live() {
           <Text style={{ color: c.muted }}>
             {room.stageName || "RentMate host"} · {room.category || "Social"} · {room.status || "Scheduled"}
           </Text>
-          <Button label="Join live room" onPress={() => router.push({ pathname: "/live/[id]", params: { id: room.id } })} />
+          <Button
+            label="Join live room"
+            onPress={() => router.push({ pathname: "/live/[id]", params: { id: room.id } })}
+          />
         </View>
       ))}
       <Button label="Refresh rooms" onPress={() => void load()} busy={busy} />

@@ -220,10 +220,26 @@ export default function Chat() {
       {active ? (
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Button label="Voice call" onPress={() => router.push({ pathname: "/call/[id]", params: { id: "new", callee: active.personId, mode: "audio" } })} />
+            <Button
+              label="Voice call"
+              onPress={() =>
+                router.push({
+                  pathname: "/call/[id]",
+                  params: { id: "new", callee: active.personId, mode: "audio" },
+                })
+              }
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Button label="Video call" onPress={() => router.push({ pathname: "/call/[id]", params: { id: "new", callee: active.personId, mode: "video" } })} />
+            <Button
+              label="Video call"
+              onPress={() =>
+                router.push({
+                  pathname: "/call/[id]",
+                  params: { id: "new", callee: active.personId, mode: "video" },
+                })
+              }
+            />
           </View>
         </View>
       ) : null}

@@ -16,7 +16,11 @@ function CallMedia({ mode }: { mode: CallMode }) {
   return (
     <View style={{ gap: 12 }}>
       {tracks.map((track) => (
-        <VideoTrack key={track.publication.trackSid} trackRef={track} style={{ width: "100%", height: 360, backgroundColor: c.card }} />
+        <VideoTrack
+          key={track.publication.trackSid}
+          trackRef={track}
+          style={{ width: "100%", height: 360, backgroundColor: c.card }}
+        />
       ))}
       {!tracks.length ? <Body muted>Waiting for video…</Body> : null}
     </View>
@@ -45,7 +49,10 @@ export default function CallScreen() {
       let current = callId;
       if (!current) {
         if (!callee) throw new Error("The person to call was not selected.");
-        const { data, error: startError } = await supabase.rpc("call_start", { p_callee: callee, p_mode: mode === "audio" ? "voice" : "video" });
+        const { data, error: startError } = await supabase.rpc("call_start", {
+          p_callee: callee,
+          p_mode: mode === "audio" ? "voice" : "video",
+        });
         if (startError) throw new Error(startError.message);
         current = String(data);
         if (!cancelled) setCallId(current);
@@ -66,9 +73,12 @@ export default function CallScreen() {
         setConnected(true);
       }
     }
-    void begin().catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not start call."))
+    void begin()
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not start call."))
       .finally(() => !cancelled && setBusy(false));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function endCall() {
@@ -76,9 +86,11 @@ export default function CallScreen() {
     if (callId && supabase) {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (token) await fetch(apiBaseUrl + "/api/v1/calls/" + callId + "/end", {
-        method: "POST", headers: { Authorization: "Bearer " + token },
-      }).catch(() => undefined);
+      if (token)
+        await fetch(apiBaseUrl + "/api/v1/calls/" + callId + "/end", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+        }).catch(() => undefined);
     }
     await AudioSession.stopAudioSession().catch(() => undefined);
     router.back();
@@ -90,7 +102,14 @@ export default function CallScreen() {
       {error ? <Notice kind="error">{error}</Notice> : null}
       {busy ? <ActivityIndicator size="large" color={c.accent} /> : null}
       {room && connected ? (
-        <LiveKitRoom serverUrl={room.url} token={room.token} connect audio video={mode === "video"} onDisconnected={() => setConnected(false)}>
+        <LiveKitRoom
+          serverUrl={room.url}
+          token={room.token}
+          connect
+          audio
+          video={mode === "video"}
+          onDisconnected={() => setConnected(false)}
+        >
           <CallMedia mode={mode} />
           <Body muted>Connected securely through RentMate.</Body>
         </LiveKitRoom>

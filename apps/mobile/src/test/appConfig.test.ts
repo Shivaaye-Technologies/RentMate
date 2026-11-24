@@ -72,12 +72,18 @@ describe("Android build settings", () => {
   });
 
   it("enables camera and microphone for LiveKit while keeping location blocked", () => {
-    expect(config.android?.permissions).toEqual(["android.permission.CAMERA", "android.permission.RECORD_AUDIO"]);
+    expect(config.android?.permissions).toEqual([
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO",
+    ]);
     for (const p of ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"]) {
       expect(config.android?.blockedPermissions).toContain(`android.permission.${p}`);
     }
     expect(config.plugins).toContain("@config-plugins/react-native-webrtc");
-    expect(config.plugins).toContainEqual(["@livekit/react-native-expo-plugin", { android: { audioType: "communication" } }]);
+    expect(config.plugins).toContainEqual([
+      "@livekit/react-native-expo-plugin",
+      { android: { audioType: "communication" } },
+    ]);
   });
 
   it("keeps secure session values out of backups and uses Expo Router", () => {
