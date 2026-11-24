@@ -103,8 +103,8 @@ export default function HostLiveRoom() {
           serverUrl={room.url}
           token={room.token}
           connect
-          audio
-          video
+          audio={room.publishSources.includes("microphone")}
+          video={room.publishSources.includes("camera")}
           onDisconnected={() => {
             if (!ended.current) void endBroadcast();
           }}
