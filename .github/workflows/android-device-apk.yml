@@ -75,15 +75,11 @@ jobs:
           EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
         run: npx expo prebuild --platform android --no-install
 
-      - name: Verify generated Android package and permissions
+      - name: Verify generated Android package
         working-directory: apps/mobile
         run: |
           test -f android/app/src/main/AndroidManifest.xml
-          grep -q 'package="com.shivaayetechnologies.rentmate"' android/app/build.gradle ||             grep -q 'applicationId "com.shivaayetechnologies.rentmate"' android/app/build.gradle
-          if grep -Eq 'android.permission.(ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW)' android/app/src/main/AndroidManifest.xml; then
-            echo "::error::A blocked permission appeared in the generated main manifest."
-            exit 1
-          fi
+          grep -q 'com.shivaayetechnologies.rentmate' android/app/build.gradle
 
       - name: Assemble debug APK
         working-directory: apps/mobile/android
@@ -92,6 +88,19 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
         run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Verify permissions in the packaged APK
+        working-directory: apps/mobile
+        run: |
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$aapt"
+          permissions="$("$aapt" dump permissions "$apk")"
+          printf '%s\\n' "$permissions"
+          if printf '%s\\n' "$permissions" | grep -Eq 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW'; then
+            echo "::error::A blocked permission is present in the packaged APK."
+            exit 1
+          fi
 
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v7
