@@ -235,7 +235,7 @@ export default function Chat() {
               label="Video call"
               onPress={() =>
                 router.push({
-                  pathname: "/call/[id]",
+                  pathname: "/call/[id]" as Href,
                   params: { id: "new", callee: active.personId, mode: "video" },
                 })
               }
