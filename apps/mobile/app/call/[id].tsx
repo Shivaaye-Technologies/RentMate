@@ -94,6 +94,22 @@ export default function CallScreen() {
   const [connected, setConnected] = useState(false);
   const [duration, setDuration] = useState(0);
 
+  const endCallOnServer = useCallback(async (current: string) => {
+    if (!supabase) return;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      await fetchWithTimeout(
+        apiBaseUrl + "/api/v1/calls/" + current + "/end",
+        { method: "POST", headers: { Authorization: "Bearer " + token } },
+        8_000,
+      );
+    } catch {
+      // Local media teardown must not depend on a best-effort server request.
+    }
+  }, []);
+
   const startCall = useCallback(async () => {
     if (starting.current || ending.current) return;
     starting.current = true;
@@ -126,6 +142,13 @@ export default function CallScreen() {
         if (mounted.current) setRetryAllowed(true);
       }
 
+      // The user may have ended or left the screen while call_start was in flight.
+      // Record the returned id and immediately close it rather than joining an orphaned call.
+      if (ending.current || !mounted.current) {
+        await endCallOnServer(current);
+        return;
+      }
+
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
@@ -147,10 +170,18 @@ export default function CallScreen() {
             : "Could not join the call.";
         throw new Error(message);
       }
-      if (!mounted.current) return;
+      if (!mounted.current || ending.current) {
+        await endCallOnServer(current);
+        return;
+      }
       setRoom(payload as RoomToken);
       await AudioSession.startAudioSession();
-      if (mounted.current) setConnected(true);
+      if (mounted.current && !ending.current) {
+        setConnected(true);
+      } else {
+        await AudioSession.stopAudioSession().catch(() => undefined);
+        await endCallOnServer(current);
+      }
     } catch (e) {
       if (mounted.current) {
         setRetryAllowed(Boolean(callIdRef.current) || !callStartAttempted.current);
@@ -160,36 +191,25 @@ export default function CallScreen() {
       starting.current = false;
       if (mounted.current) setBusy(false);
     }
-  }, [initialMode]);
+  }, [endCallOnServer, initialMode]);
 
   useEffect(() => {
     mounted.current = true;
     void startCall();
     return () => {
       mounted.current = false;
+      const current = callIdRef.current;
+      if (current) void endCallOnServer(current);
+      void AudioSession.stopAudioSession().catch(() => undefined);
     };
-  }, [startCall]);
+  }, [endCallOnServer, startCall]);
 
   async function finishCall(navigate: boolean) {
     if (ending.current) return;
     ending.current = true;
     setConnected(false);
     const current = callIdRef.current;
-    if (current && supabase) {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (token) {
-          await fetchWithTimeout(
-            apiBaseUrl + "/api/v1/calls/" + current + "/end",
-            { method: "POST", headers: { Authorization: "Bearer " + token } },
-            8_000,
-          );
-        }
-      } catch {
-        // Ending the local media session must not wait indefinitely for a best-effort API update.
-      }
-    }
+    if (current) await endCallOnServer(current);
     await AudioSession.stopAudioSession().catch(() => undefined);
     if (navigate) router.back();
   }
