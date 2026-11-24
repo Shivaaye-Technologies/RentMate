@@ -16,6 +16,11 @@ const migrations = readdirSync(join(root, "supabase/migrations")).sort();
 /** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
 const STEPS = [
   {
+    migrations: ["20261124173000_rewind_allowance.sql"],
+    rollback: "docs/rollback/20261124_rewind_allowance.rollback.sql",
+    suites: ["token_subscription_entitlements.sql"],
+  },
+  {
     migrations: ["20261123170000_retry_rejected_livekit_joins.sql"],
     rollback: "docs/rollback/20261123_retry_rejected_livekit_joins.rollback.sql",
     suites: ["calls_and_live_rooms.sql"],
