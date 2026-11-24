@@ -4,11 +4,13 @@
  * Callers decide whether a failed operation is safe to retry; this helper never retries
  * automatically because POST requests may have server-side effects.
  */
+export type FetchImplementation = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs = 15_000,
-  fetcher: typeof fetch = fetch,
+  fetcher: FetchImplementation = fetch,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
