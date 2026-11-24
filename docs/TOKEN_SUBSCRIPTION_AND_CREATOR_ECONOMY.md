@@ -30,12 +30,13 @@ Subscriptions and token balances are separate products and ledgers. Subscription
 ## 2. Token purchase and pricing configuration
 
 - Token packages are discrete, server-defined SKUs, not client-calculated prices.
+- Hard purchase cap: a member may buy at most 500 tokens in one purchase transaction. No SKU, bonus, retry, split checkout or client request may bypass the 500-token per-transaction cap. The wallet may retain an existing balance; this cap limits each purchase, not the total wallet balance. Any cumulative daily/monthly purchase limit is a separate future policy decision.
 - Each SKU snapshots INR price, token quantity, bonus quantity, effective date, tax configuration version, store product ID, and eligibility.
 - No client can mint, edit, transfer or cash-redeem tokens.
-- Package prices and token quantities must be displayed before purchase and match the billing provider's price.
+- Package prices and token quantities must be displayed before purchase and match the billing provider's price. Enforce the 500-token maximum on both API and database/provider order validation, not only in the Android UI.
 - Pricing is configurable by an authorized admin with maker-checker approval and immutable audit history.
-- Founder-approved pricing curve: small packs start at ₹20 per token; larger packs receive progressively lower per-token prices, reaching ₹15 or less at the highest tiers.
-- Illustrative tier schedule for admin configuration review (not live/purchasable SKUs): 100 tokens ₹2,000 (₹20/token); 250 tokens ₹4,500 (₹18/token); 500 tokens ₹8,500 (₹17/token); 1,000 tokens ₹15,000 (₹15/token); 2,000 tokens ₹28,000 (₹14/token). Exact package quantities, tax display, bonus tokens and final totals require admin approval and store/provider validation before publication.
+- Founder-approved pricing curve: small packs start at ₹20 per token; larger packs receive progressively lower per-token prices, reaching ₹15 at the maximum 500-token tier.
+- Illustrative tier schedule for admin configuration review (not live/purchasable SKUs): 50 tokens ₹1,000 (₹20/token); 100 tokens ₹1,800 (₹18/token); 250 tokens ₹4,250 (₹17/token); 500 tokens ₹7,500 (₹15/token). No package or single purchase may exceed 500 tokens. Exact package quantities, tax display, bonus tokens and final totals require admin approval and store/provider validation before publication.
 - The published per-token price must be mathematically consistent with the SKU total and clearly disclosed. Do not advertise a bonus as a price discount or calculate the effective rate ambiguously.
 - Historical purchases retain their original price and quantity; later changes never rewrite prior records.
 
@@ -97,7 +98,7 @@ Subscriptions and token balances are separate products and ledgers. Subscription
 
 ## 8. Android work
 
-- Wallet: real balance, recent ledger, packages, subscription status and clear separate tabs/sections.
+- Wallet: real balance, recent ledger, subscription status and clear separate tabs/sections. Show only packages of 500 tokens or fewer; reject any purchase request above 500 tokens server-side.
 - Subscription: plan comparison, purchase/restore status, expiry and entitlement refresh.
 - Discover: remaining free likes/dislikes/rewinds; subscriber-only liked-you view; rewind action.
 - Chat: free chat for all, subscriber unlimited messaging entitlement, server-side anti-spam.
@@ -117,4 +118,4 @@ Subscriptions and token balances are separate products and ledgers. Subscription
 
 ## 10. Founder pricing decision and remaining gates
 
-Founder decision (2026-11-24): small token packs start at ₹20 per token; larger packs receive progressive volume discounts, reaching ₹15 or less per token. The illustrative tier schedule in section 2 is a planning baseline only. Before any SKU becomes purchasable, approve exact quantities and totals, tax treatment/display, store product IDs, refunds and provider classification. Creator earnings (₹6–₹7 per eligible gift token and ₹8–₹10 per booking token) must be finalized as INR payable amounts, not token transfers, and remain disabled pending approvals.
+Founder decisions (2026-11-24): small token packs start at ₹20 per token; larger packs receive progressive volume discounts, reaching ₹15 per token at the 500-token tier. A single purchase transaction is capped at 500 tokens maximum. The illustrative tier schedule in section 2 is a planning baseline only. Before any SKU becomes purchasable, approve exact quantities and totals, tax treatment/display, store product IDs, refunds and provider classification. Creator earnings (₹6–₹7 per eligible gift token and ₹8–₹10 per booking token) must be finalized as INR payable amounts, not token transfers, and remain disabled pending approvals.
