@@ -217,6 +217,7 @@ export default function CallScreen() {
           video={initialMode === "video"}
           onDisconnected={() => {
             setConnected(false);
+            setRetryAllowed(false);
             void finishCall(false);
           }}
         >
