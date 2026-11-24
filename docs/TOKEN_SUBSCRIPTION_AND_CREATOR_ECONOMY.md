@@ -34,7 +34,9 @@ Subscriptions and token balances are separate products and ledgers. Subscription
 - No client can mint, edit, transfer or cash-redeem tokens.
 - Package prices and token quantities must be displayed before purchase and match the billing provider's price.
 - Pricing is configurable by an authorized admin with maker-checker approval and immutable audit history.
-- Bulk package discounts may be configured, but the published per-token price must be mathematically consistent with the SKU total and clearly disclosed.
+- Founder-approved pricing curve: small packs start at ₹20 per token; larger packs receive progressively lower per-token prices, reaching ₹15 or less at the highest tiers.
+- Illustrative tier schedule for admin configuration review (not live/purchasable SKUs): 100 tokens ₹2,000 (₹20/token); 250 tokens ₹4,500 (₹18/token); 500 tokens ₹8,500 (₹17/token); 1,000 tokens ₹15,000 (₹15/token); 2,000 tokens ₹28,000 (₹14/token). Exact package quantities, tax display, bonus tokens and final totals require admin approval and store/provider validation before publication.
+- The published per-token price must be mathematically consistent with the SKU total and clearly disclosed. Do not advertise a bonus as a price discount or calculate the effective rate ambiguously.
 - Historical purchases retain their original price and quantity; later changes never rewrite prior records.
 
 ## 3. Creator-controlled booking price
@@ -113,6 +115,6 @@ Subscriptions and token balances are separate products and ledgers. Subscription
 5. SQL/API tests for replay, race, balance exhaustion, entitlement expiry, refunds, chargebacks, and webhook verification.
 6. Android typecheck, unit tests, bundle, native checks, EAS production build and real-device verification.
 
-## 10. Explicit unresolved founder decision
+## 10. Founder pricing decision and remaining gates
 
-The founder has stated both that a token costs ₹15 and that token packages should start at ₹20 per token and discount to below ₹15 per token. Those cannot both be the same effective price. Before creating purchasable SKUs, confirm whether ₹15 is the base/standard price and ₹20 is a premium small-pack price, or whether ₹20 is the base price with volume discounts down to ₹15 or lower. Creator earnings (₹6–₹7 per eligible gift token and ₹8–₹10 per booking token) must be finalized as INR payable amounts, not token transfers, and remain disabled pending approvals.
+Founder decision (2026-11-24): small token packs start at ₹20 per token; larger packs receive progressive volume discounts, reaching ₹15 or less per token. The illustrative tier schedule in section 2 is a planning baseline only. Before any SKU becomes purchasable, approve exact quantities and totals, tax treatment/display, store product IDs, refunds and provider classification. Creator earnings (₹6–₹7 per eligible gift token and ₹8–₹10 per booking token) must be finalized as INR payable amounts, not token transfers, and remain disabled pending approvals.
