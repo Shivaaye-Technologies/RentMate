@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchWithTimeout } from "../lib/fetchWithTimeout.js";
+import { fetchWithTimeout, type FetchImplementation } from "../lib/fetchWithTimeout.js";
 
 describe("fetchWithTimeout", () => {
   afterEach(() => {
@@ -8,7 +8,7 @@ describe("fetchWithTimeout", () => {
 
   it("passes the abort signal to fetch and returns its response", async () => {
     const response = new Response("ok", { status: 200 });
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
+    const fetcher = vi.fn<FetchImplementation>().mockResolvedValue(response);
 
     await expect(fetchWithTimeout("https://example.test", {}, 1000, fetcher)).resolves.toBe(response);
     expect(fetcher).toHaveBeenCalledOnce();
@@ -17,7 +17,7 @@ describe("fetchWithTimeout", () => {
 
   it("aborts a request at the configured timeout", async () => {
     vi.useFakeTimers();
-    const fetcher: typeof fetch = (_input, init) =>
+    const fetcher: FetchImplementation = (_input, init) =>
       new Promise((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
       });
