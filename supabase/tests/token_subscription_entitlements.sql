@@ -9,6 +9,8 @@ declare
   ent record;
   rewind_actor uuid := gen_random_uuid();
   rewind_targets uuid[] := array[]::uuid[];
+  affected integer;
+  rewind_usage bigint;
 begin
   insert into auth.users(id, email, aud, role)
   values (actor, actor::text || '@entitlement.test', 'authenticated', 'authenticated');
@@ -99,14 +101,36 @@ begin
   for i in 1..3 loop
     delete from public.passes
     where passer_id = rewind_actor and passed_id = rewind_targets[i];
+    get diagnostics affected = row_count;
+    if affected <> 1 then
+      raise exception 'FAIL rewind % did not delete exactly one owned pass (rows=%)', i, affected;
+    end if;
   end loop;
+
+  reset role;
+  select count(*) into rewind_usage
+  from public.discovery_action_usage
+  where user_id = rewind_actor and action = 'rewind'
+    and created_at > now() - interval '24 hours';
+  if rewind_usage <> 3 then
+    raise exception 'FAIL expected 3 recorded rewinds after 3 deletes, got %', rewind_usage;
+  end if;
+  set local role authenticated;
 
   blocked := false;
   begin
     delete from public.passes
     where passer_id = rewind_actor and passed_id = rewind_targets[4];
+    get diagnostics affected = row_count;
+    if affected = 1 then
+      raise exception 'FAIL fourth rewind unexpectedly deleted a pass';
+    end if;
   exception when raise_exception then
-    blocked := true;
+    if sqlerrm like 'Daily rewind limit reached.%' then
+      blocked := true;
+    else
+      raise;
+    end if;
   end;
   if not blocked then
     raise exception 'FAIL free member exceeded the 3-rewind rolling limit';
