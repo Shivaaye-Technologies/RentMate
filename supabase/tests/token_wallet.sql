@@ -125,9 +125,11 @@ begin
   exception when insufficient_privilege then r := r || 'ok clients cannot change rates; ';
   end;
   select count(*) into n from public.metering_rates
-    where registration_bonus = 100 and voice_tokens_per_minute = 10 and video_tokens_per_second = 1
-      and free_likes_per_24h = 50 and free_messages_per_24h = 10 and not allowances_enforced and not call_metering_enabled;
-  r := r || case when n = 1 then 'ok agreed rates are recorded and not yet enforced; ' else 'FAIL rates; ' end;
+    where registration_bonus = 100 and voice_tokens_per_minute = 60 and video_tokens_per_second = 5
+      and free_likes_per_24h = 15 and free_dislikes_per_24h = 15 and free_rewinds_per_24h = 3
+      and free_messages_per_24h = 10000 and not allowances_enforced and not call_metering_enabled;
+  r := r || case when n = 1 then 'ok current token and free-tier rates are recorded with enforcement safely disabled; '
+                 else 'FAIL rates; ' end;
   reset role;
   set local role anon;
   begin
