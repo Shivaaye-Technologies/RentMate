@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
@@ -160,9 +160,9 @@ export default function Chat() {
       setIncomingCall(null);
       if (accept) {
         router.push({
-          pathname: "/call/[id]" as Href,
+          pathname: "/call/[id]",
           params: { id: call.id, mode: call.mode === "voice" ? "audio" : "video" },
-        });
+        } as never);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not answer the call.");
