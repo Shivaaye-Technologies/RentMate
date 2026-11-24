@@ -1,13 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
-import { AudioSession, LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
+import { AudioSession, LiveKitRoom, VideoTrack, useLocalParticipant, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { supabase, apiBaseUrl } from "../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
 type CallMode = "audio" | "video";
 type RoomToken = { url: string; token: string; room: string; mode?: CallMode };
+
+function CallControls({ mode }: { mode: CallMode }) {
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const [changing, setChanging] = useState(false);
+  async function toggleMicrophone() {
+    setChanging(true);
+    try { await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled); }
+    finally { setChanging(false); }
+  }
+  async function toggleCamera() {
+    setChanging(true);
+    try { await localParticipant.setCameraEnabled(!isCameraEnabled); }
+    finally { setChanging(false); }
+  }
+  return (
+    <View style={{ gap: 10 }}>
+      <Button label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"} kind="plain" disabled={changing} onPress={() => void toggleMicrophone()} />
+      {mode === "video" ? <Button label={isCameraEnabled ? "Turn camera off" : "Turn camera on"} kind="plain" disabled={changing} onPress={() => void toggleCamera()} /> : null}
+    </View>
+  );
+}
 
 function CallMedia({ mode }: { mode: CallMode }) {
   const tracks = useTracks([Track.Source.Camera]);
@@ -39,6 +60,8 @@ export default function CallScreen() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const ending = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +104,9 @@ export default function CallScreen() {
     };
   }, []);
 
-  async function endCall() {
+  async function finishCall(navigate: boolean) {
+    if (ending.current) return;
+    ending.current = true;
     setConnected(false);
     if (callId && supabase) {
       const { data } = await supabase.auth.getSession();
@@ -93,8 +118,16 @@ export default function CallScreen() {
         }).catch(() => undefined);
     }
     await AudioSession.stopAudioSession().catch(() => undefined);
-    router.back();
+    if (navigate) router.back();
   }
+
+  useEffect(() => {
+    if (!connected) return;
+    const timer = setInterval(() => setDuration((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [connected]);
+
+  const elapsed = String(Math.floor(duration / 60)).padStart(2, "0") + ":" + String(duration % 60).padStart(2, "0");
 
   return (
     <Screen>
@@ -108,14 +141,19 @@ export default function CallScreen() {
           connect
           audio
           video={mode === "video"}
-          onDisconnected={() => setConnected(false)}
+          onDisconnected={() => {
+            setConnected(false);
+            void finishCall(false);
+          }}
         >
           <CallMedia mode={mode} />
+          <CallControls mode={mode} />
+          <Body muted>Connected · {elapsed}</Body>
           <Body muted>Connected securely through RentMate.</Body>
         </LiveKitRoom>
       ) : null}
       {!busy && !error && !connected ? <Body muted>Call ended or disconnected.</Body> : null}
-      <Button label="End call" kind="danger" onPress={() => void endCall()} />
+      <Button label="End call" kind="danger" onPress={() => void finishCall(true)} />
     </Screen>
   );
 }
