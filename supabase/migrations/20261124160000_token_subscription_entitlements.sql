@@ -154,8 +154,10 @@ begin
       using errcode = 'P0001';
   end if;
 
-  insert into public.discovery_action_usage(user_id, action)
-  values (v_user, v_action);
+  if not coalesce(v_subscriber, false) then
+    insert into public.discovery_action_usage(user_id, action)
+    values (v_user, v_action);
+  end if;
   return new;
 end;
 $$;
