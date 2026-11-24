@@ -19,11 +19,12 @@ export function LiveChat({ streamId }: { streamId: string }) {
   useEffect(() => {
     const client = supabase;
     if (!client) return;
+    const db = client as NonNullable<typeof client>;
     let active = true;
     async function load() {
       const [chat, reacts] = await Promise.all([
-        client.from("live_chat_messages").select("id,sender_id,body,created_at").eq("stream_id", streamId).is("hidden_at", null).order("created_at", { ascending: false }).limit(40),
-        client.from("live_reactions").select("id,kind,created_at").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(30),
+        db.from("live_chat_messages").select("id,sender_id,body,created_at").eq("stream_id", streamId).is("hidden_at", null).order("created_at", { ascending: false }).limit(40),
+        db.from("live_reactions").select("id,kind,created_at").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(30),
       ]);
       if (!active) return;
       if (chat.error) setError(chat.error.message);
@@ -31,7 +32,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
       if (!reacts.error) setReactions((reacts.data ?? []) as Reaction[]);
     }
     void load();
-    const channel = client
+    const channel = db
       .channel("live-chat-" + streamId)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "live_chat_messages", filter: "stream_id=eq." + streamId }, (payload) => {
         const next = payload.new as Message;
@@ -49,7 +50,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
       .subscribe();
     return () => {
       active = false;
-      void client.removeChannel(channel);
+      void db.removeChannel(channel);
     };
   }, [streamId]);
 
