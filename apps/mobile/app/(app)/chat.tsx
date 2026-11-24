@@ -257,11 +257,29 @@ export default function Chat() {
       </View>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {incomingCall ? (
-        <View style={{ padding: 14, borderRadius: 16, borderWidth: 1, borderColor: c.accent, backgroundColor: c.card, gap: 10 }}>
+        <View
+          style={{
+            padding: 14,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: c.accent,
+            backgroundColor: c.card,
+            gap: 10,
+          }}
+        >
           <Body>{incomingCall.mode === "voice" ? "Incoming voice call" : "Incoming video call"}</Body>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}><Button label="Accept" busy={answeringCall} onPress={() => void answerIncoming(true)} /></View>
-            <View style={{ flex: 1 }}><Button label="Decline" kind="danger" disabled={answeringCall} onPress={() => void answerIncoming(false)} /></View>
+            <View style={{ flex: 1 }}>
+              <Button label="Accept" busy={answeringCall} onPress={() => void answerIncoming(true)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Decline"
+                kind="danger"
+                disabled={answeringCall}
+                onPress={() => void answerIncoming(false)}
+              />
+            </View>
           </View>
         </View>
       ) : null}
