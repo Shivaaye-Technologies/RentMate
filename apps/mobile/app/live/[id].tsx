@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
+import { LiveChat } from "../../src/components/LiveChat";
 import { supabase, apiBaseUrl } from "../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
@@ -76,6 +77,7 @@ export default function LiveRoomScreen() {
           <Body>You're watching live. Keep chat kind and respectful.</Body>
         </LiveKitRoom>
       ) : null}
+      {room && connected && id ? <LiveChat streamId={id} /> : null}
       {!busy && !error && !connected ? <Body muted>This room has ended or disconnected.</Body> : null}
       <Button label="Leave room" kind="danger" onPress={() => router.back()} />
     </Screen>
