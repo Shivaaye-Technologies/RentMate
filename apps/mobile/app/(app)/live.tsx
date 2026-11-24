@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { View, Text } from "react-native";
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
@@ -13,6 +13,7 @@ type Stream = {
 };
 export default function Live() {
   const c = usePalette();
+  const router = useRouter();
   const [rooms, setRooms] = useState<Stream[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -70,10 +71,7 @@ export default function Live() {
           <Text style={{ color: c.muted }}>
             {room.stageName || "RentMate host"} · {room.category || "Social"} · {room.status || "Scheduled"}
           </Text>
-          <Body muted>
-            Room discovery is available. Media join is only enabled after the native LiveKit client and
-            permissions are configured.
-          </Body>
+          <Button label="Join live room" onPress={() => router.push({ pathname: "/live/[id]", params: { id: room.id } })} />
         </View>
       ))}
       <Button label="Refresh rooms" onPress={() => void load()} busy={busy} />
