@@ -61,7 +61,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Please sign in to chat.");
-      const { error: insertError } = await client.from("live_chat_messages").insert({
+      const { error: insertError } = await supabase.from("live_chat_messages").insert({
         stream_id: streamId,
         sender_id: auth.user.id,
         body,
