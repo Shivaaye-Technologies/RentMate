@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { AudioSession, LiveKitRoom, VideoTrack, useLocalParticipant, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
+import { LiveChat } from "../../src/components/LiveChat";
 import { apiBaseUrl, supabase } from "../../../src/lib/supabase";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../../src/ui";
 
@@ -113,6 +114,7 @@ export default function HostLiveRoom() {
           <Body muted>You're broadcasting live. Your camera and microphone can be switched off at any time.</Body>
         </LiveKitRoom>
       ) : null}
+      {room && !error && id ? <LiveChat streamId={id} /> : null}
       <Button label={ending ? "Ending…" : "End broadcast"} kind="danger" busy={ending} onPress={() => void endBroadcast()} />
     </Screen>
   );
