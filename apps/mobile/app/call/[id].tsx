@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { AudioSession, LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { supabase, apiBaseUrl } from "../../src/lib/supabase";
@@ -45,7 +45,7 @@ export default function CallScreen() {
       let current = callId;
       if (!current) {
         if (!callee) throw new Error("The person to call was not selected.");
-        const { data, error: startError } = await supabase.rpc("call_start", { p_callee: callee, p_mode: mode });
+        const { data, error: startError } = await supabase.rpc("call_start", { p_callee: callee, p_mode: mode === "audio" ? "voice" : "video" });
         if (startError) throw new Error(startError.message);
         current = String(data);
         if (!cancelled) setCallId(current);
