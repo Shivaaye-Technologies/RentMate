@@ -70,12 +70,12 @@ const STEPS = [
   {
     migrations: ["20261124160000_token_subscription_entitlements.sql"],
     rollback: "docs/rollback/20261124_token_subscription_entitlements.rollback.sql",
-    suites: ["token_subscription_entitlements.sql"],
+    suites: ["token_wallet.sql", "token_subscription_entitlements.sql"],
   },
   {
     migrations: ["20261120090000_audit_hardening.sql", "20261120100000_token_wallet.sql"],
     rollback: "docs/rollback/20261120_audit_hardening_and_wallet.rollback.sql",
-    suites: ["audit_hardening.sql", "token_wallet.sql"],
+    suites: ["audit_hardening.sql"],
   },
 ];
 const EARLIER_SUITES = ["rls_flow.sql", "live_foundation.sql", "marketplace.sql"];
