@@ -1,6 +1,11 @@
 name: Android device-test APK
 
 on:
+  pull_request:
+    branches: [feature/android-livekit-calls-streaming]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/android-device-apk.yml"
   workflow_dispatch:
     inputs:
       ref:
@@ -25,7 +30,7 @@ jobs:
       - name: Checkout selected source
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v7
