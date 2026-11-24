@@ -30,15 +30,12 @@ const config: ExpoConfig = {
   android: {
     package: ANDROID_PACKAGE,
     // EAS remote appVersionSource owns Android versionCode; do not set a local versionCode here.
-    // Permissions are added only when the feature that needs them ships, and requested at the moment of use.
-    // Calls will add CAMERA and RECORD_AUDIO; push will add POST_NOTIFICATIONS; location stays optional.
-    permissions: [],
+    // LiveKit calls and live rooms need camera and microphone. Android prompts at runtime before publishing.
+    permissions: ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
     blockedPermissions: [
-      "android.permission.CAMERA",
       "android.permission.ACCESS_FINE_LOCATION",
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_BACKGROUND_LOCATION",
-      "android.permission.RECORD_AUDIO",
       "android.permission.READ_CONTACTS",
       "android.permission.READ_EXTERNAL_STORAGE",
       "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -47,6 +44,8 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    ["@livekit/react-native-expo-plugin", { android: { audioType: "communication" } }],
+    "@config-plugins/react-native-webrtc",
     [
       "expo-image-picker",
       {
