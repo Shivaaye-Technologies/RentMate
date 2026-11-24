@@ -35,7 +35,7 @@ create table public.subscription_entitlements (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (current_period_end > current_period_start),
-  check ((status in ('active', 'grace')) = (verified_at is not null)),
+  check (status not in ('active', 'grace') or verified_at is not null),
   unique (provider, provider_purchase_id)
 );
 create index subscription_entitlements_user_period
@@ -54,7 +54,7 @@ create table public.token_package_catalog (
   sku text primary key check (sku ~ '^[a-z0-9][a-z0-9_-]{2,63}$'),
   token_quantity integer not null check (token_quantity between 1 and 500),
   price_inr_paise integer not null check (price_inr_paise > 0),
-  enabled boolean not null default false check (not enabled),
+  enabled boolean not null default false,
   effective_from timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
