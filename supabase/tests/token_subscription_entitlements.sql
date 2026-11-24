@@ -63,6 +63,7 @@ begin
     now() - interval '1 minute', now() + interval '30 days', now()
   );
 
+  set local role authenticated;
   select * into ent from public.my_subscription_entitlement();
   if not ent.is_subscriber or ent.plan_key <> 'monthly' or ent.status <> 'active' then
     raise exception 'FAIL active verified subscription was not exposed to its owner';
@@ -71,14 +72,6 @@ begin
   -- The same user can continue discovering as a subscriber; abuse/safety controls remain separate.
   insert into public.likes(liker_id, liked_id) values (actor, target_ids[16]);
   insert into public.passes(passer_id, passed_id) values (actor, target_ids[32]);
-
-  set local role authenticated;
-  perform set_config('request.jwt.claims',
-    json_build_object('sub', actor, 'role', 'authenticated')::text, true);
-  select * into ent from public.my_subscription_entitlement();
-  if not ent.is_subscriber then
-    raise exception 'FAIL authenticated member cannot read own subscription status';
-  end if;
   reset role;
 
   -- A separate free member receives exactly three rewinds in a rolling 24-hour window.
@@ -119,6 +112,7 @@ begin
     raise exception 'FAIL free member exceeded the 3-rewind rolling limit';
   end if;
 
+  reset role;
   insert into public.subscription_entitlements(
     user_id, plan_key, status, provider, provider_purchase_id,
     current_period_start, current_period_end, verified_at
