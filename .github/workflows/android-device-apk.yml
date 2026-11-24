@@ -1,0 +1,102 @@
+name: Android device-test APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to build (use fix/android-call-reliability)
+        required: true
+        default: fix/android-call-reliability
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-device-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug-apk:
+    name: Build installable Android debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout selected source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v7
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Validate public app configuration
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+        run: |
+          missing=0
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_API_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository Actions variable $name is missing."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add the three public client configuration values under Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
+          node -e 'new URL(process.env.EXPO_PUBLIC_SUPABASE_URL); new URL(process.env.EXPO_PUBLIC_API_URL);'
+
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Verify generated Android package and permissions
+        working-directory: apps/mobile
+        run: |
+          test -f android/app/src/main/AndroidManifest.xml
+          grep -q 'package="com.shivaayetechnologies.rentmate"' android/app/build.gradle ||             grep -q 'applicationId "com.shivaayetechnologies.rentmate"' android/app/build.gradle
+          if grep -Eq 'android.permission.(ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW)' android/app/src/main/AndroidManifest.xml; then
+            echo "::error::A blocked permission appeared in the generated main manifest."
+            exit 1
+          fi
+
+      - name: Assemble debug APK
+        working-directory: apps/mobile/android
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: rentmate-android-device-test
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
