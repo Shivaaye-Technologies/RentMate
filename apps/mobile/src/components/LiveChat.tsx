@@ -17,12 +17,13 @@ export function LiveChat({ streamId }: { streamId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     let active = true;
     async function load() {
       const [chat, reacts] = await Promise.all([
-        supabase.from("live_chat_messages").select("id,sender_id,body,created_at").eq("stream_id", streamId).is("hidden_at", null).order("created_at", { ascending: false }).limit(40),
-        supabase.from("live_reactions").select("id,kind,created_at").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(30),
+        client.from("live_chat_messages").select("id,sender_id,body,created_at").eq("stream_id", streamId).is("hidden_at", null).order("created_at", { ascending: false }).limit(40),
+        client.from("live_reactions").select("id,kind,created_at").eq("stream_id", streamId).order("created_at", { ascending: false }).limit(30),
       ]);
       if (!active) return;
       if (chat.error) setError(chat.error.message);
@@ -30,7 +31,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
       if (!reacts.error) setReactions((reacts.data ?? []) as Reaction[]);
     }
     void load();
-    const channel = supabase
+    const channel = client
       .channel("live-chat-" + streamId)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "live_chat_messages", filter: "stream_id=eq." + streamId }, (payload) => {
         const next = payload.new as Message;
@@ -48,7 +49,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
       .subscribe();
     return () => {
       active = false;
-      void supabase.removeChannel(channel);
+      void client.removeChannel(channel);
     };
   }, [streamId]);
 
@@ -60,7 +61,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Please sign in to chat.");
-      const { error: insertError } = await supabase.from("live_chat_messages").insert({
+      const { error: insertError } = await client.from("live_chat_messages").insert({
         stream_id: streamId,
         sender_id: auth.user.id,
         body,
