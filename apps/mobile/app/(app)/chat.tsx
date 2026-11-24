@@ -15,6 +15,7 @@ type PersonRow = {
   online: boolean;
 };
 type Message = { id: string; match_id: string; sender_id: string; body: string; created_at: string };
+type IncomingCall = { id: string; caller_id: string; mode: "voice" | "video"; created_at: string };
 type Thread = {
   matchId: string;
   personId: string;
@@ -36,6 +37,8 @@ export default function Chat() {
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
+  const [answeringCall, setAnsweringCall] = useState(false);
   const load = useCallback(async () => {
     if (!supabase) {
       setError("App configuration is missing.");
@@ -115,6 +118,58 @@ export default function Chat() {
     setMessages([]);
     setActive(thread);
   }, [requestedMatchId, threads]);
+  useEffect(() => {
+    if (!myId || !supabase) return;
+    let cancelled = false;
+    const loadIncoming = async () => {
+      const { data, error: queryError } = await supabase!
+        .from("call_sessions")
+        .select("id,caller_id,mode,created_at")
+        .eq("callee_id", myId)
+        .eq("status", "ringing")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && !queryError) setIncomingCall((data as IncomingCall | null) ?? null);
+    };
+    void loadIncoming();
+    const channel = supabase
+      .channel("mobile-incoming-calls:" + myId)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "call_sessions", filter: "callee_id=eq." + myId },
+        () => void loadIncoming(),
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      void supabase!.removeChannel(channel);
+    };
+  }, [myId]);
+  async function answerIncoming(accept: boolean) {
+    if (!incomingCall || !supabase || answeringCall) return;
+    setAnsweringCall(true);
+    setError(null);
+    try {
+      const { error: answerError } = await supabase.rpc("call_answer", {
+        p_call: incomingCall.id,
+        p_accept: accept,
+      });
+      if (answerError) throw new Error(answerError.message);
+      const call = incomingCall;
+      setIncomingCall(null);
+      if (accept) {
+        router.push({
+          pathname: "/call/[id]" as Href,
+          params: { id: call.id, mode: call.mode === "voice" ? "audio" : "video" },
+        });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not answer the call.");
+    } finally {
+      setAnsweringCall(false);
+    }
+  }
   const activeMatchId = active?.matchId;
   useEffect(() => {
     if (!activeMatchId || !supabase) return;
@@ -201,6 +256,15 @@ export default function Chat() {
         )}
       </View>
       {error ? <Notice kind="error">{error}</Notice> : null}
+      {incomingCall ? (
+        <View style={{ padding: 14, borderRadius: 16, borderWidth: 1, borderColor: c.accent, backgroundColor: c.card, gap: 10 }}>
+          <Body>{incomingCall.mode === "voice" ? "Incoming voice call" : "Incoming video call"}</Body>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}><Button label="Accept" busy={answeringCall} onPress={() => void answerIncoming(true)} /></View>
+            <View style={{ flex: 1 }}><Button label="Decline" kind="danger" disabled={answeringCall} onPress={() => void answerIncoming(false)} /></View>
+          </View>
+        </View>
+      ) : null}
       {active ? (
         <SafetyActions
           userId={active.personId}
