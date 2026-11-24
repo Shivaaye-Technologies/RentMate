@@ -47,6 +47,10 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The deprecated SDK package named "tools" is no longer published.
+          tools: ""
+          packages: "platform-tools;platforms;android-37;build-tools;36.0.0"
 
       - name: Install mobile dependencies
         working-directory: apps/mobile
