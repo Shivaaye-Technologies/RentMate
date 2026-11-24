@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
@@ -224,7 +224,7 @@ export default function Chat() {
               label="Voice call"
               onPress={() =>
                 router.push({
-                  pathname: "/call/[id]",
+                  pathname: "/call/[id]" as Href,
                   params: { id: "new", callee: active.personId, mode: "audio" },
                 })
               }
