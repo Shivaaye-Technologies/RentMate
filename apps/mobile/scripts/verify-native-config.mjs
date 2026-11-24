@@ -49,22 +49,31 @@ try {
   );
 
   const granted = [...manifest.matchAll(/<uses-permission android:name="([^"]+)"\/>/g)].map((m) => m[1]);
-  const allowed = new Set(["android.permission.INTERNET", "android.permission.VIBRATE"]);
+  const allowed = new Set([
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.BLUETOOTH",
+    "android.permission.CAMERA",
+    "android.permission.INTERNET",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.VIBRATE",
+    "android.permission.WAKE_LOCK",
+  ]);
   check(
-    "only INTERNET and VIBRATE are requested",
+    "only required LiveKit, network, and vibration permissions are requested",
     granted.every((p) => allowed.has(p)),
     granted.join(", "),
   );
-  for (const p of [
-    "CAMERA",
-    "RECORD_AUDIO",
-    "ACCESS_FINE_LOCATION",
-    "ACCESS_COARSE_LOCATION",
-    "READ_CONTACTS",
-  ]) {
+  for (const p of ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "READ_CONTACTS"]) {
     check(
-      `${p} is removed until its feature ships`,
+      `${p} is removed because the feature is not enabled`,
       manifest.includes(`<uses-permission android:name="android.permission.${p}" tools:node="remove"/>`),
+    );
+  }
+  for (const p of ["CAMERA", "RECORD_AUDIO"]) {
+    check(
+      `${p} is available for opt-in LiveKit calls and live rooms`,
+      granted.includes(`android.permission.${p}`),
     );
   }
   check(
