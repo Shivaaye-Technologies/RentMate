@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { LiveKitRoom, VideoTrack, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
 import { supabase, apiBaseUrl } from "../../src/lib/supabase";
