@@ -73,67 +73,121 @@ export default function CallScreen() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const callee = Array.isArray(params.callee) ? params.callee[0] : params.callee;
   const mode: CallMode = params.mode === "video" ? "video" : "audio";
-  const [callId, setCallId] = useState(id && id !== "new" ? id : null);
+  // Route params are intentionally captured once. A retry must resume the same call,
+  // not react to later router-param changes and accidentally create a second session.
+  const initial = useRef({
+    callId: id && id !== "new" ? id : null,
+    callee,
+    mode,
+  });
+  const initialMode = initial.current.mode;
+  const callIdRef = useRef<string | null>(initial.current.callId);
+  const mounted = useRef(true);
+  const starting = useRef(false);
+  const callStartAttempted = useRef(false);
+  const ending = useRef(false);
   const [room, setRoom] = useState<RoomToken | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryAllowed, setRetryAllowed] = useState(Boolean(initial.current.callId));
   const [connected, setConnected] = useState(false);
   const [duration, setDuration] = useState(0);
-  const ending = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function begin() {
+  const startCall = useCallback(async () => {
+    if (starting.current || ending.current) return;
+    starting.current = true;
+    if (mounted.current) {
+      setBusy(true);
+      setError(null);
+    }
+
+    try {
       if (!supabase) throw new Error("App configuration is missing.");
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Please sign in again.");
-      let current = callId;
+
+      let current = callIdRef.current;
       if (!current) {
-        if (!callee) throw new Error("The person to call was not selected.");
+        if (!initial.current.callee) throw new Error("The person to call was not selected.");
+        // Do not automatically repeat call_start after an uncertain response: it may
+        // have created a session even if the mobile network lost the reply.
+        callStartAttempted.current = true;
         const { data, error: startError } = await supabase.rpc("call_start", {
-          p_callee: callee,
-          p_mode: mode === "audio" ? "voice" : "video",
+          p_callee: initial.current.callee,
+          p_mode: initialMode === "audio" ? "voice" : "video",
         });
         if (startError) throw new Error(startError.message);
         current = String(data);
-        if (!cancelled) setCallId(current);
+        if (!current || current === "null" || current === "undefined") {
+          throw new Error("The call could not be created. Please return and try again.");
+        }
+        callIdRef.current = current;
+        if (mounted.current) setRetryAllowed(true);
       }
+
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
-      const response = await fetch(apiBaseUrl + "/api/v1/calls/" + current + "/join", {
-        method: "POST",
-        headers: { "content-type": "application/json", Authorization: "Bearer " + token },
-        body: "{}",
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not join the call.");
-      if (!cancelled) {
-        setRoom(payload as RoomToken);
-        await AudioSession.startAudioSession();
-        setConnected(true);
+
+      const response = await fetchWithTimeout(
+        apiBaseUrl + "/api/v1/calls/" + current + "/join",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", Authorization: "Bearer " + token },
+          body: "{}",
+        },
+        15_000,
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          typeof payload === "object" && payload !== null && "error" in payload
+            ? String(payload.error)
+            : "Could not join the call.";
+        throw new Error(message);
       }
+      if (!mounted.current) return;
+      setRoom(payload as RoomToken);
+      await AudioSession.startAudioSession();
+      if (mounted.current) setConnected(true);
+    } catch (e) {
+      if (mounted.current) {
+        setRetryAllowed(Boolean(callIdRef.current) || !callStartAttempted.current);
+        setError(e instanceof Error ? e.message : "Could not start call.");
+      }
+    } finally {
+      starting.current = false;
+      if (mounted.current) setBusy(false);
     }
-    void begin()
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not start call."))
-      .finally(() => !cancelled && setBusy(false));
+  }, [initialMode]);
+
+  useEffect(() => {
+    mounted.current = true;
+    void startCall();
     return () => {
-      cancelled = true;
+      mounted.current = false;
     };
-  }, []);
+  }, [startCall]);
 
   async function finishCall(navigate: boolean) {
     if (ending.current) return;
     ending.current = true;
     setConnected(false);
-    if (callId && supabase) {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (token)
-        await fetch(apiBaseUrl + "/api/v1/calls/" + callId + "/end", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + token },
-        }).catch(() => undefined);
+    const current = callIdRef.current;
+    if (current && supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          await fetchWithTimeout(
+            apiBaseUrl + "/api/v1/calls/" + current + "/end",
+            { method: "POST", headers: { Authorization: "Bearer " + token } },
+            8_000,
+          );
+        }
+      } catch {
+        // Ending the local media session must not wait indefinitely for a best-effort API update.
+      }
     }
     await AudioSession.stopAudioSession().catch(() => undefined);
     if (navigate) router.back();
@@ -150,7 +204,7 @@ export default function CallScreen() {
 
   return (
     <Screen>
-      <Title>{mode === "video" ? "Video call" : "Voice call"}</Title>
+      <Title>{initialMode === "video" ? "Video call" : "Voice call"}</Title>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {busy ? <ActivityIndicator size="large" color={c.accent} /> : null}
       {room && connected ? (
@@ -159,19 +213,22 @@ export default function CallScreen() {
           token={room.token}
           connect
           audio
-          video={mode === "video"}
+          video={initialMode === "video"}
           onDisconnected={() => {
             setConnected(false);
             void finishCall(false);
           }}
         >
-          <CallMedia mode={mode} />
-          <CallControls mode={mode} />
+          <CallMedia mode={initialMode} />
+          <CallControls mode={initialMode} />
           <Body muted>Connected · {elapsed}</Body>
           <Body muted>Connected securely through RentMate.</Body>
         </LiveKitRoom>
       ) : null}
       {!busy && !error && !connected ? <Body muted>Call ended or disconnected.</Body> : null}
+      {retryAllowed && !connected && !busy ? (
+        <Button label="Retry connection" kind="plain" onPress={() => void startCall()} />
+      ) : null}
       <Button label="End call" kind="danger" onPress={() => void finishCall(true)} />
     </Screen>
   );
