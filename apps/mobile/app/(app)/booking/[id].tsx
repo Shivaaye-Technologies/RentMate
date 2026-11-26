@@ -5,13 +5,16 @@ import { Card } from "../../../src/components/Card";
 import {
   allowedActions,
   bookingErrorMessage,
+  checkInStep,
   formatWhen,
   HOLD_LABEL,
+  normaliseCheckInCode,
   roleIn,
   STATUS_LABEL,
   type Booking,
   type BookingAction,
 } from "../../../src/lib/bookings";
+import { formatIndianNumber } from "../../../src/lib/shared";
 import { supabase } from "../../../src/lib/supabase";
 import { Body, Button, Field, Notice, Screen, Title, usePalette } from "../../../src/ui";
 
@@ -41,6 +44,8 @@ export default function BookingDetail() {
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [code, setCode] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState("");
 
   const load = useCallback(async () => {
     if (!supabase || !id) return;
@@ -52,7 +57,7 @@ export default function BookingDetail() {
       supabase
         .from("bookings")
         .select(
-          "id, reference, member_id, companion_id, service_title, starts_at, ends_at, meeting_point, status",
+          "id, reference, member_id, companion_id, service_title, starts_at, ends_at, meeting_point, status, checked_in_at",
         )
         .eq("id", id)
         .maybeSingle(),
@@ -89,7 +94,34 @@ export default function BookingDetail() {
     const { error: e } = await call;
     setBusy(null);
     if (e) return setError(bookingErrorMessage(e));
-    setInfo(a === "complete" ? "Thanks. If you both confirmed, the booking is complete." : "Done.");
+    setInfo(a === "complete" ? "Thanks, your confirmation is recorded." : "Done.");
+    await load();
+  }
+
+  async function showCode() {
+    if (!supabase || !b || busy) return;
+    setBusy("code");
+    setError(null);
+    setInfo(null);
+    const { data, error: e } = await supabase.rpc("booking_checkin_code", { p_booking: b.id });
+    setBusy(null);
+    if (e) return setError(bookingErrorMessage(e));
+    setCode(typeof data === "string" ? data : null);
+  }
+
+  async function checkIn() {
+    if (!supabase || !b || busy) return;
+    const digits = normaliseCheckInCode(codeInput);
+    if (!digits) return setError("Enter the 6-digit code shown in the member's app.");
+    setBusy("checkin");
+    setError(null);
+    setInfo(null);
+    const { data, error: e } = await supabase.rpc("booking_check_in", { p_booking: b.id, p_code: digits });
+    setBusy(null);
+    if (e) return setError(bookingErrorMessage(e));
+    if (data !== true) return setError("That code is not right. Check it with the member and try again.");
+    setCodeInput("");
+    setInfo("Checked in. Enjoy the meetup.");
     await load();
   }
 
@@ -132,6 +164,7 @@ export default function BookingDetail() {
     );
   }
   const actions = me ? allowedActions(b, me) : [];
+  const step = me ? checkInStep(b, me) : null;
   return (
     <Screen>
       <Title>{b.service_title}</Title>
@@ -144,7 +177,7 @@ export default function BookingDetail() {
       {tokens ? (
         <Card>
           <Text style={{ color: c.text, fontWeight: "700" }}>
-            {tokens.gross_tokens.toLocaleString("en-IN")} tokens
+            {formatIndianNumber(tokens.gross_tokens)} tokens
           </Text>
           <Text style={{ color: c.muted }}>{HOLD_LABEL[tokens.hold_status] ?? tokens.hold_status}</Text>
           {b.status === "accepted" && tokens.confirmations > 0 ? (
@@ -153,6 +186,57 @@ export default function BookingDetail() {
                 ? "You confirmed. Waiting for the other person."
                 : "The other person confirmed."}
             </Text>
+          ) : null}
+        </Card>
+      ) : null}
+      {step ? (
+        <Card>
+          <Text style={{ color: c.text, fontWeight: "700" }}>Meetup check-in</Text>
+          {step === "not_yet" ? (
+            <Text style={{ color: c.muted }}>
+              Check-in opens 30 minutes before the start, at the meeting place.
+            </Text>
+          ) : null}
+          {step === "checked_in" ? <Text style={{ color: c.muted }}>Checked in at the meetup.</Text> : null}
+          {step === "show_code" ? (
+            <>
+              <Text style={{ color: c.muted }}>
+                When you meet, show this code to your companion. Never share it before you are together.
+              </Text>
+              {code ? (
+                <Text
+                  accessibilityLabel={`Check-in code ${code.split("").join(" ")}`}
+                  style={{
+                    color: c.text,
+                    fontSize: 32,
+                    fontWeight: "700",
+                    letterSpacing: 6,
+                    textAlign: "center",
+                  }}
+                >
+                  {code.slice(0, 3)} {code.slice(3)}
+                </Text>
+              ) : null}
+              <Button
+                label={code ? "Get a new code" : "Show my check-in code"}
+                kind={code ? "plain" : "primary"}
+                busy={busy === "code"}
+                onPress={() => void showCode()}
+              />
+            </>
+          ) : null}
+          {step === "enter_code" ? (
+            <>
+              <Text style={{ color: c.muted }}>Ask the member for the code in their app when you meet.</Text>
+              <Field
+                label="Check-in code"
+                value={codeInput}
+                onChangeText={setCodeInput}
+                keyboardType="number-pad"
+                maxLength={7}
+              />
+              <Button label="Check in" busy={busy === "checkin"} onPress={() => void checkIn()} />
+            </>
           ) : null}
         </Card>
       ) : null}
@@ -176,8 +260,9 @@ export default function BookingDetail() {
         ))}
       <Title>Safety</Title>
       <Body muted>
-        Meet only at the public place above. Both of you confirm the meeting happened before it completes.
-        Reporting freezes any reserved tokens until RentMate reviews.
+        Meet only at the public place above. Check in with the code when you meet. A day after the booking
+        ends, it completes automatically if you checked in or the member confirmed; otherwise RentMate reviews
+        it before any tokens move. Reporting freezes any reserved tokens until RentMate reviews.
       </Body>
       <Field
         label="What happened (for a report or dispute)"

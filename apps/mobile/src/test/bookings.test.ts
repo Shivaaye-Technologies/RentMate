@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   allowedActions,
   bookingErrorMessage,
+  checkInStep,
   durationOptions,
   LEDGER_LABEL,
   newRequestKey,
+  normaliseCheckInCode,
   roleIn,
   startOptions,
   type Booking,
@@ -96,5 +98,42 @@ describe("wording", () => {
     expect(bookingErrorMessage({ message: "Not enough tokens." })).toBe("Not enough tokens.");
     expect(bookingErrorMessage({ message: 'relation "x" does not exist' })).toMatch(/Something went wrong/);
     expect(bookingErrorMessage({ message: "Failed to fetch" })).toMatch(/not confirmed/);
+  });
+});
+
+describe("meetup check-in", () => {
+  const accepted: Booking = { ...base, status: "accepted" };
+  const at = (iso: string) => new Date(iso);
+
+  it("opens 30 minutes before the start and closes at the end", () => {
+    expect(checkInStep(accepted, "m", at("2026-12-02T09:29:00Z"))).toBe("not_yet");
+    expect(checkInStep(accepted, "m", at("2026-12-02T09:30:00Z"))).toBe("show_code");
+    expect(checkInStep(accepted, "c", at("2026-12-02T10:45:00Z"))).toBe("enter_code");
+    expect(checkInStep(accepted, "c", at("2026-12-02T11:00:01Z"))).toBeNull();
+  });
+
+  it("only the member shows a code and only the companion enters one; outsiders see nothing", () => {
+    const t = at("2026-12-02T10:00:00Z");
+    expect(checkInStep(accepted, "m", t)).toBe("show_code");
+    expect(checkInStep(accepted, "c", t)).toBe("enter_code");
+    expect(checkInStep(accepted, "x", t)).toBeNull();
+  });
+
+  it("shows checked in once recorded, and nothing for bookings that were never accepted", () => {
+    const t = at("2026-12-02T10:00:00Z");
+    expect(checkInStep({ ...accepted, checked_in_at: "2026-12-02T10:01:00Z" }, "c", t)).toBe("checked_in");
+    expect(checkInStep({ ...base, status: "completed", checked_in_at: "2026-12-02T10:01:00Z" }, "m", t)).toBe(
+      "checked_in",
+    );
+    expect(checkInStep({ ...base, status: "requested" }, "m", t)).toBeNull();
+    expect(checkInStep({ ...base, status: "cancelled" }, "c", t)).toBeNull();
+  });
+
+  it("accepts six digits with spaces or dashes and rejects anything else", () => {
+    expect(normaliseCheckInCode("123 456")).toBe("123456");
+    expect(normaliseCheckInCode("123-456")).toBe("123456");
+    expect(normaliseCheckInCode("12345")).toBeNull();
+    expect(normaliseCheckInCode("12345a")).toBeNull();
+    expect(normaliseCheckInCode("1234567")).toBeNull();
   });
 });

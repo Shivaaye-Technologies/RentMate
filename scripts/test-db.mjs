@@ -60,6 +60,7 @@ for (const test of [
   "play_billing_purchases.sql",
   "admin_role_tiers.sql",
   "booking_expiry_job.sql",
+  "booking_checkin_and_settlement.sql",
   "schema_security_audit.sql",
 ]) {
   try {

@@ -26,7 +26,7 @@ begin
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
     and p.proname not in ('billing_mark_completed', 'billing_purchase_by_fingerprint', 'billing_record_play_purchase',
-                          'billing_revoke_play_purchase', 'billing_rtdn_first_seen', 'booking_jobs_expire',
+                          'billing_revoke_play_purchase', 'billing_rtdn_first_seen', 'booking_jobs_expire', 'booking_jobs_settle',
                           'demo_mode_profiles', 'live_kicks_claim', 'live_kicks_done', 'live_webhook_ingest');
   r := r || case when t is null then 'ok anon can execute only the reviewed allowlist; ' else 'FAIL anon executes: ' || t || '; ' end;
 

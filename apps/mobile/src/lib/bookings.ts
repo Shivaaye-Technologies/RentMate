@@ -15,6 +15,7 @@ export type Booking = {
   ends_at: string;
   meeting_point: string;
   status: BookingStatus;
+  checked_in_at?: string | null;
 };
 
 export type BookingAction = "accept" | "reject" | "cancel" | "complete" | "dispute";
@@ -39,6 +40,33 @@ export function allowedActions(b: Booking, me: string, now = new Date()): Bookin
   if (b.status === "accepted" && ended) out.push("complete");
   if (b.status === "accepted" && started) out.push("dispute");
   return out;
+}
+
+/** Check-in opens 30 minutes before the start and closes at the end (mirrors private.checkin_window_open). */
+export const CHECKIN_OPENS_MINUTES = 30;
+
+export type CheckInStep = "show_code" | "enter_code" | "checked_in" | "not_yet" | null;
+
+/**
+ * What the check-in card shows. The member shows a one-time code; the companion types it in. Outside the window,
+ * or for anything but an accepted booking, there is nothing to do (null), except a reminder shortly before.
+ */
+export function checkInStep(b: Booking, me: string, now = new Date()): CheckInStep {
+  const role = roleIn(b, me);
+  if (!role || b.status !== "accepted") return b.checked_in_at && role ? "checked_in" : null;
+  if (b.checked_in_at) return "checked_in";
+  const opens = new Date(b.starts_at).getTime() - CHECKIN_OPENS_MINUTES * 60_000;
+  const closes = new Date(b.ends_at).getTime();
+  const t = now.getTime();
+  if (t > closes) return null;
+  if (t < opens) return "not_yet";
+  return role === "member" ? "show_code" : "enter_code";
+}
+
+/** Six digits, spaces and dashes ignored. Returns null if it cannot be a code. */
+export function normaliseCheckInCode(input: string): string | null {
+  const digits = input.replace(/[\s-]/g, "");
+  return /^[0-9]{6}$/.test(digits) ? digits : null;
 }
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {

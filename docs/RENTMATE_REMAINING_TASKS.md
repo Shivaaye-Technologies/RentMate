@@ -33,6 +33,11 @@ proceed in a session with GitHub write access.
 | P-4 | F     | Set up Pub/Sub RTDN: create a topic, grant Publisher to Google Play's notification account, add a push subscription to `/api/v1/billing/google/rtdn?token=…`. |
 | P-5 | F     | Release keystore for Play uploads (GitHub secrets or EAS credentials). The current workflow builds debug-signed APKs only.                                    |
 
+## Session blockers (2026-11-26)
+
+- No GitHub credentials in this session: no push, no PR, no CI or CodeQL. No PR exists for `feature/rentmate-testing-apk`, and CI runs only on PRs.
+- No Android SDK on this machine, so no APK was built.
+
 ## Engineering gaps (not built)
 
 | ID    | Owner | Task                                                                                                                                                                                                                                                   |
@@ -40,7 +45,7 @@ proceed in a session with GitHub write access.
 | F-RT1 | F→E   | **Decision needed:** removing staff tiers. The policy guard forbids `delete from` in new migrations. Options: (a) approve a reviewed exception for role removal, or (b) leave removal with the database owner. Until then, removal is SQL-editor only. |
 | E-1   | E     | Push notifications (FCM through `expo-notifications`): needs a Firebase project and `google-services.json` (F).                                                                                                                                        |
 | E-2   | E     | Gifts: there is no catalog, flow or rule set. Needs a product decision (what a gift is, the price in tokens, the creator share, moderation).                                                                                                           |
-| E-3   | E     | OTP/QR meetup check-in; automatic completion or dispute window for accepted bookings whose time has passed.                                                                                                                                            |
+| E-3   | E     | **Done (2026-11-26):** 6-digit check-in code (`20261126140000`) and the settlement job (24 h dispute window; no evidence means moderator review). Left: a QR display of the code and the web app's check-in screen.                                                                                                                                            |
 | E-4   | E     | Effective-dated GST/tax records and invoices; maker-checker approval for catalog price changes (the `financial_config_versions` table exists, but packages are still edited by migration).                                                             |
 | E-5   | E     | Upgrade the Expo tooling that pulls in a vulnerable `minimatch` (4 moderate, development tooling) when Expo ships a fix.                                                                                                                               |
 | E-6   | E     | Android admin screens are intentionally absent (admin stays on the web with MFA). Revisit only if requested.                                                                                                                                           |

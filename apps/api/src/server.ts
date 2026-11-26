@@ -110,7 +110,7 @@ if (integration && providers.get("livekit")?.configured) {
   }, 3000).unref();
 }
 
-// Unanswered booking requests past their start time expire and their token holds are refunded.
+// Booking jobs: stale requests expire (holds refunded); finished token bookings settle or go to moderator review.
 if (supabaseReady && config.BOOKING_JOBS_DB_SECRET) {
   startBookingExpiry(
     new SupabaseBookingJobs(SUPABASE_URL!, SUPABASE_ANON_KEY!, config.BOOKING_JOBS_DB_SECRET),

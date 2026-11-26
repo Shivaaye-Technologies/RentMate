@@ -16,6 +16,11 @@ const migrations = readdirSync(join(root, "supabase/migrations")).sort();
 /** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
 const STEPS = [
   {
+    migrations: ["20261126140000_booking_checkin_and_settlement.sql"],
+    rollback: "docs/rollback/20261126_booking_checkin_and_settlement.rollback.sql",
+    suites: ["booking_expiry_job.sql", "booking_checkin_and_settlement.sql"],
+  },
+  {
     migrations: ["20261126130000_revoke_anon_social_reads.sql"],
     rollback: "docs/rollback/20261126_revoke_anon_social_reads.rollback.sql",
     suites: ["rls_flow.sql", "marketplace.sql"],
