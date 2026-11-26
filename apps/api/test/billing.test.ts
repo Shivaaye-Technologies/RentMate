@@ -181,6 +181,39 @@ describe("Google Play response interpretation", () => {
     expect(interpretSubscription({ subscriptionState: "SOMETHING_NEW" }).state).toBe("pending");
   });
 
+  it("keeps a cancelled plan until its paid period ends, and never entitles paused or pending plans", () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const item = (expiryTime: string) => ({ lineItems: [{ productId: "rentmate_monthly", expiryTime }] });
+    // Cancelled by the member: still paid up to the end of the period, then expired.
+    expect(
+      interpretSubscription({ ...item(future), subscriptionState: "SUBSCRIPTION_STATE_CANCELED" }).state,
+    ).toBe("active");
+    expect(
+      interpretSubscription({ ...item(past), subscriptionState: "SUBSCRIPTION_STATE_CANCELED" }).state,
+    ).toBe("expired");
+    // A grace period that has run out is not an entitlement either.
+    expect(
+      interpretSubscription({ ...item(past), subscriptionState: "SUBSCRIPTION_STATE_IN_GRACE_PERIOD" }).state,
+    ).toBe("expired");
+    expect(
+      interpretSubscription({ ...item(future), subscriptionState: "SUBSCRIPTION_STATE_PAUSED" }).state,
+    ).toBe("expired");
+    expect(
+      interpretSubscription({ ...item(future), subscriptionState: "SUBSCRIPTION_STATE_PENDING" }).state,
+    ).toBe("pending");
+    expect(
+      interpretSubscription({
+        ...item(future),
+        subscriptionState: "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED",
+      }).state,
+    ).toBe("expired");
+    // No expiry time at all: never treated as active.
+    expect(
+      interpretSubscription({ subscriptionState: "SUBSCRIPTION_STATE_ACTIVE", lineItems: [{}] }).state,
+    ).toBe("expired");
+  });
+
   it("fingerprints tokens one-way and hashes the account id", () => {
     expect(tokenFingerprint(TOKEN)).toMatch(/^[0-9a-f]{64}$/);
     expect(tokenFingerprint(TOKEN)).not.toContain(TOKEN);
