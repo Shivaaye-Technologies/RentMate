@@ -96,7 +96,10 @@ export default function Wallet() {
         {loading ? (
           <ActivityIndicator accessibilityLabel="Loading wallet balance" color={c.accent} />
         ) : (
-          <Text accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`} style={{ color: c.text, fontSize: 34, fontWeight: "800" }}>
+          <Text
+            accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`}
+            style={{ color: c.text, fontSize: 34, fontWeight: "800" }}
+          >
             {(wallet?.balance ?? 0).toLocaleString()}
           </Text>
         )}
@@ -106,7 +109,16 @@ export default function Wallet() {
       </View>
 
       {error ? (
-        <View style={{ backgroundColor: c.card, borderColor: c.border, borderWidth: 1, borderRadius: 16, padding: 14, gap: 8 }}>
+        <View
+          style={{
+            backgroundColor: c.card,
+            borderColor: c.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            padding: 14,
+            gap: 8,
+          }}
+        >
           <Body>{error}</Body>
           <Text accessibilityRole="button" onPress={() => void loadWallet()} style={{ color: c.accent, fontWeight: "700" }}>
             Try again
@@ -131,7 +143,9 @@ export default function Wallet() {
             }}
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-              <Text style={{ color: c.text, fontWeight: "700", flex: 1 }}>{entry.reason.replaceAll("_", " ")}</Text>
+              <Text style={{ color: c.text, fontWeight: "700", flex: 1 }}>
+                {entry.reason.replaceAll("_", " ")}
+              </Text>
               <Text style={{ color: entry.delta > 0 ? c.accent : c.text, fontWeight: "800" }}>
                 {formatDelta(entry.delta)}
               </Text>
