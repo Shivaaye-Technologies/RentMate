@@ -35,7 +35,9 @@ No feature should be represented as live if its backend, authorization, provider
 Founder selected **Option A: members may spend RentMate tokens on approved bookings**. Implement this model as sandbox/test functionality first.
 
 ### Ledgers and accounting
+
 Keep separate, append-only, server-authoritative ledgers for:
+
 1. Member token wallet and token purchase credits.
 2. Booking-specific token holds.
 3. Refunds/reversals.
@@ -46,6 +48,7 @@ Keep separate, append-only, server-authoritative ledgers for:
 Never mix these balances. Tokens are internal, non-transferable, non-withdrawable, non-redeemable app units. Do not convert tokens to INR or imply creators can cash out. Creator cash payouts/redemption remain disabled unless separately approved.
 
 ### Booking transaction requirements
+
 - Calculate quote server-side from approved listing and current price; never trust client-supplied amounts.
 - Validate member/creator age and identity/verification, listing approval, availability, active blocks/suspensions, city rollout, venue eligibility and booking limits at request and acceptance.
 - Atomically create booking/payment attempt, snapshot quote and policy versions, reserve exact token amount and write ledger entries.
@@ -58,6 +61,7 @@ Never mix these balances. Tokens are internal, non-transferable, non-withdrawabl
 - No token-to-cash conversion, member-to-member transfer, cash withdrawal or creator payout.
 
 ### Booking chat
+
 - Dedicated booking conversation scoped to booking ID and exactly the two authorized participants.
 - Chat remains accessible for the documented pre-booking, active and post-booking support period.
 - Strong RLS and server authorization, tests against cross-booking access, block/report controls, audit and privacy-aware retention.
@@ -101,6 +105,7 @@ Existing token package planning values, if still current in source, must be veri
 ## 7. Testing and release engineering
 
 Run and fix all relevant:
+
 - Format/lint/typecheck.
 - API and web unit/integration tests.
 - Mobile unit tests and React Native tests.
@@ -116,6 +121,7 @@ Run and fix all relevant:
 Never run unreviewed migrations against production. Use disposable database instances for migration tests. Never expose secrets in logs or artifacts.
 
 ### APK
+
 - Resolve the Android SDK/API 37 workflow issue without downgrading `compileSdkVersion` simply to make CI pass. Confirm supported SDK package availability from the runner and use a compatible build image/SDK installation.
 - Build a debug/internal-testing APK in GitHub Actions or another approved build environment. EAS quota was previously exhausted; check current quota rather than assuming.
 - Verify package ID `com.shivaayetechnologies.rentmate`, app config, manifest permissions and no prohibited location/contacts/overlay permissions.
@@ -135,6 +141,7 @@ Never run unreviewed migrations against production. Use disposable database inst
 ## 9. Reference repositories
 
 Use selectively, not as dependencies by default:
+
 - https://github.com/cporter202/API-mega-list — API discovery; vet each provider for licensing, privacy, cost, uptime, terms and security.
 - https://github.com/anomalyco/sst — infrastructure patterns only; do not migrate from Supabase/Render without a justified architecture proposal and approval.
 - https://github.com/public-apis/public-apis — API discovery and prototypes; verify official documentation and production terms.

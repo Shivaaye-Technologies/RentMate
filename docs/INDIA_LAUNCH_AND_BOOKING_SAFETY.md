@@ -48,6 +48,7 @@ Proposed state machine:
 Terminal/exception states: `REJECTED`, `CANCELLED`, `EXPIRED`, `REFUNDED`, `DISPUTED`, `SAFETY_HOLD`.
 
 Rules:
+
 - Re-check both accounts' age/verification status, active blocks, suspensions, booking limits, and venue eligibility on request and again on acceptance/check-in.
 - A block, suspension, safety report, or account restriction prevents new acceptance and can put an existing booking into a review/cancellation path.
 - Arrival is not completion. A single party's OTP is not sufficient proof of mutual completion.
@@ -70,6 +71,7 @@ Rules:
 ## 5. Autonomous operations with human controls
 
 May be automated after tests:
+
 - Booking reminders, expiry of unused OTP/QR challenges, stale-request expiry, duplicate-request prevention.
 - Re-check of blocks/suspensions/venue status at each state transition.
 - Rate limits, suspicious-attempt flags, ledger reconciliation reports, and retry queues with idempotency.
@@ -77,6 +79,7 @@ May be automated after tests:
 - Deterministic release/refund of token holds only when a published policy condition is unambiguously met and the database transaction can be completed atomically.
 
 Must require a human or explicit authorized approval:
+
 - Safety incidents, disputed arrival/completion, fraud decisions with material impact, refunds outside deterministic policy, creator cash payouts, chargebacks, legal/tax changes, commission changes, and any emergency-stop reset.
 - Automation must fail closed if policy/configuration is missing, stale, or contradictory. Keep an immutable audit trail and a manual override with reason and actor.
 
@@ -91,6 +94,7 @@ Must require a human or explicit authorized approval:
 ## 7. Android application requirements
 
 Before enabling booking flows:
+
 - Add a Booking Safety screen explaining public-place-only meetups, verification, token hold/release/refund, OTP/QR steps, cancellation/dispute handling, and emergency options.
 - Add accessible booking status, token quote and hold status, expiry countdown, and clear action confirmations; never display a success state before the API confirms it.
 - Add booking-specific chat with participant-only authorization, booking status events, report/block/SOS entry points, and safe handling of account restrictions.
