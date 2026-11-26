@@ -1,5 +1,56 @@
 # RentMate — completion report
 
+## Round 3 (2026-11-26)
+
+On top of `d963b06`, which is now on GitHub. The commits from this round are **local only**: this session has no
+GitHub credentials, so pushing failed (no username), the GitHub MCP server failed to connect, and CodeQL needs
+authentication. No PR exists for `feature/rentmate-testing-apk`. `ci.yml` runs only on pull requests (and pushes
+to `main` or `staging/rentmate-android`), so CI has never run on this branch. No APK was built: there is no
+Android SDK on this machine.
+
+Work done:
+
+1. **Meetup check-in and settlement** (`20261126140000_booking_checkin_and_settlement.sql`), which fixes a defect:
+   an accepted token booking whose time had passed held the member's tokens indefinitely unless both people
+   tapped "complete".
+   - Check-in: inside the meetup window, the member shows a one-time 6-digit code and the companion enters it.
+     The code is stored only as a hash, each code allows 5 wrong tries, and a member can issue at most 10 codes.
+   - The `booking_jobs_settle` job runs from the API every minute, after the dispute window (24 hours by default;
+     an admin can set 1 to 168 hours).
+     - A booking that was checked in, or that the member confirmed, completes and settles exactly once.
+     - Any other finished booking is frozen for a moderator to decide. A companion's confirmation alone never
+       moves tokens.
+   - Includes a rollback script (it refuses to run once the feature has been used) and a rollback rehearsal step.
+   - Includes a check-in card on Android and web. The rules are shared from `apps/web/src/market/marketText.ts`.
+2. **Indian digit grouping** (₹1,50,000) no longer depends on the runtime's locale data. A small-icu Node printed
+   ₹150,000, and some Android JS engines can do the same. This applies to the web wallet and the Android wallet,
+   token store and booking screens.
+3. **Security sweep**: every security-definer function that members can call was checked for a caller check.
+   - Every function was accounted for.
+   - Two findings were recorded as SEC-1 and SEC-2 in `RENTMATE_REMAINING_TASKS.md`. SEC-1 is a disputes-after-
+     settlement gap that needs a decision; SEC-2 is a low-severity room-name disclosure.
+
+Test results, run in this session on disposable databases only:
+
+| Command                             | Result                                                             |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `npm run check`                     | exit 0                                                             |
+| API tests                           | 158/158                                                            |
+| Web tests                           | 226/226                                                            |
+| `npm run test:db`                   | exit 0; new suite: check-in and settlement 29/29; schema audit 8/8 |
+| `npm run test:rollback`             | exit 0 (19 stages)                                                 |
+| `npm run test:hooks` / `test:aihub` | 21/21 / 32/32                                                      |
+| Mobile `vitest` / `typecheck`       | 88/88 / clean                                                      |
+
+Environment notes (not committed):
+
+- `node_modules` had Termux (android-arm64) native binaries. They were replaced with linux-arm64 Rollup and
+  esbuild builds, and the mobile dependencies were reinstalled with `npm ci`. No lockfile changed.
+- A stale, untracked `apps/mobile/.expo/types/router.d.ts` was moved aside so the typecheck runs as it does on a
+  fresh CI checkout.
+
+## Round 2
+
 Branch `feature/rentmate-testing-apk`. Started from `e30eef4` (already on GitHub). New local commits since:
 `7d61f92`, `006d3cb`, `5ed5492`, `cb76a43` and this documentation commit. They are **not pushed yet**: this
 session can read the GitHub repository but has no write or API access (proxy 403). They are delivered as a git
