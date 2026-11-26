@@ -20,7 +20,10 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Date unavailable"
-    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    : date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
 }
 
 function formatDelta(value: number) {
@@ -36,7 +39,9 @@ export default function Wallet() {
 
   const loadWallet = useCallback(async () => {
     if (!supabase) {
-      setError("RentMate is not configured. Please try again after the app configuration is restored.");
+      setError(
+        "RentMate is not configured. Please try again after the app configuration is restored.",
+      );
       setLoading(false);
       return;
     }
@@ -44,13 +49,18 @@ export default function Wallet() {
     setLoading(true);
     setError(null);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
       if (sessionError) throw sessionError;
       const userId = sessionData.session?.user.id;
       if (!userId) throw new Error("Please sign in again to view your wallet.");
 
       const [walletResult, ledgerResult] = await Promise.all([
-        supabase.from("token_wallets").select("balance").eq("user_id", userId).maybeSingle(),
+        supabase
+          .from("token_wallets")
+          .select("balance")
+          .eq("user_id", userId)
+          .maybeSingle(),
         supabase
           .from("token_ledger")
           .select("id, delta, balance_after, reason, created_at")
@@ -67,7 +77,11 @@ export default function Wallet() {
         entries: (ledgerResult.data ?? []) as LedgerEntry[],
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load your wallet right now.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to load your wallet right now.",
+      );
       setWallet(null);
     } finally {
       setLoading(false);
@@ -80,7 +94,9 @@ export default function Wallet() {
 
   return (
     <Screen>
-      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>RENTMATE TOKENS</Text>
+      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>
+        RENTMATE TOKENS
+      </Text>
       <Title>Wallet</Title>
       <View
         style={{
@@ -94,7 +110,10 @@ export default function Wallet() {
       >
         <Text style={{ color: c.muted }}>Available token balance</Text>
         {loading ? (
-          <ActivityIndicator accessibilityLabel="Loading wallet balance" color={c.accent} />
+          <ActivityIndicator
+            accessibilityLabel="Loading wallet balance"
+            color={c.accent}
+          />
         ) : (
           <Text
             accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`}
@@ -104,7 +123,8 @@ export default function Wallet() {
           </Text>
         )}
         <Text style={{ color: c.muted }}>
-          RentMate tokens are internal app units. They are not cash, cannot be withdrawn or transferred, and have no cash redemption value.
+          RentMate tokens are internal app units. They are not cash, cannot be
+          withdrawn or transferred, and have no cash redemption value.
         </Text>
       </View>
 
@@ -120,7 +140,11 @@ export default function Wallet() {
           }}
         >
           <Body>{error}</Body>
-          <Text accessibilityRole="button" onPress={() => void loadWallet()} style={{ color: c.accent, fontWeight: "700" }}>
+          <Text
+            accessibilityRole="button"
+            onPress={() => void loadWallet()}
+            style={{ color: c.accent, fontWeight: "700" }}
+          >
             Try again
           </Text>
         </View>
@@ -142,16 +166,31 @@ export default function Wallet() {
               gap: 4,
             }}
           >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
               <Text style={{ color: c.text, fontWeight: "700", flex: 1 }}>
                 {entry.reason.replaceAll("_", " ")}
               </Text>
-              <Text style={{ color: entry.delta > 0 ? c.accent : c.text, fontWeight: "800" }}>
+              <Text
+                style={{
+                  color: entry.delta > 0 ? c.accent : c.text,
+                  fontWeight: "800",
+                }}
+              >
                 {formatDelta(entry.delta)}
               </Text>
             </View>
-            <Text style={{ color: c.muted, fontSize: 12 }}>{formatDate(entry.created_at)}</Text>
-            <Text style={{ color: c.muted, fontSize: 12 }}>Balance after: {entry.balance_after.toLocaleString()}</Text>
+            <Text style={{ color: c.muted, fontSize: 12 }}>
+              {formatDate(entry.created_at)}
+            </Text>
+            <Text style={{ color: c.muted, fontSize: 12 }}>
+              Balance after: {entry.balance_after.toLocaleString()}
+            </Text>
           </View>
         ))
       ) : (
@@ -160,10 +199,13 @@ export default function Wallet() {
 
       <Title>Purchases and gifts</Title>
       <Body>
-        Token purchases and member-to-member gifts are not enabled in this testing build. Purchases will be available only after the approved store billing flow and server verification are complete.
+        Token purchases and member-to-member gifts are not enabled in this
+        testing build. Purchases will be available only after the approved store
+        billing flow and server verification are complete.
       </Body>
       <Body muted>
-        Booking token holds and refunds will appear here only after their separate booking ledger integration is implemented and tested.
+        Booking token holds and refunds will appear here only after their
+        separate booking ledger integration is implemented and tested.
       </Body>
     </Screen>
   );
