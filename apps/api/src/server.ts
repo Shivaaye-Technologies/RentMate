@@ -8,6 +8,8 @@ import { SupabaseAccountDeleter } from "./account.js";
 import { buildRegistry } from "./live/providers.js";
 import { SupabaseIntegrationStore, SupabaseLiveStore } from "./live/store.js";
 import { drainKicks } from "./live/webhook.js";
+import { GooglePlayClient, parseServiceAccount } from "./billing/googlePlay.js";
+import { SupabaseBillingStore } from "./billing/store.js";
 
 const config = loadConfig();
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = config;
@@ -49,6 +51,25 @@ const accountFor = supabaseReady
   ? (req: Request) => new SupabaseAccountDeleter(SUPABASE_URL!, SUPABASE_ANON_KEY!, req.accessToken!)
   : undefined;
 
+// Google Play Billing: verified on the server with a service account; the database decides what is credited.
+// Fails closed: any missing setting leaves the billing routes answering 503.
+const billing =
+  supabaseReady &&
+  config.GOOGLE_PLAY_PACKAGE_NAME &&
+  config.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON &&
+  config.BILLING_DB_SECRET &&
+  config.GOOGLE_PLAY_RTDN_TOKEN
+    ? {
+        play: new GooglePlayClient(
+          config.GOOGLE_PLAY_PACKAGE_NAME,
+          parseServiceAccount(config.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON),
+        ),
+        store: new SupabaseBillingStore(SUPABASE_URL!, SUPABASE_ANON_KEY!, config.BILLING_DB_SECRET),
+        packageName: config.GOOGLE_PLAY_PACKAGE_NAME,
+        rtdnToken: config.GOOGLE_PLAY_RTDN_TOKEN,
+      }
+    : null;
+
 const app = createApp({
   config,
   verifyToken,
@@ -56,6 +77,7 @@ const app = createApp({
   live,
   webhook: { providers, integration },
   accountFor,
+  billing,
   readinessCheck: async () => {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
     try {

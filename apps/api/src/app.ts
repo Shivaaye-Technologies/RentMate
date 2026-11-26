@@ -12,6 +12,7 @@ import { AgeAttestationRequiredError } from "./profileErrors.js";
 import { liveRouter, type LiveDeps } from "./live/routes.js";
 import { callsRouter } from "./live/calls.js";
 import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
+import { billingRouter, rtdnRouter, type BillingDeps } from "./billing/routes.js";
 
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -106,6 +107,18 @@ export const ROUTES = [
   },
   {
     method: "POST",
+    path: "/api/v1/billing/google/purchases",
+    auth: true,
+    description: "Verify a Google Play purchase on the server (sandbox only)",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/billing/google/rtdn",
+    auth: false,
+    description: "Google Play real-time notifications (push token checked)",
+  },
+  {
+    method: "POST",
     path: "/api/v1/live/webhook",
     auth: false,
     description: "LiveKit signed webhooks (signature checked)",
@@ -131,6 +144,8 @@ export interface AppDeps {
   webhook?: WebhookDeps;
   /** Server-side account deletion (optional: without it DELETE /api/v1/account returns 503). */
   accountFor?: (req: Request) => AccountDeleter;
+  /** Google Play Billing (optional: without it the billing routes return 503). */
+  billing?: BillingDeps | null;
   /** Checks the external dependency required to serve authenticated requests. */
   readinessCheck?: () => Promise<boolean>;
 }
@@ -142,6 +157,7 @@ export function createApp({
   live,
   webhook,
   accountFor,
+  billing,
   readinessCheck,
 }: AppDeps) {
   const app = express();
@@ -193,6 +209,9 @@ export function createApp({
       res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
     }
   });
+
+  // Pub/Sub push from Google: authenticated by its push token, not a member session.
+  app.use("/api/v1/billing/google/rtdn", rtdnRouter(billing ?? null));
 
   const api = express.Router();
   api.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: "draft-7", legacyHeaders: false }));
@@ -278,6 +297,8 @@ export function createApp({
       next(err);
     }
   });
+
+  api.use("/billing", billingRouter(billing ?? null));
 
   if (live) {
     api.use("/live", liveRouter(live));

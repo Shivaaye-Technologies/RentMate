@@ -206,5 +206,30 @@ else
   bad "double refund race: refunds=$refunds balance=$bal"
 fi
 
-rm -f /tmp/race_[a-r].$$
+# 9. The same Google Play purchase recorded twice at the same moment (app retry and second device): credited once.
+"${PSQL[@]}" -d "$DB" -c "select private.set_integration_secret('play_billing', 'k9Qw2Lr7Zp4Xv1Tn8Bs5Hd3Jf6Gm0Ca9Ue2Yi7Ro4Wl1Pq8Nt5Kb3Mc6Vx0Az2'); update public.billing_settings set sandbox_enabled = true; update public.store_products set enabled = true where product_id = 'rentmate_tokens_100';" >/dev/null
+before=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M3'")
+record() { # $1 seconds to hold
+  "${PSQL[@]}" -d "$DB" 2>&1 <<SQL
+begin;
+set local role anon;
+select 'out=' || ((public.billing_record_play_purchase('k9Qw2Lr7Zp4Xv1Tn8Bs5Hd3Jf6Gm0Ca9Ue2Yi7Ro4Wl1Pq8Nt5Kb3Mc6Vx0Az2', '$M3', 'rentmate_tokens_100',
+  encode(sha256('race-purchase-token'::bytea), 'hex'), 'GPA.race', 'purchased', true, 1, now(), null))->>'outcome');
+select pg_sleep($1);
+commit;
+SQL
+}
+record 3 >/tmp/race_s.$$ &
+sleep 1
+record 0 >/tmp/race_t.$$ || true
+wait
+after=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M3'")
+credits=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.token_ledger where reason = 'token_purchase' and user_id = '$M3'")
+if [ "$credits" = "1" ] && [ "$after" = "$((before + 100))" ] && grep -q "out=credited" /tmp/race_s.$$ && grep -q "out=already_recorded" /tmp/race_t.$$; then
+  ok "one Play purchase recorded twice at once: credited exactly once (balance $after)"
+else
+  bad "purchase race: credits=$credits before=$before after=$after first=$(tr '\n' ' ' </tmp/race_s.$$) second=$(tr '\n' ' ' </tmp/race_t.$$)"
+fi
+
+rm -f /tmp/race_[a-t].$$
 exit $fail

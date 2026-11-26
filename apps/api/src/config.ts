@@ -50,12 +50,36 @@ const EnvSchema = z.object({
     .string()
     .regex(/^[a-z0-9-]{2,40}$/, "must be a lower-case header name")
     .optional(),
+  /**
+   * Google Play Billing (sandbox first; docs/PLAY_BILLING_IMPLEMENTATION.md). All four are needed or the billing routes
+   * answer 503. The service-account JSON and the two secrets never leave the server.
+   */
+  GOOGLE_PLAY_PACKAGE_NAME: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, "must be an Android package name")
+    .optional(),
+  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
+  /** Must match private.set_integration_secret('play_billing', ...). */
+  BILLING_DB_SECRET: z.string().min(32).optional(),
+  /** Token in the Pub/Sub push endpoint URL (?token=...) for Real-time Developer Notifications. */
+  GOOGLE_PLAY_RTDN_TOKEN: z
+    .string()
+    .min(32)
+    .regex(/^[A-Za-z0-9_-]+$/, "must be URL-safe (letters, digits, - and _)")
+    .optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
 
 /** Settings whose values must never appear in logs, error reports or serialised output. */
-export const SECRET_KEYS = ["SUPABASE_ANON_KEY", "LIVEKIT_API_SECRET", "LIVE_WEBHOOK_DB_SECRET"] as const;
+export const SECRET_KEYS = [
+  "SUPABASE_ANON_KEY",
+  "LIVEKIT_API_SECRET",
+  "LIVE_WEBHOOK_DB_SECRET",
+  "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+  "BILLING_DB_SECRET",
+  "GOOGLE_PLAY_RTDN_TOKEN",
+] as const;
 
 /**
  * Makes the config safe to log by accident: `JSON.stringify(config)`, `console.log(config)` and `util.inspect` all
