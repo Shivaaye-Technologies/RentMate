@@ -4,13 +4,11 @@ Status: implementation target for sandbox/internal testing. This document does n
 
 ## 1. Product classification
 
-| Product | Intended treatment | Release gate |
-| --- | --- | --- |
-| RentMate digital subscription | Google Play subscription product for Play-distributed Android builds, unless a documented, enrolled alternative billing programme applies | Play Console product, backend verification, renewal/revocation handling |
-| RentMate token package | Google Play one-time digital product for Play-distributed Android builds, unless a documented, enrolled alternative billing programme applies | Product configuration, backend purchase verification, one-time purchase lifecycle |
-| Token spend on approved RentMate booking | Internal token ledger operation; no INR conversion and no cash settlement | Founder-selected sandbox implementation; live spend remains gated by legal, tax, store and provider approvals |
-| Physical-world service payment | Separate classification and payment flow; do not conflate with digital token purchase | Product/legal review and approved provider |
-| Creator earnings | Internal pending token-denominated accounting only | No cash-out, redemption or transfer enabled |
+- **RentMate digital subscription:** Google Play subscription product for Play-distributed Android builds, unless a documented, enrolled alternative billing programme applies. Release gate: Play Console product, backend verification, renewal/revocation handling.
+- **RentMate token package:** Google Play one-time digital product for Play-distributed Android builds, unless a documented, enrolled alternative billing programme applies. Release gate: product configuration, backend purchase verification, one-time purchase lifecycle.
+- **Token spend on approved RentMate booking:** Internal token ledger operation; no INR conversion and no cash settlement. Release gate: founder-selected sandbox implementation; live spend remains gated by legal, tax, store and provider approvals.
+- **Physical-world service payment:** Separate classification and payment flow; do not conflate with digital token purchase. Release gate: product/legal review and approved provider.
+- **Creator earnings:** Internal pending token-denominated accounting only. Release gate: no cash-out, redemption or transfer enabled.
 
 The Android app must not offer an external checkout for digital tokens or subscriptions merely because an external gateway is convenient. Any alternative billing route requires a documented current Google Play programme, enrolment and compliance review for the exact product and region.
 
