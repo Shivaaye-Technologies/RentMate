@@ -148,5 +148,63 @@ else
   bad "unfundable replay: rows=$rows $(tr '\n' ' ' </tmp/race_i.$$)"
 fi
 
-rm -f /tmp/race_[a-l].$$
+# 6. Token-funded bookings (sandbox): two requests from one member at the same moment with different request keys.
+# The member has 100 tokens and each request holds 80, so exactly one may succeed and the other must leave nothing.
+M3=11111111-0000-4000-8000-000000000004
+TSVC=22222222-0000-4000-8000-000000000002
+"${PSQL[@]}" -d "$DB" >/dev/null <<SQL
+insert into auth.users (id, email, aud, role) values ('$M3', 'm3@race.test', 'authenticated', 'authenticated');
+insert into public.profiles (id, display_name, age, looking_for, age_min, age_max)
+  values ('$M3', 'Racer', 30, 'friendship', 18, 60);
+update public.profiles set is_tester = true where id in ('$CM', '$M3');
+update public.booking_token_settings set sandbox_spend_enabled = true;
+insert into public.companion_services (id, companion_id, category, title, pricing, price_inr, price_tokens, min_minutes, max_minutes)
+  values ('$TSVC', '$CM', 'coffee', 'Coffee chat (tokens)', 'hourly', 500, 80, 60, 120);
+SQL
+TREQ() { echo "select 'id=' || public.booking_request_with_tokens('$TSVC', $SLOT + interval '$1', 60, 'Cafe on FC Road', '', '$2');"; }
+as_user "$M3" "$(TREQ '3 days' token-race-0001)" 3 >/tmp/race_m.$$ &
+sleep 1
+as_user "$M3" "$(TREQ '4 days' token-race-0002)" 0 >/tmp/race_n.$$ || true
+wait
+bal=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M3'")
+nb=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.bookings where member_id = '$M3'")
+nh=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.booking_token_holds where member_id = '$M3'")
+if [ "$bal" = "20" ] && [ "$nb" = "1" ] && [ "$nh" = "1" ] && grep -q "id=" /tmp/race_m.$$ && grep -q "Not enough tokens" /tmp/race_n.$$; then
+  ok "two token bookings at once from one wallet: one holds 80, the other is refused and leaves no booking"
+else
+  bad "token booking race: balance=$bal bookings=$nb holds=$nh second said: $(tr '\n' ' ' </tmp/race_n.$$)"
+fi
+
+# 7. The same token booking request sent twice at the same moment (double tap): one booking, one hold, one debit.
+"${PSQL[@]}" -d "$DB" -c "select private.ledger_post('$M3', 200, 'sandbox_grant', 'sandbox', null, 'sandbox-race-grant')" >/dev/null
+as_user "$M3" "$(TREQ '5 days' token-same-0777)" 3 >/tmp/race_o.$$ &
+sleep 1
+as_user "$M3" "$(TREQ '5 days' token-same-0777)" 0 >/tmp/race_p.$$ || true
+wait
+bal=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M3'")
+nb=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.bookings where idempotency_key = 'token-same-0777'")
+nh=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.booking_token_holds h join public.bookings b on b.id = h.booking_id where b.idempotency_key = 'token-same-0777'")
+id_o=$(grep -o 'id=.*' /tmp/race_o.$$ || true)
+id_p=$(grep -o 'id=.*' /tmp/race_p.$$ || true)
+if [ "$bal" = "140" ] && [ "$nb" = "1" ] && [ "$nh" = "1" ] && [ -n "$id_o" ] && [ "$id_o" = "$id_p" ]; then
+  ok "a token booking retried at the same moment: one booking, one hold, charged once (balance $bal)"
+else
+  bad "token booking retry: balance=$bal bookings=$nb holds=$nh first=[$id_o] second=[$id_p] $(tr '\n' ' ' </tmp/race_p.$$)"
+fi
+
+# 8. Reject and cancel at the same moment on one held booking: the hold is refunded exactly once.
+B9=${id_o#id=}
+as_user "$CM" "select public.booking_respond('$B9', 'reject', 'busy');" 3 >/tmp/race_q.$$ &
+sleep 1
+as_user "$M3" "select public.booking_cancel('$B9', 'changed plans');" 0 >/tmp/race_r.$$ || true
+wait
+refunds=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.token_ledger where idempotency_key = 'booking_refund:$B9'")
+bal=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M3'")
+if [ "$refunds" = "1" ] && [ "$bal" = "220" ]; then
+  ok "reject and cancel at once: the hold is refunded exactly once (balance $bal)"
+else
+  bad "double refund race: refunds=$refunds balance=$bal"
+fi
+
+rm -f /tmp/race_[a-r].$$
 exit $fail
