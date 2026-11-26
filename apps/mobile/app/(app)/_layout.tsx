@@ -126,6 +126,7 @@ export default function AppLayout() {
       <Tabs.Screen name="nearby" options={{ href: null, title: "Nearby" }} />
       <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
       <Tabs.Screen name="notifications" options={{ href: null, title: "Notifications" }} />
+      <Tabs.Screen name="availability" options={{ href: null, title: "Availability" }} />
       <Tabs.Screen name="declare-age" options={{ href: null, title: "Your date of birth" }} />
     </Tabs>
   );

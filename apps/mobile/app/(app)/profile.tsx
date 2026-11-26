@@ -400,6 +400,9 @@ export default function Profile() {
       <Link href={"/(app)/booking" as Href} asChild>
         <Button label="My bookings" kind="plain" onPress={() => undefined} />
       </Link>
+      <Link href={"/(app)/availability" as Href} asChild>
+        <Button label="Companion availability" kind="plain" onPress={() => undefined} />
+      </Link>
       <Link href="/(app)/companions" asChild>
         <Button label="Companionship options" kind="plain" onPress={() => undefined} />
       </Link>
