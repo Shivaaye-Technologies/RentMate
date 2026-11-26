@@ -231,5 +231,68 @@ else
   bad "purchase race: credits=$credits before=$before after=$after first=$(tr '\n' ' ' </tmp/race_s.$$) second=$(tr '\n' ' ' </tmp/race_t.$$)"
 fi
 
-rm -f /tmp/race_[a-t].$$
+# 10. Two settlement job runs at the same moment (two API processes): every finished booking is decided once.
+M4=11111111-0000-4000-8000-000000000005
+ADM=11111111-0000-4000-8000-000000000006
+JOBS_SECRET='Rv3Tq8Lm2Xp7Wz1Kn5Bs9Hd4Jf6Gc0Ya8Ue2Ti7Ro4Wl1Pq8Nv5Kb3Mc6Vx0Az9'
+"${PSQL[@]}" -d "$DB" >/dev/null <<SQL
+insert into auth.users (id, email, aud, role) values
+  ('$M4', 'm4@race.test', 'authenticated', 'authenticated'), ('$ADM', 'adm@race.test', 'authenticated', 'authenticated');
+insert into public.profiles (id, display_name, age, looking_for, age_min, age_max)
+  values ('$M4', 'Racer', 30, 'friendship', 18, 60), ('$ADM', 'Admin', 30, 'friendship', 18, 60);
+update public.profiles set is_tester = true where id = '$M4';
+insert into private.user_roles (user_id, role) values ('$ADM', 'admin');
+select private.ledger_post('$M4', 500, 'sandbox_grant', 'sandbox', null, 'sandbox-settle-grant');
+select private.set_integration_secret('booking_jobs', '$JOBS_SECRET');
+SQL
+S1=$(as_user "$M4" "$(TREQ '8 days' settle-race-0001)" 0 | grep -o 'id=.*' | sed 's/id=//')
+S2=$(as_user "$M4" "$(TREQ '9 days' settle-race-0002)" 0 | grep -o 'id=.*' | sed 's/id=//')
+S3=$(as_user "$M4" "$(TREQ '10 days' settle-race-0003)" 0 | grep -o 'id=.*' | sed 's/id=//')
+for b in "$S1" "$S2" "$S3"; do as_user "$CM" "select public.booking_respond('$b', 'accept', null);" 0 >/dev/null; done
+"${PSQL[@]}" -d "$DB" >/dev/null <<SQL
+update public.bookings b set starts_at = now() - interval '3 days' - v.k * interval '2 hours',
+                             ends_at = now() - interval '3 days' - v.k * interval '2 hours' + interval '1 hour'
+from (values ('$S1'::uuid, 0), ('$S2'::uuid, 1), ('$S3'::uuid, 2)) v(id, k) where b.id = v.id;
+SQL
+# The member confirms S1 and S2; nobody confirms S3 (it must go to review, not settle).
+as_user "$M4" "select public.booking_complete('$S1'); select public.booking_complete('$S2');" 0 >/dev/null
+settle() { # $1 seconds to hold
+  "${PSQL[@]}" -d "$DB" 2>&1 <<SQL
+begin;
+set local role anon;
+select 'out=' || completed || '/' || held_for_review from public.booking_jobs_settle('$JOBS_SECRET', 100);
+select pg_sleep($1);
+commit;
+SQL
+}
+settle 3 >/tmp/race_u.$$ &
+sleep 1
+settle 0 >/tmp/race_v.$$ || true
+wait
+earn=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.creator_booking_earnings where booking_id in ('$S1', '$S2', '$S3')")
+settled=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.booking_token_hold_events where event = 'settled' and booking_id in ('$S1', '$S2', '$S3')")
+frozen=$("${PSQL[@]}" -d "$DB" -c "select string_agg(status, ',') from public.booking_token_holds where booking_id = '$S3'")
+if [ "$earn" = "2" ] && [ "$settled" = "2" ] && [ "$frozen" = "frozen" ] && grep -q "out=2/1" /tmp/race_u.$$ && grep -q "out=0/0" /tmp/race_v.$$; then
+  ok "two settlement runs at once: each booking decided once (2 settled, 1 held for review)"
+else
+  bad "settlement race: earnings=$earn settled=$settled S3=$frozen first=$(tr '\n' ' ' </tmp/race_u.$$) second=$(tr '\n' ' ' </tmp/race_v.$$)"
+fi
+
+# 11. Two admins reverse the same disputed settlement at the same moment: the member is refunded once.
+as_user "$M4" "select public.booking_dispute('$S1', 'The companion left after five minutes.');" 0 >/dev/null
+before=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M4'")
+as_user "$ADM" "select public.admin_decide_settled_dispute('$S1', 'reverse', 'Refund after review (first)');" 3 >/tmp/race_w.$$ &
+sleep 1
+as_user "$ADM" "select public.admin_decide_settled_dispute('$S1', 'reverse', 'Refund after review (second)');" 0 >/tmp/race_x.$$ || true
+wait
+after=$("${PSQL[@]}" -d "$DB" -c "select balance from public.token_wallets where user_id = '$M4'")
+refunds=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.token_ledger where idempotency_key = 'booking_reversal:$S1'")
+revs=$("${PSQL[@]}" -d "$DB" -c "select count(*) from public.booking_settlement_reversals where booking_id = '$S1'")
+if [ "$refunds" = "1" ] && [ "$revs" = "1" ] && [ "$after" = "$((before + 80))" ] && grep -q "Only disputed bookings" /tmp/race_x.$$; then
+  ok "two reversals of one settlement at once: refunded once (balance $before -> $after), the second is refused"
+else
+  bad "reversal race: refunds=$refunds reversals=$revs before=$before after=$after second=$(tr '\n' ' ' </tmp/race_x.$$)"
+fi
+
+rm -f /tmp/race_[a-x].$$
 exit $fail
