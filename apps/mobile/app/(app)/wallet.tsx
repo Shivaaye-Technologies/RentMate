@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text } from "react-native";
+import { TokenStore } from "../../src/components/TokenStore";
 import { LEDGER_LABEL } from "../../src/lib/bookings";
 import { supabase } from "../../src/lib/supabase";
 import { Body, Notice, Screen, Title, usePalette } from "../../src/ui";
@@ -38,6 +39,8 @@ export default function Wallet() {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  const reload = useCallback(() => setRefresh((n) => n + 1), []);
 
   useEffect(() => {
     let active = true;
@@ -80,7 +83,7 @@ export default function Wallet() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refresh]);
 
   return (
     <Screen>
@@ -134,7 +137,7 @@ export default function Wallet() {
         <Body muted>
           {subscription?.is_subscriber && subscription.current_period_end
             ? `Active until ${new Date(subscription.current_period_end).toLocaleDateString("en-IN")}`
-            : "Subscription purchase and activation are not available in this build."}
+            : "Subscribe below when the monthly plan is available. Only Google Play can activate it."}
         </Body>
       </View>
       <Title>Recent activity</Title>
@@ -170,14 +173,11 @@ export default function Wallet() {
       ) : (
         <Body muted>No wallet activity is available yet.</Body>
       )}
-      <Title>Gifts & token packages</Title>
-      <Body>
-        Token purchases and gift sending are currently disabled. No package can be purchased and no gift
-        transaction is simulated.
-      </Body>
+      <Title>Token packs</Title>
+      <TokenStore onChanged={reload} />
       <Body muted>
-        The maximum planned purchase is 500 tokens per transaction. Purchases, transfers, cash withdrawal and
-        redemption remain unavailable until the required approvals and verified billing integration ship.
+        Up to 500 tokens per pack. Transfers, cash withdrawal and redemption are not available: tokens have no
+        cash value.
       </Body>
     </Screen>
   );

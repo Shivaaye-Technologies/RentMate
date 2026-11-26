@@ -121,6 +121,11 @@ jobs:
             echo "::error::A blocked permission is present in the packaged APK."
             exit 1
           fi
+          # Google Play Billing (expo-iap) must be linked: its library adds this permission.
+          if ! printf '%s\n' "$permissions" | grep -q 'com.android.vending.BILLING'; then
+            echo "::error::Google Play Billing is not linked into the APK."
+            exit 1
+          fi
 
       - name: Verify package id and record checksum
         working-directory: apps/mobile

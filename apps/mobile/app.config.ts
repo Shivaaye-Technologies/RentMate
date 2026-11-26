@@ -54,6 +54,9 @@ const config: ExpoConfig = {
         microphonePermission: "Allow RentMate to use your microphone for opt-in calls and live audio.",
       },
     ],
+    // Google Play Billing (sandbox token packs and the monthly plan). Pinned to the Play store so the APK links only the
+    // Play Billing library. Purchases are verified and consumed by the API, never trusted on the device.
+    ["expo-iap", { android: { store: "play" } }],
     // Keystore-encrypted session values cannot be decrypted after a restore, so they are excluded from backups.
     ["expo-secure-store", { configureAndroidBackup: true }],
     [

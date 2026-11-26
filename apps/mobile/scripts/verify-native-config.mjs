@@ -36,6 +36,7 @@ try {
   check("compileSdk 37 (required by Expo SDK 58 libraries)", /android\.compileSdkVersion=37\b/.test(props));
   check("targetSdk 36 (Google Play requirement)", /android\.targetSdkVersion=36\b/.test(props));
   check("minSdk 24", /android\.minSdkVersion=24\b/.test(props));
+  check("billing links only the Google Play store (expo-iap)", /^openiapStore=play$/m.test(props));
 
   check(
     "rentmate:// deep links open the app",
