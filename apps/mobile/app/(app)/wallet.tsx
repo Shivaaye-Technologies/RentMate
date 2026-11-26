@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
+import { LEDGER_LABEL } from "../../src/lib/bookings";
 import { supabase } from "../../src/lib/supabase";
 import { Body, Notice, Screen, Title, usePalette } from "../../src/ui";
 
@@ -154,7 +155,7 @@ export default function Wallet() {
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
               <Text style={{ color: c.text, fontWeight: "700", flex: 1 }}>
-                {entry.reason.replaceAll("_", " ")}
+                {LEDGER_LABEL[entry.reason] ?? entry.reason.replaceAll("_", " ")}
               </Text>
               <Text style={{ color: entry.delta > 0 ? c.accent : c.text, fontWeight: "800" }}>
                 {formatDelta(entry.delta)}
