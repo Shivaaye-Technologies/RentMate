@@ -61,6 +61,7 @@ for (const test of [
   "admin_role_tiers.sql",
   "booking_expiry_job.sql",
   "booking_checkin_and_settlement.sql",
+  "live_room_for_restricted.sql",
   "schema_security_audit.sql",
 ]) {
   try {
