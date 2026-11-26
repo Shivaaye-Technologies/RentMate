@@ -33,3 +33,4 @@ export {
   type DeclarationStatus,
   type ProfileDb,
 } from "../../../web/src/shared/profileData";
+export { formatIndianNumber } from "../../../web/src/market/marketText";

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { TokenStore } from "../../src/components/TokenStore";
 import { LEDGER_LABEL } from "../../src/lib/bookings";
+import { formatIndianNumber } from "../../src/lib/shared";
 import { supabase } from "../../src/lib/supabase";
 import { Body, Notice, Screen, Title, usePalette } from "../../src/ui";
 
@@ -21,7 +22,7 @@ type LedgerEntry = {
 };
 
 function formatDelta(value: number) {
-  const amount = Math.abs(value).toLocaleString("en-IN");
+  const amount = formatIndianNumber(Math.abs(value));
   return value > 0 ? `+${amount}` : `−${amount}`;
 }
 
@@ -110,7 +111,7 @@ export default function Wallet() {
       >
         <Text style={{ color: c.muted }}>Your token balance</Text>
         <Text style={{ color: c.text, fontSize: 34, fontWeight: "800" }}>
-          {loading ? "…" : balance === null ? "—" : balance.toLocaleString("en-IN")}
+          {loading ? "…" : balance === null ? "—" : formatIndianNumber(balance)}
         </Text>
         <Text style={{ color: c.muted }}>
           {loading ? "Loading your wallet…" : "Tokens are internal app credits with no cash value."}
@@ -166,7 +167,7 @@ export default function Wallet() {
             </View>
             <Text style={{ color: c.muted, fontSize: 12 }}>{formatDate(entry.created_at)}</Text>
             <Text style={{ color: c.muted, fontSize: 12 }}>
-              Balance after: {entry.balance_after.toLocaleString("en-IN")}
+              Balance after: {formatIndianNumber(entry.balance_after)}
             </Text>
           </View>
         ))

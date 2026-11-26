@@ -31,10 +31,23 @@ export const WEEKDAYS = [
 export const MARKET_RULES =
   "RentMate companionship is non-sexual: public places and approved activities only. Escorting, sexual services and sexual solicitation are prohibited and lead to removal.";
 
+/**
+ * 1,50,000 — Indian digit grouping (last three digits, then pairs). Done by hand because runtimes built without
+ * full ICU data (small-icu Node builds, some Android JS engines) ignore "en-IN" and print 150,000.
+ */
+export function formatIndianNumber(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const rounded = Math.round(n);
+  const digits = String(Math.abs(rounded));
+  const last3 = digits.slice(-3);
+  const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+  return (rounded < 0 ? "-" : "") + (rest ? `${rest},${last3}` : last3);
+}
+
 /** ₹1,600 */
 export function formatINR(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+  return `₹${formatIndianNumber(n)}`;
 }
 
 /** Mirrors private.booking_price; the server always computes the real price. */

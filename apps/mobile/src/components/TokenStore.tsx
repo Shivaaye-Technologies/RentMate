@@ -8,6 +8,7 @@ import {
   verifyWithServer,
   type StoreProduct,
 } from "../lib/billing";
+import { formatIndianNumber } from "../lib/shared";
 import { apiBaseUrl, supabase } from "../lib/supabase";
 import { useSession } from "../session";
 import { Body, Button, Notice, usePalette } from "../ui";
@@ -158,7 +159,7 @@ export function TokenStore({ onChanged }: { onChanged: () => void }) {
           }}
         >
           <Text style={{ color: c.text, fontWeight: "700" }}>
-            {p.kind === "subscription" ? "Monthly plan" : `${(p.tokens ?? 0).toLocaleString("en-IN")} tokens`}
+            {p.kind === "subscription" ? "Monthly plan" : `${formatIndianNumber(p.tokens ?? 0)} tokens`}
           </Text>
           <Text style={{ color: c.muted }}>{prices[p.productId]?.displayPrice ?? ""}</Text>
           <Button

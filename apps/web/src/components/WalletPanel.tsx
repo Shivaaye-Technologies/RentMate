@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatIndianNumber } from "../market/marketText";
 import { supabase } from "../supabase";
 
 type Entry = { id: number; delta: number; balance_after: number; reason: string; created_at: string };
@@ -67,7 +68,7 @@ export function WalletPanel({ me }: { me: string }) {
       ) : (
         <>
           <p className="wallet-balance">
-            <strong>{balance.toLocaleString("en-IN")}</strong> tokens
+            <strong>{formatIndianNumber(balance)}</strong> tokens
           </p>
           <p className="muted small">
             Tokens are an in-app allowance with no cash value. They can&apos;t be bought, sent to other

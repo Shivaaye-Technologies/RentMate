@@ -8,6 +8,7 @@ import {
   newRequestKey,
   startOptions,
 } from "../../../../src/lib/bookings";
+import { formatIndianNumber } from "../../../../src/lib/shared";
 import { supabase } from "../../../../src/lib/supabase";
 import { Body, Button, Field, Notice, Screen, Title, usePalette } from "../../../../src/ui";
 
@@ -145,7 +146,7 @@ export default function NewBooking() {
           <Text style={{ color: c.text }}>
             {s.price_tokens == null
               ? "Request only (no token price)"
-              : `${s.price_tokens.toLocaleString("en-IN")} tokens ${s.pricing === "hourly" ? "per hour" : "per session"}`}
+              : `${formatIndianNumber(s.price_tokens)} tokens ${s.pricing === "hourly" ? "per hour" : "per session"}`}
           </Text>
         </Card>
       ))}
@@ -179,12 +180,12 @@ export default function NewBooking() {
           {quote ? (
             <Card>
               <Text style={{ color: c.text, fontWeight: "700" }}>
-                {quote.gross_tokens.toLocaleString("en-IN")} tokens will be reserved
+                {formatIndianNumber(quote.gross_tokens)} tokens will be reserved
               </Text>
               <Text style={{ color: c.muted }}>
-                Your balance: {quote.available_balance.toLocaleString("en-IN")} tokens. Reserved tokens return
-                to your wallet if the companion declines, the request expires or the booking is cancelled
-                under the policy.
+                Your balance: {formatIndianNumber(quote.available_balance)} tokens. Reserved tokens return to
+                your wallet if the companion declines, the request expires or the booking is cancelled under
+                the policy.
               </Text>
               {!quote.token_booking_available ? (
                 <Notice kind="info">

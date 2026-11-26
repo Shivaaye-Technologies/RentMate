@@ -8,6 +8,7 @@ import {
   bookingActions,
   bookingProblem,
   formatINR,
+  formatIndianNumber,
   looksLikeAddress,
   marketError,
   priceEstimate,
@@ -29,6 +30,16 @@ describe("pricing (mirrors the server)", () => {
     expect(formatINR(1600)).toBe("₹1,600");
     expect(formatINR(150000)).toBe("₹1,50,000");
     expect(formatINR(null)).toBe("—");
+  });
+
+  it("groups digits the Indian way without relying on the runtime's locale data", () => {
+    expect(formatIndianNumber(0)).toBe("0");
+    expect(formatIndianNumber(999)).toBe("999");
+    expect(formatIndianNumber(1000)).toBe("1,000");
+    expect(formatIndianNumber(12345678)).toBe("1,23,45,678");
+    expect(formatIndianNumber(-150000)).toBe("-1,50,000");
+    expect(formatIndianNumber(1499.6)).toBe("1,500");
+    expect(formatIndianNumber(Number.NaN)).toBe("—");
   });
 });
 
