@@ -13,14 +13,15 @@ compileSdk 37, targetSdk 36, minSdk 24. Point it at **staging** only.
 3. The run checks the package id with `aapt`, writes `apk-checksums.txt` and uploads artifact
    `rentmate-android-internal-test-<run number>`. Download it from the run page.
 
-The workflow builds `app-debug.apk`, signed with the Android debug key: installable on test devices, not uploadable
-to Play. A release-signed build needs a release keystore stored as repository secrets (not built yet).
+The workflow builds the release variant, `app-release.apk`. It embeds the JavaScript bundle, so it runs without a
+Metro dev server, and it is not debuggable. It is signed with the Android debug key: installable on test devices,
+not uploadable to Play. A release-signed build needs a release keystore stored as repository secrets (not built yet).
 
 ## 2. Install
 
 - Phone: Settings → allow "Install unknown apps" for the browser/files app, open the APK.
-- Or USB: `adb install -r app-debug.apk` (uninstall any older build with a different signature first).
-- Verify the checksum: `sha256sum app-debug.apk` matches `apk-checksums.txt`.
+- Or USB: `adb install -r app-release.apk` (uninstall any older build with a different signature first).
+- Verify the checksum: `sha256sum app-release.apk` matches `apk-checksums.txt`.
 
 ## 3. Staging prerequisites
 

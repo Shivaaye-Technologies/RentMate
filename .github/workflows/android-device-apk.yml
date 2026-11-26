@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   build-debug-apk:
-    name: Build installable Android debug APK
+    name: Build installable Android test APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -101,18 +101,21 @@ jobs:
           test -f android/app/src/main/AndroidManifest.xml
           grep -q 'com.shivaayetechnologies.rentmate' android/app/build.gradle
 
-      - name: Assemble debug APK
+      # The release variant embeds the JavaScript bundle, so the APK runs on a phone without a Metro dev server, and
+      # it leaves out the debug-only manifest that re-adds SYSTEM_ALERT_WINDOW for the developer menu. Expo's
+      # generated build signs it with the debug keystore: installable on test phones, not uploadable to Play (P-5).
+      - name: Assemble test APK (release variant, debug-signed)
         working-directory: apps/mobile/android
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :app:assembleRelease
 
       - name: Verify permissions in the packaged APK
         working-directory: apps/mobile
         run: |
-          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          apk="android/app/build/outputs/apk/release/app-release.apk"
           aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$aapt"
           permissions="$("$aapt" dump permissions "$apk")"
@@ -130,19 +133,25 @@ jobs:
       - name: Verify package id and record checksum
         working-directory: apps/mobile
         run: |
-          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          apk="android/app/build/outputs/apk/release/app-release.apk"
           aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           "$aapt" dump badging "$apk" | head -3
           "$aapt" dump badging "$apk" | grep -q "package: name='com.shivaayetechnologies.rentmate'"
-          sha256sum "$apk" | sed 's#android/app/build/outputs/apk/debug/##' > apk-checksums.txt
+          # A tester's APK must carry its own JavaScript bundle and must not be debuggable.
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle'
+          if "$aapt" dump badging "$apk" | grep -q 'application-debuggable'; then
+            echo "::error::The test APK is debuggable."
+            exit 1
+          fi
+          sha256sum "$apk" | sed 's#android/app/build/outputs/apk/release/##' > apk-checksums.txt
           cat apk-checksums.txt
 
-      - name: Upload installable debug APK
+      - name: Upload installable test APK
         uses: actions/upload-artifact@v6
         with:
           name: rentmate-android-internal-test-${{ github.run_number }}
           path: |
-            apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            apps/mobile/android/app/build/outputs/apk/release/app-release.apk
             apps/mobile/apk-checksums.txt
           if-no-files-found: error
           retention-days: 7
