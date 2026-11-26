@@ -17,6 +17,7 @@ The Android app must not offer an external checkout for digital tokens or subscr
 Use a native in-app purchase library compatible with the project's exact Expo SDK 58 / React Native 0.88.1 toolchain. Expo's current IAP guidance identifies `expo-iap` as an option for custom development builds; Expo Go is not sufficient. Before adding it, verify the current release's Expo Modules, Kotlin, Gradle, Android Billing Library and config-plugin compatibility against SDK 58. Do not copy Kotlin settings from a different Expo SDK without validating the complete toolchain.
 
 Client responsibilities:
+
 - Query products from the store; do not hardcode prices as authoritative.
 - Display store-returned localized price, currency and billing period.
 - Start the native Play purchase flow only for an authenticated member.
@@ -31,6 +32,7 @@ Client responsibilities:
 ## 3. Server purchase verification
 
 Create a provider-neutral purchase domain with a Google Play adapter. The API must:
+
 1. Authenticate the member and rate-limit purchase verification.
 2. Validate strict request schema, product allowlist, package name and expected product type.
 3. Verify the purchase token with the Google Play Developer API using a server-only service account credential.
@@ -47,6 +49,7 @@ A repeated verification request for the same verified purchase must return the p
 ## 4. Data model and ledger boundaries
 
 Use separate records/tables (or existing equivalent) for:
+
 - Store products/catalogue and effective-dated admin price configuration.
 - Purchase attempts/orders and store purchase token fingerprints.
 - Verified one-time purchases.
@@ -77,6 +80,7 @@ For one-time token purchases, process purchase lifecycle notifications and voide
 ## 6. External gateway adapter — later credential stage
 
 Define a provider interface for a future external gateway, but do not enable it now. Adapter contract must cover:
+
 - Create order with server-generated amount/currency/reference.
 - Verify provider signature over the exact documented payload.
 - Verify webhook signature and timestamp/replay window.
@@ -92,6 +96,7 @@ Gateway credentials will be supplied by the founder later through secure deploym
 ## 7. Admin pricing and audit
 
 Admin controls must be role-gated and use maker-checker approval for high-impact changes:
+
 - Store product ID and product type mapping.
 - Internal token quantity and bonus.
 - Effective date/time and expiry.
@@ -128,6 +133,7 @@ Use mocked Google API responses for deterministic CI, plus Google Play license t
 ## 9. Release gates
 
 Before internal testing:
+
 - Native IAP dependency and config plugin pass SDK 58 clean prebuild and Android build.
 - Google Play test products and license testers are configured in Play Console.
 - Backend sandbox/test verification is exercised with store test purchases.
@@ -135,6 +141,7 @@ Before internal testing:
 - CI, security scans, RLS and purchase lifecycle tests pass.
 
 Before public launch:
+
 - Play Console products, billing setup, tax/banking/business verification and store review are complete.
 - Google Play Billing policy and any applicable India alternative billing programme are reviewed for the actual product and region.
 - India legal/tax review, refund/cancellation terms, privacy disclosures, support and fraud processes are approved.
