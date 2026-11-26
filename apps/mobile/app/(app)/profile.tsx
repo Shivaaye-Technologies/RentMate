@@ -394,6 +394,12 @@ export default function Profile() {
       <Link href={"/(app)/wallet" as Href} asChild>
         <Button label="Wallet & tokens" onPress={() => undefined} />
       </Link>
+      <Link href={"/(app)/notifications" as Href} asChild>
+        <Button label="Notifications" kind="plain" onPress={() => undefined} />
+      </Link>
+      <Link href={"/(app)/booking" as Href} asChild>
+        <Button label="My bookings" kind="plain" onPress={() => undefined} />
+      </Link>
       <Link href="/(app)/companions" asChild>
         <Button label="Companionship options" kind="plain" onPress={() => undefined} />
       </Link>

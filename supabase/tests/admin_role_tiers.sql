@@ -54,57 +54,66 @@ begin
 
   -- ===== Granting rules =====
   perform set_config('request.jwt.claims', json_build_object('sub', mas, 'role', 'authenticated')::text, true);
-  perform public.admin_set_role(mem, 'sub_admin', true);
+  perform public.admin_grant_staff_role(mem, 'sub_admin');
   reset role;
   r := r || case when private.rank_of(mem) = 30 then 'ok master admin grants sub admin; ' else 'FAIL grant; ' end;
   set local role authenticated;
   begin
-    perform public.admin_set_role(mem2, 'master_admin', true);
+    perform public.admin_grant_staff_role(mem2, 'master_admin');
     r := r || 'FAIL master granted a peer role; ';
   exception when insufficient_privilege then r := r || 'ok cannot grant own level; ';
   end;
   begin
-    perform public.admin_set_role(mem2, 'super_admin', true);
+    perform public.admin_grant_staff_role(mem2, 'super_admin');
     r := r || 'FAIL granted super; ';
-  exception when insufficient_privilege then r := r || 'ok super admin cannot be granted through the API by a master admin; ';
+  exception when invalid_parameter_value then r := r || 'ok super admin can never be granted through the API; ';
   end;
   begin
-    perform public.admin_set_role(leg, 'agent', true);
+    perform public.admin_grant_staff_role(leg, 'agent');
     r := r || 'FAIL changed a peer; ';
   exception when insufficient_privilege then r := r || 'ok cannot change someone at the same level; ';
   end;
   begin
-    perform public.admin_set_role(mas, 'agent', true);
+    perform public.admin_grant_staff_role(mas, 'agent');
     r := r || 'FAIL self change; ';
   exception when insufficient_privilege then r := r || 'ok cannot change own roles; ';
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', sub, 'role', 'authenticated')::text, true);
-  perform public.admin_set_role(mem2, 'agent', true);
+  perform public.admin_grant_staff_role(mem2, 'agent');
   reset role;
   r := r || case when private.rank_of(mem2) = 20 then 'ok sub admin grants agent; ' else 'FAIL agent grant; ' end;
   set local role authenticated;
   begin
-    perform public.admin_set_role(mem2, 'moderator', true);
-    r := r || 'FAIL sub granted moderator; ';
+    perform public.admin_grant_staff_role(mem2, 'sub_admin');
+    r := r || 'FAIL sub granted sub admin; ';
   exception when insufficient_privilege then r := r || 'ok sub admin cannot grant its own level; ';
+  end;
+  begin
+    perform public.admin_set_role(mem2, 'moderator', true);
+    r := r || 'FAIL sub used the legacy admin function; ';
+  exception when insufficient_privilege then r := r || 'ok legacy role function stays admin-only; ';
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', agt, 'role', 'authenticated')::text, true);
   begin
-    perform public.admin_set_role(mem2, 'agent', false);
+    perform public.admin_grant_staff_role(gen_random_uuid(), 'agent');
     r := r || 'FAIL agent changed roles; ';
   exception when insufficient_privilege then r := r || 'ok agents cannot manage roles; ';
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', sup, 'role', 'authenticated')::text, true);
-  perform public.admin_set_role(mem, 'sub_admin', false);
-  perform public.admin_set_role(mem, 'master_admin', true);
+  perform public.admin_grant_staff_role(mem, 'master_admin');
   reset role;
-  r := r || case when private.rank_of(mem) = 40 then 'ok super admin grants master admin and revokes; ' else 'FAIL super grant; ' end;
+  r := r || case when private.rank_of(mem) = 40 then 'ok super admin grants master admin; ' else 'FAIL super grant; ' end;
   set local role authenticated;
+  begin
+    perform public.admin_grant_staff_role(gen_random_uuid(), 'agent');
+    r := r || 'FAIL granted to nobody; ';
+  exception when raise_exception then r := r || 'ok unknown members are refused; ';
+  end;
   select count(*) into n from public.admin_list_staff();
-  r := r || case when n = 7 then 'ok staff directory lists every role; ' else 'FAIL staff ' || n || '; ' end;
+  r := r || case when n = 8 then 'ok staff directory lists every role; ' else 'FAIL staff ' || n || '; ' end;
   reset role;
   select count(*) into n from public.moderation_actions where action in ('role_granted', 'role_revoked');
-  r := r || case when n = 4 then 'ok every role change is logged; ' else 'FAIL logged ' || n || '; ' end;
+  r := r || case when n = 3 then 'ok every role change is logged; ' else 'FAIL logged ' || n || '; ' end;
   set local role authenticated;
 
   -- ===== Agent support queue =====

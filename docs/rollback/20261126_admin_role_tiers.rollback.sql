@@ -12,6 +12,7 @@ drop function if exists public.support_escalate_report(uuid, text);
 drop function if exists public.support_report_queue(int);
 drop function if exists public.admin_list_staff();
 drop function if exists public.my_staff_tier();
+drop function if exists public.admin_grant_staff_role(uuid, text);
 
 create or replace function public.my_live_roles()
 returns text[]
@@ -19,26 +20,6 @@ language sql stable security definer set search_path = ''
 as $$
   select coalesce(array_agg(role order by role), '{}')
   from private.user_roles where user_id = (select auth.uid());
-$$;
-
-create or replace function public.admin_set_role(p_user uuid, p_role text, p_grant boolean)
-returns void
-language plpgsql security definer set search_path = ''
-as $$
-begin
-  perform private.require_role('admin');
-  if p_role not in ('admin', 'moderator') then raise exception 'Unknown role' using errcode = '22023'; end if;
-  if p_user = (select auth.uid()) and p_role = 'admin' and not p_grant then
-    raise exception 'You cannot remove your own admin role' using errcode = '42501';
-  end if;
-  if p_grant then
-    insert into private.user_roles (user_id, role, granted_by) values (p_user, p_role, (select auth.uid()))
-    on conflict do nothing;
-  else
-    delete from private.user_roles where user_id = p_user and role = p_role;
-  end if;
-  perform private.log_action(case when p_grant then 'role_granted' else 'role_revoked' end, 'user', p_user::text, p_role);
-end;
 $$;
 
 create or replace function private.has_role(p_role text)

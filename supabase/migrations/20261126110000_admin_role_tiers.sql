@@ -6,8 +6,8 @@
 -- has_role('agent') is true for every staff tier. MFA (private.mfa_satisfied) still applies to all of them, and every
 -- staff row counts as privileged for the MFA policy (private.is_privileged reads any user_roles row).
 --
--- Granting: staff may only grant or remove roles ranked strictly below their own, only for people ranked below them,
--- and never for themselves. super_admin is granted only by the database owner (SQL editor), never through the API.
+-- Granting a tier (admin_grant_staff_role): only roles ranked strictly below your own, to people ranked below you,
+-- never yourself. super_admin is granted only by the database owner (SQL editor), never through the API.
 
 alter table private.user_roles drop constraint user_roles_role_check;
 alter table private.user_roles add constraint user_roles_role_check
@@ -50,7 +50,11 @@ as $$
      and private.mfa_satisfied();
 $$;
 
-create or replace function public.admin_set_role(p_user uuid, p_role text, p_grant boolean)
+-- Granting a staff tier: only roles ranked strictly below your own, only to people ranked below you, never to
+-- yourself. Insert-only on purpose: migrations here may not delete data (scripts/policy-check.mjs), so removing a
+-- tier is done by the database owner until a reviewed migration adds it (see docs/RENTMATE_REMAINING_TASKS.md).
+-- public.admin_set_role is unchanged and still grants and removes the legacy admin and moderator roles.
+create function public.admin_grant_staff_role(p_user uuid, p_role text)
 returns void
 language plpgsql security definer set search_path = ''
 as $$
@@ -60,7 +64,9 @@ begin
   if not private.has_role('sub_admin') then
     raise exception 'This needs a staff admin role' using errcode = '42501';
   end if;
-  if private.role_rank(p_role) = 0 then raise exception 'Unknown role' using errcode = '22023'; end if;
+  if p_role not in ('master_admin', 'sub_admin', 'agent') then
+    raise exception 'Unknown staff role' using errcode = '22023';
+  end if;
   if p_user = (select auth.uid()) then
     raise exception 'You cannot change your own roles' using errcode = '42501';
   end if;
@@ -70,15 +76,16 @@ begin
   if private.rank_of(p_user) >= mine then
     raise exception 'You cannot change the roles of someone at or above your level' using errcode = '42501';
   end if;
-  if p_grant then
-    insert into private.user_roles (user_id, role, granted_by) values (p_user, p_role, (select auth.uid()))
-    on conflict do nothing;
-  else
-    delete from private.user_roles where user_id = p_user and role = p_role;
+  if not exists (select 1 from auth.users u where u.id = p_user) then
+    raise exception 'Unknown member' using errcode = 'P0001';
   end if;
-  perform private.log_action(case when p_grant then 'role_granted' else 'role_revoked' end, 'user', p_user::text, p_role);
+  insert into private.user_roles (user_id, role, granted_by) values (p_user, p_role, (select auth.uid()))
+  on conflict do nothing;
+  perform private.log_action('role_granted', 'user', p_user::text, p_role);
 end;
 $$;
+revoke execute on function public.admin_grant_staff_role(uuid, text) from public, anon;
+grant execute on function public.admin_grant_staff_role(uuid, text) to authenticated;
 
 -- Your roles plus the legacy capability names they imply, so existing admin screens (which look for 'admin' or
 -- 'moderator') keep working for the new tiers.

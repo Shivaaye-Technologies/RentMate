@@ -256,6 +256,8 @@ export const adminApi = {
   appeals: () => rpc<AppealRow[]>("admin_list_appeals"),
   decideAppeal: (id: string, overturn: boolean, note: string) =>
     rpc<void>("admin_decide_appeal", { p_appeal: id, p_overturn: overturn, p_note: note || null }),
+  grantStaffRole: (user: string, role: "agent" | "sub_admin" | "master_admin") =>
+    rpc<void>("admin_grant_staff_role", { p_user: user, p_role: role }),
   setRole: (user: string, role: "admin" | "moderator", grant: boolean) =>
     rpc<void>("admin_set_role", { p_user: user, p_role: role, p_grant: grant }),
 };
