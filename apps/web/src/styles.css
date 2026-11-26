@@ -3693,6 +3693,22 @@ textarea::placeholder {
   margin: 0;
 }
 
+.booking-card .checkin {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.booking-card .checkin-code {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
 .pill.status-requested,
 .pill.status-pending {
   background: var(--info-bg);

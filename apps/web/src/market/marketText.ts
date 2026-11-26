@@ -190,6 +190,44 @@ export function bookingActions(
   };
 }
 
+/** Check-in opens 30 minutes before the start and closes at the end (mirrors private.checkin_window_open). */
+export const CHECKIN_OPENS_MINUTES = 30;
+
+export type CheckInStep = "show_code" | "enter_code" | "checked_in" | "not_yet" | null;
+
+/**
+ * What the check-in card shows. The member shows a one-time code; the companion types it in. Outside the window,
+ * or for anything but an accepted booking, there is nothing to do (null), except a reminder shortly before.
+ */
+export function checkInStep(
+  b: {
+    status: string;
+    starts_at: string;
+    ends_at: string;
+    member_id: string | null;
+    companion_id: string | null;
+    checked_in_at?: string | null;
+  },
+  me: string,
+  now: Date = new Date(),
+): CheckInStep {
+  const role = b.member_id === me ? "member" : b.companion_id === me ? "companion" : null;
+  if (!role) return null;
+  if (b.checked_in_at) return "checked_in";
+  if (b.status !== "accepted") return null;
+  const opens = Date.parse(b.starts_at) - CHECKIN_OPENS_MINUTES * 60_000;
+  const t = now.getTime();
+  if (t > Date.parse(b.ends_at)) return null;
+  if (t < opens) return "not_yet";
+  return role === "member" ? "show_code" : "enter_code";
+}
+
+/** Six digits, spaces and dashes ignored. Returns null if it cannot be a code. */
+export function normaliseCheckInCode(input: string): string | null {
+  const digits = input.replace(/[\s-]/g, "");
+  return /^[0-9]{6}$/.test(digits) ? digits : null;
+}
+
 /** Friendly wording for database refusals (keeps the server's own explanation where it wrote one). */
 export function marketError(e: { code?: string; message?: string }): string {
   const m = e.message ?? "";

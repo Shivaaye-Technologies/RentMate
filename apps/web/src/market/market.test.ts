@@ -1,14 +1,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BookingCard } from "./BookingsList";
+import { BookingCard, CheckInPanel } from "./BookingsList";
 import { BookingForm, CompanionCards } from "./Marketplace";
 import type { Booking, Service, Settings } from "./marketData";
 import {
   bookingActions,
   bookingProblem,
+  checkInStep,
   formatINR,
   formatIndianNumber,
+  normaliseCheckInCode,
   looksLikeAddress,
   marketError,
   priceEstimate,
@@ -295,5 +297,37 @@ describe("screens", () => {
       createElement(BookingCard, { b: done, me: "c", names: {}, reviewed: false, reload: noop }),
     );
     expect(companion).not.toContain(">Write a review<");
+  });
+});
+
+describe("meetup check-in (shared with Android)", () => {
+  const b = {
+    status: "accepted",
+    starts_at: "2026-12-02T10:00:00Z",
+    ends_at: "2026-12-02T11:00:00Z",
+    member_id: "m",
+    companion_id: "c",
+  };
+  it("gives the member a code and the companion a code box only inside the window", () => {
+    expect(checkInStep(b, "m", new Date("2026-12-02T09:00:00Z"))).toBe("not_yet");
+    expect(checkInStep(b, "m", new Date("2026-12-02T09:45:00Z"))).toBe("show_code");
+    expect(checkInStep(b, "c", new Date("2026-12-02T10:30:00Z"))).toBe("enter_code");
+    expect(checkInStep(b, "c", new Date("2026-12-02T11:30:00Z"))).toBeNull();
+    expect(checkInStep(b, "x", new Date("2026-12-02T10:30:00Z"))).toBeNull();
+  });
+  it("renders the panel in the booking card for the member", () => {
+    const html = renderToStaticMarkup(
+      createElement(CheckInPanel, {
+        b: {
+          ...b,
+          starts_at: new Date(Date.now() - 600_000).toISOString(),
+          ends_at: new Date(Date.now() + 3_000_000).toISOString(),
+        } as never,
+        me: "m",
+        reload: async () => {},
+      }),
+    );
+    expect(html).toContain("Show my check-in code");
+    expect(normaliseCheckInCode("12 34 56")).toBe("123456");
   });
 });
