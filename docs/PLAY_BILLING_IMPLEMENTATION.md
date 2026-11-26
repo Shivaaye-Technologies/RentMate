@@ -65,6 +65,7 @@ Never mutate historical purchase, token or commission rows. Corrections use appe
 ## 5. Subscription state and Google notifications
 
 Implement a subscription state projection that can represent at minimum:
+
 - pending purchase (no entitlement)
 - active
 - grace period (only if confirmed by verified Play state and product policy)
