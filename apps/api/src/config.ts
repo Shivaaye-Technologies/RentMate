@@ -67,6 +67,12 @@ const EnvSchema = z.object({
     .min(32)
     .regex(/^[A-Za-z0-9_-]+$/, "must be URL-safe (letters, digits, - and _)")
     .optional(),
+  /**
+   * Lets the server expire unanswered booking requests every minute (refunding their token holds). Must match
+   * private.set_integration_secret('booking_jobs', ...). Without it nothing runs and members' own visits still
+   * expire their bookings.
+   */
+  BOOKING_JOBS_DB_SECRET: z.string().min(32).optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
@@ -79,6 +85,7 @@ export const SECRET_KEYS = [
   "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
   "BILLING_DB_SECRET",
   "GOOGLE_PLAY_RTDN_TOKEN",
+  "BOOKING_JOBS_DB_SECRET",
 ] as const;
 
 /**

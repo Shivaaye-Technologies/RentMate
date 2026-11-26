@@ -45,6 +45,9 @@ services:
         sync: false
       - key: GOOGLE_PLAY_RTDN_TOKEN
         sync: false
+      # Booking expiry job; same value stored once with private.set_integration_secret('booking_jobs', ...).
+      - key: BOOKING_JOBS_DB_SECRET
+        sync: false
 
   - type: web
     name: soulmate-web

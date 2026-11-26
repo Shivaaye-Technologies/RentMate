@@ -10,6 +10,7 @@ import { SupabaseIntegrationStore, SupabaseLiveStore } from "./live/store.js";
 import { drainKicks } from "./live/webhook.js";
 import { GooglePlayClient, parseServiceAccount } from "./billing/googlePlay.js";
 import { SupabaseBillingStore } from "./billing/store.js";
+import { startBookingExpiry, SupabaseBookingJobs } from "./jobs/bookingExpiry.js";
 
 const config = loadConfig();
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = config;
@@ -107,6 +108,13 @@ if (integration && providers.get("livekit")?.configured) {
         running = false;
       });
   }, 3000).unref();
+}
+
+// Unanswered booking requests past their start time expire and their token holds are refunded.
+if (supabaseReady && config.BOOKING_JOBS_DB_SECRET) {
+  startBookingExpiry(
+    new SupabaseBookingJobs(SUPABASE_URL!, SUPABASE_ANON_KEY!, config.BOOKING_JOBS_DB_SECRET),
+  );
 }
 
 const server = app.listen(config.PORT, () => {

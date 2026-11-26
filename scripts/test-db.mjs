@@ -58,6 +58,8 @@ for (const test of [
   "age_attestation_abuse.sql",
   "booking_token_holds.sql",
   "play_billing_purchases.sql",
+  "admin_role_tiers.sql",
+  "booking_expiry_job.sql",
 ]) {
   try {
     await db.exec(read(`supabase/tests/${test}`));

@@ -15,6 +15,7 @@ const SERVER_ONLY = [
   "BILLING_DB_SECRET",
   "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
   "GOOGLE_PLAY_RTDN_TOKEN",
+  "BOOKING_JOBS_DB_SECRET",
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
 const canary = (name) => `canary_${name}_${randomBytes(12).toString("hex")}`;
