@@ -1,0 +1,248 @@
+-- ============================================================================
+-- HELD FOR REVIEW — NOT A MIGRATION — DO NOT APPLY
+-- Proposed name: supabase/migrations/20261126180000_gifts_sandbox.sql
+-- sha256 of the proposed SQL below this header: ccba015ec90d2eae917f35603d83dd18326bfd220ba05d10a4c38fbe1255dfcf
+-- Written 2026-11-26 by a Claude session. Held because supabase/tests/token_wallet.sql deliberately fails while
+-- any public function name matches (transfer|withdraw|redeem|payout|send_tokens|gift): gifts need founder
+-- approval first. Neither that guard nor these function names were changed to get past it.
+-- What it does: an empty, admin-priced gift catalogue (price history kept), a gift sandbox switch (off; testers
+-- only; live gifts locked off by a constraint), gift_send with idempotency keys and price snapshots, an append-only
+-- gift ledger, member history and admin reconciliation. creator_share_pct is constrained to NULL: no part of a gift
+-- is credited to anyone until an approved policy exists. Test: gifts_sandbox.test.HELD.sql.txt (rehearsed on a
+-- throwaway database; see RENTMATE_COMPLETION_REPORT.md).
+-- To adopt: founder approves the gift rules (prices, share, moderation); a reviewed change updates the
+-- token_wallet.sql guard to allow exactly these functions; then rename this file into supabase/migrations.
+-- ============================================================================
+-- Gifts: catalogue, server-priced sending and an append-only gift ledger (sandbox, testers only). Append-only.
+--
+-- Founder approval is still pending for gift pricing and for any creator share, so this migration invents neither:
+--   * the catalogue starts EMPTY; admins add gifts and set their token prices (logged, effective immediately,
+--     and every gift sent keeps a snapshot of the price it was sent at);
+--   * creator_share_pct is constrained to stay NULL: no part of a gift is credited to anyone. The tokens leave
+--     the sender's wallet and the gift is recorded with allocation_status 'pending_policy' until an approved,
+--     reviewed migration defines a share. There is no earnings, withdrawal or payout path here;
+--   * sending needs the gift sandbox switch (admin, off by default) and BOTH people marked as testers.
+--     live_enabled is locked false by a constraint, exactly like the booking and billing switches.
+-- Gifts go to approved creators only, never between blocked people or to/from suspended accounts, and a gift
+-- inside a live stream needs the stream to be live and the sender able to watch it (ignoring only the country,
+-- which the client cannot prove here; the API's watch check covers it when gifts move into the live screen).
+
+alter table public.token_ledger drop constraint token_ledger_reason_check;
+alter table public.token_ledger add constraint token_ledger_reason_check check (reason in (
+  'registration_bonus', 'like', 'message', 'voice_call', 'video_call', 'admin_adjustment', 'refund',
+  'booking_hold', 'booking_refund', 'sandbox_grant', 'token_purchase', 'purchase_reversal', 'gift'));
+
+create table public.gift_settings (
+  id smallint primary key default 1 check (id = 1),
+  sandbox_enabled boolean not null default false,
+  live_enabled boolean not null default false,
+  creator_share_pct numeric(5, 2),
+  updated_by uuid,
+  updated_at timestamptz not null default now(),
+  constraint live_gifts_off check (not live_enabled),
+  constraint creator_share_pending_approval check (creator_share_pct is null)
+);
+insert into public.gift_settings (id) values (1);
+alter table public.gift_settings enable row level security;
+revoke all on public.gift_settings from public, anon, authenticated;
+grant select on public.gift_settings to authenticated;
+create policy "gift settings readable" on public.gift_settings for select to authenticated using (true);
+
+create table public.gift_catalog (
+  key text primary key check (key ~ '^[a-z][a-z0-9_]{2,39}$'),
+  name text not null check (char_length(btrim(name)) between 2 and 40),
+  token_price integer not null check (token_price between 1 and 10000),
+  active boolean not null default false,
+  updated_by uuid,
+  updated_at timestamptz not null default now()
+);
+alter table public.gift_catalog enable row level security;
+revoke all on public.gift_catalog from public, anon, authenticated;
+grant select on public.gift_catalog to authenticated;
+create policy "active gifts readable" on public.gift_catalog for select to authenticated using (active);
+
+-- Every price a gift has ever had (who set it, when). Never edited.
+create table public.gift_price_history (
+  id bigint generated always as identity primary key,
+  gift_key text not null references public.gift_catalog (key) on delete restrict,
+  token_price integer not null check (token_price between 1 and 10000),
+  active boolean not null,
+  changed_by uuid not null,
+  changed_at timestamptz not null default now()
+);
+alter table public.gift_price_history enable row level security;
+revoke all on public.gift_price_history from public, anon, authenticated;
+
+create table public.gift_transactions (
+  id bigint generated always as identity primary key,
+  sender_id uuid,     -- no foreign key: kept for accounting if an account is deleted
+  recipient_id uuid,
+  gift_key text not null references public.gift_catalog (key) on delete restrict,
+  gift_name text not null,
+  tokens integer not null check (tokens > 0),
+  stream_id uuid references public.live_streams (id) on delete set null,
+  ledger_entry bigint not null,
+  idempotency_key text not null unique check (char_length(idempotency_key) between 8 and 80),
+  creator_share_pct numeric(5, 2) check (creator_share_pct is null),
+  allocation_status text not null default 'pending_policy' check (allocation_status in ('pending_policy')),
+  created_at timestamptz not null default now(),
+  constraint not_to_self check (sender_id is null or recipient_id is null or sender_id <> recipient_id)
+);
+create index gift_transactions_sender on public.gift_transactions (sender_id, created_at desc);
+create index gift_transactions_recipient on public.gift_transactions (recipient_id, created_at desc);
+alter table public.gift_transactions enable row level security;
+revoke all on public.gift_transactions from public, anon, authenticated;
+grant select on public.gift_transactions to authenticated;
+create policy "gifts read own" on public.gift_transactions for select to authenticated
+  using ((select auth.uid()) in (sender_id, recipient_id));
+create trigger append_only before update or delete on public.gift_transactions
+  for each row execute function private.accounting_append_only();
+create trigger append_only before update or delete on public.gift_price_history
+  for each row execute function private.accounting_append_only();
+
+-- Admins add or change a gift. Changes apply to gifts sent afterwards; sent gifts keep their snapshot.
+create function public.admin_set_gift(p_key text, p_name text, p_token_price int, p_active boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform private.require_role('admin');
+  insert into public.gift_catalog (key, name, token_price, active, updated_by, updated_at)
+  values (p_key, btrim(p_name), p_token_price, coalesce(p_active, false), (select auth.uid()), now())
+  on conflict (key) do update set name = excluded.name, token_price = excluded.token_price,
+    active = excluded.active, updated_by = excluded.updated_by, updated_at = now();
+  insert into public.gift_price_history (gift_key, token_price, active, changed_by)
+  values (p_key, p_token_price, coalesce(p_active, false), (select auth.uid()));
+  perform private.log_action('gift_set', 'settings', p_key, null,
+    jsonb_build_object('token_price', p_token_price, 'active', coalesce(p_active, false)));
+end;
+$$;
+
+create function public.admin_set_gift_sandbox(p_enabled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform private.require_role('admin');
+  update public.gift_settings set sandbox_enabled = coalesce(p_enabled, false), updated_by = (select auth.uid()),
+    updated_at = now() where id = 1;
+  perform private.log_action(case when p_enabled then 'gift_sandbox_on' else 'gift_sandbox_off' end,
+    'settings', 'gifts', null);
+end;
+$$;
+
+-- Sends one gift. The same idempotency key returns the first gift and never charges twice.
+create function public.gift_send(p_gift text, p_recipient uuid, p_stream uuid, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  me uuid := private.require_member();
+  g public.gift_catalog;
+  prior public.gift_transactions;
+  st public.live_streams;
+  entry bigint;
+  gid bigint;
+begin
+  if char_length(coalesce(p_key, '')) not between 8 and 80 then
+    raise exception 'Invalid request key.' using errcode = '22023';
+  end if;
+  select * into prior from public.gift_transactions where idempotency_key = 'gift:' || p_key;
+  if prior.id is not null then
+    if prior.sender_id is distinct from me or prior.recipient_id is distinct from p_recipient
+       or prior.gift_key is distinct from p_gift or prior.stream_id is distinct from p_stream then
+      raise exception 'This request key was already used for a different gift.' using errcode = '23505';
+    end if;
+    return prior.id;
+  end if;
+  if not coalesce((select s.sandbox_enabled from public.gift_settings s where s.id = 1), false) then
+    raise exception 'Gifts are not available yet.' using errcode = 'P0001';
+  end if;
+  if p_recipient is null or p_recipient = me then
+    raise exception 'Choose who to send the gift to.' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = me and p.is_tester and not p.is_demo)
+     or not exists (select 1 from public.profiles p where p.id = p_recipient and p.is_tester and not p.is_demo) then
+    raise exception 'Gifts are in testing and limited to test accounts.' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.creators c where c.user_id = p_recipient and c.status = 'approved') then
+    raise exception 'Gifts can only be sent to approved creators.' using errcode = 'P0001';
+  end if;
+  if private.blocked_pair(me, p_recipient) or private.is_suspended(p_recipient) then
+    raise exception 'This gift cannot be sent.' using errcode = 'P0001';
+  end if;
+  if p_stream is not null then
+    select * into st from public.live_streams s where s.id = p_stream;
+    if st.id is null or st.creator_id <> p_recipient
+       or not (private.watch_problems(p_stream, me, null) <@ array['country_unknown']::text[]) then
+      raise exception 'Gifts can only be sent during a live stream you can watch.' using errcode = 'P0001';
+    end if;
+  end if;
+  select * into g from public.gift_catalog c where c.key = p_gift and c.active;
+  if g.key is null then
+    raise exception 'That gift is not available.' using errcode = 'P0001';
+  end if;
+  entry := private.ledger_post(me, -g.token_price, 'gift', 'gift', p_gift, 'gift:' || p_key);
+  insert into public.gift_transactions (sender_id, recipient_id, gift_key, gift_name, tokens, stream_id, ledger_entry,
+                                        idempotency_key)
+  values (me, p_recipient, g.key, g.name, g.token_price, p_stream, entry, 'gift:' || p_key)
+  returning id into gid;
+  return gid;
+end;
+$$;
+
+-- Both sides of a member's gift history (newest first).
+create function public.my_gift_history(p_limit int default 50)
+returns table (id bigint, direction text, other_id uuid, gift_name text, tokens int, stream_id uuid,
+               allocation_status text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.id, case when t.sender_id = (select auth.uid()) then 'sent' else 'received' end,
+         case when t.sender_id = (select auth.uid()) then t.recipient_id else t.sender_id end,
+         t.gift_name, t.tokens, t.stream_id, t.allocation_status, t.created_at
+  from public.gift_transactions t
+  where (select auth.uid()) in (t.sender_id, t.recipient_id)
+  order by t.created_at desc
+  limit least(greatest(coalesce(p_limit, 50), 1), 200);
+$$;
+
+-- Admin reconciliation: every gift's ledger debit matches its snapshot price exactly once.
+create function public.admin_gift_reconciliation()
+returns table (gifts bigint, tokens bigint, ledger_tokens bigint, balanced boolean)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  perform private.require_role('moderator');
+  return query
+  select count(*)::bigint, coalesce(sum(t.tokens), 0)::bigint,
+         coalesce(-(select sum(l.delta) from public.token_ledger l where l.reason = 'gift'), 0)::bigint,
+         coalesce(sum(t.tokens), 0) = coalesce(-(select sum(l.delta) from public.token_ledger l where l.reason = 'gift'), 0)
+           and not exists (select 1 from public.gift_transactions t2 join public.token_ledger l2 on l2.id = t2.ledger_entry
+                           where l2.delta <> -t2.tokens or l2.user_id is distinct from t2.sender_id)
+  from public.gift_transactions t;
+end;
+$$;
+
+do $$
+declare f text;
+begin
+  foreach f in array array[
+    'admin_set_gift(text, text, int, boolean)', 'admin_set_gift_sandbox(boolean)',
+    'gift_send(text, uuid, uuid, text)', 'my_gift_history(int)', 'admin_gift_reconciliation()'
+  ] loop
+    execute format('revoke execute on function public.%s from public, anon', f);
+    execute format('grant execute on function public.%s to authenticated', f);
+  end loop;
+end $$;
