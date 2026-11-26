@@ -94,9 +94,7 @@ export default function Wallet() {
 
   return (
     <Screen>
-      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>
-        RENTMATE TOKENS
-      </Text>
+      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>RENTMATE TOKENS</Text>
       <Title>Wallet</Title>
       <View
         style={{
@@ -110,15 +108,9 @@ export default function Wallet() {
       >
         <Text style={{ color: c.muted }}>Available token balance</Text>
         {loading ? (
-          <ActivityIndicator
-            accessibilityLabel="Loading wallet balance"
-            color={c.accent}
-          />
+          <ActivityIndicator accessibilityLabel="Loading wallet balance" color={c.accent} />
         ) : (
-          <Text
-            accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`}
-            style={{ color: c.text, fontSize: 34, fontWeight: "800" }}
-          >
+          <Text accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`} style={{ color: c.text, fontSize: 34, fontWeight: "800" }}>
             {(wallet?.balance ?? 0).toLocaleString()}
           </Text>
         )}
