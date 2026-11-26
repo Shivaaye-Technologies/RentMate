@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 import { Body, Notice, Screen, Title, usePalette } from "../../src/ui";
+
+type SubscriptionRow = {
+  is_subscriber: boolean;
+  plan_key: string | null;
+  status: string | null;
+  current_period_end: string | null;
+};
 
 type LedgerEntry = {
   id: number;
@@ -11,94 +18,80 @@ type LedgerEntry = {
   created_at: string;
 };
 
-type SubscriptionRow = {
-  is_subscriber: boolean;
-  plan_key: string | null;
-  status: string | null;
-  current_period_end: string | null;
-};
-
-type WalletState = {
-  balance: number;
-  entries: LedgerEntry[];
-};
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Date unavailable"
-    : date.toLocaleString("en-IN", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-}
-
 function formatDelta(value: number) {
   const amount = Math.abs(value).toLocaleString("en-IN");
   return value > 0 ? `+${amount}` : `−${amount}`;
 }
 
+function formatDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Date unavailable"
+    : date.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function Wallet() {
   const c = usePalette();
-  const [wallet, setWallet] = useState<WalletState | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadWallet = useCallback(async () => {
-    if (!supabase) {
-      setError("RentMate is not configured. Please try again after the app configuration is restored.");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const userId = sessionData.session?.user.id;
-      if (!userId) throw new Error("Please sign in again to view your wallet.");
-
-      const [walletResult, ledgerResult, entitlementResult] = await Promise.all([
-        supabase.from("token_wallets").select("balance").eq("user_id", userId).maybeSingle(),
-        supabase
-          .from("token_ledger")
-          .select("id, delta, balance_after, reason, created_at")
-          .eq("user_id", userId)
-          .order("id", { ascending: false })
-          .limit(20),
-        supabase.rpc("my_subscription_entitlement"),
-      ]);
-
-      if (walletResult.error) throw walletResult.error;
-      if (ledgerResult.error) throw ledgerResult.error;
-      if (entitlementResult.error) throw entitlementResult.error;
-
-      const entitlementRow = Array.isArray(entitlementResult.data)
-        ? entitlementResult.data[0]
-        : null;
-      setWallet({
-        balance: Number(walletResult.data?.balance ?? 0),
-        entries: (ledgerResult.data ?? []) as LedgerEntry[],
-      });
-      setSubscription((entitlementRow as SubscriptionRow | null) ?? null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load your wallet right now.");
-      setWallet(null);
-      setSubscription(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void loadWallet();
-  }, [loadWallet]);
+    let active = true;
+    async function load() {
+      if (!supabase) {
+        setError("App configuration is missing.");
+        setLoading(false);
+        return;
+      }
+      try {
+        const { data: auth, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!auth.user) throw new Error("Please sign in again.");
+
+        const [wallet, entitlement, ledger] = await Promise.all([
+          supabase.from("token_wallets").select("balance").eq("user_id", auth.user.id).maybeSingle(),
+          supabase.rpc("my_subscription_entitlement"),
+          supabase
+            .from("token_ledger")
+            .select("id, delta, balance_after, reason, created_at")
+            .eq("user_id", auth.user.id)
+            .order("id", { ascending: false })
+            .limit(20),
+        ]);
+        if (wallet.error) throw wallet.error;
+        if (entitlement.error) throw entitlement.error;
+        if (ledger.error) throw ledger.error;
+        if (!active) return;
+        setBalance(Number(wallet.data?.balance ?? 0));
+        setEntries((ledger.data ?? []) as LedgerEntry[]);
+        const row = Array.isArray(entitlement.data) ? entitlement.data[0] : null;
+        setSubscription((row as SubscriptionRow | null) ?? null);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Could not load your wallet.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <Screen>
-      <Text style={{ color: c.accent, fontWeight: "800", letterSpacing: 2 }}>RENTMATE TOKENS</Text>
+      <Text
+        style={{
+          color: c.accent,
+          fontWeight: "800",
+          letterSpacing: 2,
+        }}
+      >
+        RENTMATE TOKENS
+      </Text>
       <Title>Wallet</Title>
       {error ? <Notice kind="error">{error}</Notice> : null}
       <View
@@ -111,22 +104,14 @@ export default function Wallet() {
           gap: 8,
         }}
       >
-        <Text style={{ color: c.muted }}>Available token balance</Text>
-        {loading ? (
-          <ActivityIndicator accessibilityLabel="Loading wallet balance" color={c.accent} />
-        ) : (
-          <Text
-            accessibilityLabel={`Token balance ${wallet?.balance ?? 0}`}
-            style={{ color: c.text, fontSize: 34, fontWeight: "800" }}
-          >
-            {(wallet?.balance ?? 0).toLocaleString("en-IN")}
-          </Text>
-        )}
+        <Text style={{ color: c.muted }}>Your token balance</Text>
+        <Text style={{ color: c.text, fontSize: 34, fontWeight: "800" }}>
+          {loading ? "…" : balance === null ? "—" : balance.toLocaleString("en-IN")}
+        </Text>
         <Text style={{ color: c.muted }}>
-          RentMate tokens are internal app units. They are not cash, cannot be withdrawn or transferred, and have no cash redemption value.
+          {loading ? "Loading your wallet…" : "Tokens are internal app credits with no cash value."}
         </Text>
       </View>
-
       <Title>Subscription</Title>
       <View
         style={{
@@ -151,12 +136,11 @@ export default function Wallet() {
             : "Subscription purchase and activation are not available in this build."}
         </Body>
       </View>
-
       <Title>Recent activity</Title>
       {loading ? (
         <Body muted>Loading your ledger…</Body>
-      ) : wallet?.entries.length ? (
-        wallet.entries.map((entry) => (
+      ) : entries.length ? (
+        entries.map((entry) => (
           <View
             key={entry.id}
             style={{
@@ -185,15 +169,14 @@ export default function Wallet() {
       ) : (
         <Body muted>No wallet activity is available yet.</Body>
       )}
-
-      <Title>Purchases and gifts</Title>
+      <Title>Gifts & token packages</Title>
       <Body>
-        Token purchases and member-to-member gifts are not enabled in this testing build. Purchases will be
-        available only after the approved store billing flow and server verification are complete.
+        Token purchases and gift sending are currently disabled. No package can be purchased and no gift
+        transaction is simulated.
       </Body>
       <Body muted>
-        Booking token holds and refunds will appear here only after their separate booking ledger integration
-        is implemented and tested.
+        The maximum planned purchase is 500 tokens per transaction. Purchases, transfers, cash withdrawal and
+        redemption remain unavailable until the required approvals and verified billing integration ship.
       </Body>
     </Screen>
   );
