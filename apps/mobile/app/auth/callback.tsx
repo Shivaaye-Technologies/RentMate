@@ -4,7 +4,7 @@ import { completeOAuthLink } from "../../src/lib/auth";
 import { authClient } from "../../src/lib/authClient";
 import { Body, Notice, Screen, Title } from "../../src/ui";
 
-/** OAuth callback: exchanges Supabase's one-time PKCE code for the Google-authenticated session. */
+/** rentmate://auth/callback: finishes an email confirmation or Google sign-in (one-time PKCE code). */
 export default function AuthCallback() {
   const params = useLocalSearchParams<{ code?: string; error_description?: string }>();
   const [state, setState] = useState<"working" | "done" | { error: string }>("working");
@@ -12,7 +12,7 @@ export default function AuthCallback() {
   useEffect(() => {
     if (!authClient) return;
     void completeOAuthLink(authClient, params).then((r) =>
-      setState(r.ok ? "done" : { error: r.message ?? "Please try Google sign-in again." }),
+      setState(r.ok ? "done" : { error: r.message ?? "Please sign in again." }),
     );
     // OAuth callback parameters are handled once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -23,7 +23,7 @@ export default function AuthCallback() {
     <Screen>
       <Title>Signing you in</Title>
       {state === "working" ? (
-        <Body muted>Completing secure Google sign-in…</Body>
+        <Body muted>Completing secure sign-in…</Body>
       ) : (
         <Notice kind="error">{state.error}</Notice>
       )}
