@@ -61,15 +61,13 @@ export default function Availability() {
     if (problem) return setError(problem);
     setBusy(true);
     setError(null);
-    const { error: e } = await supabase
-      .from("companion_availability")
-      .insert({
-        companion_id: me,
-        weekday: day,
-        start_minute: start,
-        end_minute: end,
-        timezone: "Asia/Kolkata",
-      });
+    const { error: e } = await supabase.from("companion_availability").insert({
+      companion_id: me,
+      weekday: day,
+      start_minute: start,
+      end_minute: end,
+      timezone: "Asia/Kolkata",
+    });
     setBusy(false);
     if (e) return setError("Could not save this window. Please try again.");
     setInfo(`Added ${WEEKDAYS[day]} ${minuteLabel(start)}–${minuteLabel(end)}.`);
