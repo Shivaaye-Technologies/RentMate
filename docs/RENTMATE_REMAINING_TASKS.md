@@ -1,0 +1,53 @@
+# RentMate — remaining tasks
+
+Owner key: **F** = founder or operator action (credentials, consoles, approval). **E** = engineering work that can
+proceed in a session with GitHub write access.
+
+## Blocking the internal-testing APK
+
+| ID  | Owner | Task                                                                                                                                                      |
+| --- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A-1 | F     | Push this round's commits (bundle), or give the session write access to `Shivaaye-Technologies/RentMate`.                                                 |
+| A-2 | F/E   | Open a draft PR from `feature/rentmate-testing-apk` (check first that none exists). Get CI and CodeQL green. Do not merge without approval.               |
+| A-3 | F     | Set the Actions variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (publishable key only) and `EXPO_PUBLIC_API_URL` to staging values. |
+| A-4 | F/E   | Run `android-device-apk.yml`, download the artifact and check its package id and checksum.                                                                |
+| A-5 | F     | Install on 2+ phones (one small screen, Android 8–9 and a current Android) and run the smoke test.                                                        |
+
+## Staging setup (see `RENTMATE_DEPLOYMENT_RUNBOOK.md`)
+
+| ID  | Owner | Task                                                                                                                                               |
+| --- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S-1 | F     | Apply migrations through `20261126130000` to **staging** only, after a backup.                                                                     |
+| S-2 | F     | Supabase Auth: redirect URLs `rentmate://auth/callback`, `rentmate://auth/reset`; Google provider.                                                 |
+| S-3 | F     | Integration secrets: `play_billing`, `booking_jobs` (and `livekit_webhook` if live features are tested), each set the same in the API environment. |
+| S-4 | F     | Mark tester accounts (`is_tester`). Switch on the booking sandbox and the billing sandbox. Enable each product.                                    |
+| S-5 | F     | Grant the first `super_admin` from the SQL editor. Turn on admin MFA before giving out staff roles.                                                |
+
+## Google Play (sandbox)
+
+| ID  | Owner | Task                                                                                                                                                          |
+| --- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-1 | F     | Create the products `rentmate_tokens_50/100/250/500` (consumable) and `rentmate_monthly` (subscription with a base plan and offer).                           |
+| P-2 | F     | Add license testers. Upload a build to the internal testing track: Play Billing only works for apps installed through Play.                                   |
+| P-3 | F     | Service account with order and financial permissions; store its JSON in the API host's secret store only.                                                     |
+| P-4 | F     | Set up Pub/Sub RTDN: create a topic, grant Publisher to Google Play's notification account, add a push subscription to `/api/v1/billing/google/rtdn?token=…`. |
+| P-5 | F     | Release keystore for Play uploads (GitHub secrets or EAS credentials). The current workflow builds debug-signed APKs only.                                    |
+
+## Engineering gaps (not built)
+
+| ID    | Owner | Task                                                                                                                                                                                                                                                   |
+| ----- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| F-RT1 | F→E   | **Decision needed:** removing staff tiers. The policy guard forbids `delete from` in new migrations. Options: (a) approve a reviewed exception for role removal, or (b) leave removal with the database owner. Until then, removal is SQL-editor only. |
+| E-1   | E     | Push notifications (FCM through `expo-notifications`): needs a Firebase project and `google-services.json` (F).                                                                                                                                        |
+| E-2   | E     | Gifts: there is no catalog, flow or rule set. Needs a product decision (what a gift is, the price in tokens, the creator share, moderation).                                                                                                           |
+| E-3   | E     | OTP/QR meetup check-in; automatic completion or dispute window for accepted bookings whose time has passed.                                                                                                                                            |
+| E-4   | E     | Effective-dated GST/tax records and invoices; maker-checker approval for catalog price changes (the `financial_config_versions` table exists, but packages are still edited by migration).                                                             |
+| E-5   | E     | Upgrade the Expo tooling that pulls in a vulnerable `minimatch` (4 moderate, development tooling) when Expo ships a fix.                                                                                                                               |
+| E-6   | E     | Android admin screens are intentionally absent (admin stays on the web with MFA). Revisit only if requested.                                                                                                                                           |
+| E-7   | E     | Real-device fixes found during A-5.                                                                                                                                                                                                                    |
+
+## Before any public launch (founder approval required)
+
+Legal, tax and Google Play policy review; published terms and privacy policy; a penetration test; a production backup
+and migration plan; and production monitoring. Live purchases, cash conversion, withdrawals, transfers and creator
+payouts stay locked off by constraints. Lifting any of them requires a separately approved migration.

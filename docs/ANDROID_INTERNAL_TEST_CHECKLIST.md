@@ -31,32 +31,39 @@ to Play. A release-signed build needs a release keystore stored as repository se
 
 ## 4. Smoke test (mark each pass/fail)
 
-| #   | Flow                 | Steps                                         | Expected                                                              |
-| --- | -------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
-| 1   | Launch               | Cold start, airplane mode off                 | Splash, then sign-in; no crash, no red screen                         |
-| 2   | Sign up              | Email + password + 18+ declaration            | Verification email; link opens the app                                |
-| 3   | 18+ gate             | Try to continue without the declaration       | Blocked with a clear message                                          |
-| 4   | Sign in / out        | Sign in, kill app, reopen                     | Session persists; sign out returns to sign-in                         |
-| 5   | Password reset       | "Forgot password" → email link                | Opens `auth/reset`, new password works                                |
-| 6   | Google sign-in       | Continue with Google                          | Returns to the app signed in                                          |
-| 7   | Onboarding           | Complete profile steps                        | Lands on home; back button does not re-enter onboarding               |
-| 8   | Discover / likes     | Browse, like, mutual like with second account | Match appears; chat opens                                             |
-| 9   | Chat                 | Send messages both ways                       | Delivered in real time; prohibited text refused                       |
-| 10  | Companions           | Open Companions, pick a service               | Only public meetup venues; no hotel/residence option                  |
-| 11  | Token booking        | Choose time/duration, see quote, request      | Hold shown; wallet balance drops by the quote; retry does not double  |
-| 12  | Accept / reject      | Companion accepts one, rejects another        | Rejected hold refunded once; status labels update                     |
-| 13  | Booking chat         | Message inside the booking                    | Only the two participants see it; third account cannot                |
-| 14  | Completion           | Both confirm completion                       | Hold settles; creator sees pending earnings; no cash option anywhere  |
-| 15  | Report / block / SOS | Report the booking; block; tap emergency      | Hold frozen; blocked user hidden; dialer opens 112                    |
-| 16  | Wallet               | Open Wallet                                   | Read-only balance and history; no transfer, withdraw or buy-with-cash |
-| 17  | Keyboard / small     | Small screen (≤ 5"), rotate, long text        | Inputs stay visible above keyboard; nothing clipped                   |
-| 18  | Permissions          | Deny camera/mic/notifications                 | App keeps working; asks again only when needed                        |
-| 19  | Offline              | Airplane mode mid-flow                        | Clear error, no crash; recovers when online                           |
+| #   | Flow                 | Steps                                                                             | Expected                                                                 |
+| --- | -------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | Launch               | Cold start, airplane mode off                                                     | Splash, then sign-in; no crash, no red screen                            |
+| 2   | Sign up              | Email + password + 18+ declaration                                                | Verification email; link opens the app                                   |
+| 3   | 18+ gate             | Try to continue without the declaration                                           | Blocked with a clear message                                             |
+| 4   | Sign in / out        | Sign in, kill app, reopen                                                         | Session persists; sign out returns to sign-in                            |
+| 5   | Password reset       | "Forgot password" → email link                                                    | Opens `auth/reset`, new password works                                   |
+| 6   | Google sign-in       | Continue with Google                                                              | Returns to the app signed in                                             |
+| 7   | Onboarding           | Complete profile steps                                                            | Lands on home; back button does not re-enter onboarding                  |
+| 8   | Discover / likes     | Browse, like, mutual like with second account                                     | Match appears; chat opens                                                |
+| 9   | Chat                 | Send messages both ways                                                           | Delivered in real time; prohibited text refused                          |
+| 10  | Companions           | Open Companions, pick a service                                                   | Only public meetup venues; no hotel/residence option                     |
+| 11  | Token booking        | Choose time/duration, see quote, request                                          | Hold shown; wallet balance drops by the quote; retry does not double     |
+| 12  | Accept / reject      | Companion accepts one, rejects another                                            | Rejected hold refunded once; status labels update                        |
+| 13  | Booking chat         | Message inside the booking                                                        | Only the two participants see it; third account cannot                   |
+| 14  | Completion           | Both confirm completion                                                           | Hold settles; creator sees pending earnings; no cash option anywhere     |
+| 15  | Report / block / SOS | Report the booking; block; tap emergency                                          | Hold frozen; blocked user hidden; dialer opens 112                       |
+| 16  | Wallet               | Open Wallet                                                                       | Read-only balance and history; no transfer, withdraw or buy-with-cash    |
+| 17  | Keyboard / small     | Small screen (≤ 5"), rotate, long text                                            | Inputs stay visible above keyboard; nothing clipped                      |
+| 18  | Permissions          | Deny camera/mic/notifications                                                     | App keeps working; asks again only when needed                           |
+| 19  | Offline              | Airplane mode mid-flow                                                            | Clear error, no crash; recovers when online                              |
+| 20  | Notifications        | Make a booking request from a second account                                      | Companion sees an unread notification; tapping opens the booking         |
+| 21  | Availability         | As a companion, add Mon 10:00–13:00, try an overlapping window, remove one        | Overlap refused; members can only request inside the windows             |
+| 22  | Token pack (Play)    | Installed from the Play internal track, tester account, sandbox on: buy 50 tokens | Google test sheet; balance +50 once; replaying or reopening adds nothing |
+| 23  | Pending purchase     | Use Play's "slow test card" (pending)                                             | "Waiting for payment" notice; no tokens until it completes               |
+| 24  | Refund               | Refund the test order in Play Console                                             | Within minutes (RTDN) a reversal entry appears; balance never negative   |
+| 25  | Monthly plan         | Subscribe with a test account, then cancel in Play                                | Wallet shows subscriber until period end; expires after                  |
 
 Report failures with device model, Android version, step number and a screen recording.
 
 ## Not in this APK
 
-- In-app purchase of token packs (server verification is built; the app billing module is not — see
-  `docs/PLAY_BILLING_SANDBOX_RUNBOOK.md`).
-- OTP/QR meetup check-in, scheduled hold-expiry job, published terms.
+- Push notifications (in-app notifications only), gifts, OTP/QR meetup check-in, published terms.
+- Google Play purchases (rows 22–25) only work when the app is installed from a Play testing track with a
+  release-signed build. The side-loaded debug APK shows "Google Play Billing is not available" or hides the store,
+  which is expected.
