@@ -2,16 +2,15 @@ name: Android device-test APK
 
 on:
   pull_request:
-    branches: [feature/android-livekit-calls-streaming]
     paths:
       - "apps/mobile/**"
       - ".github/workflows/android-device-apk.yml"
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch or commit to build (use fix/android-call-reliability)
+        description: Branch or commit to build
         required: true
-        default: fix/android-call-reliability
+        default: feature/rentmate-testing-apk
         type: string
 
 permissions:
@@ -45,12 +44,24 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK components
+      - name: Install Android SDK components (compileSdk 37 is required; never downgraded)
         run: |
           sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -x "$sdkmanager"
           yes | "$sdkmanager" --licenses >/dev/null
-          "$sdkmanager" "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+          # The API 37 platform has been published as both "platforms;android-37" and "platforms;android-37.0";
+          # take whichever this runner's SDK catalogue offers instead of guessing, and fail loudly if neither exists.
+          "$sdkmanager" --list 2>/dev/null > "$RUNNER_TEMP/sdk-list.txt"
+          platform="$(grep -oE 'platforms;android-37(\.[0-9]+)?' "$RUNNER_TEMP/sdk-list.txt" | sort -uV | tail -n 1)"
+          build_tools="$(grep -vE -- '-rc[0-9]' "$RUNNER_TEMP/sdk-list.txt" | grep -oE 'build-tools;3[67]\.[0-9]+\.[0-9]+' | sort -uV | tail -n 1)"
+          if [ -z "$platform" ] || [ -z "$build_tools" ]; then
+            echo "::error::Android API 37 platform or build-tools 36/37 is not available from sdkmanager on this runner."
+            grep -E 'platforms;android-3[67]|build-tools;3[67]' "$RUNNER_TEMP/sdk-list.txt" | sort -u | head -20
+            exit 1
+          fi
+          echo "Installing $platform and $build_tools"
+          "$sdkmanager" "platform-tools" "$platform" "$build_tools"
+          ls "$ANDROID_HOME/platforms"
 
       - name: Install mobile dependencies
         working-directory: apps/mobile
@@ -105,16 +116,28 @@ jobs:
           aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$aapt"
           permissions="$("$aapt" dump permissions "$apk")"
-          printf '%s\\n' "$permissions"
-          if printf '%s\\n' "$permissions" | grep -Eq 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW'; then
+          printf '%s\n' "$permissions"
+          if printf '%s\n' "$permissions" | grep -Eq 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW'; then
             echo "::error::A blocked permission is present in the packaged APK."
             exit 1
           fi
 
+      - name: Verify package id and record checksum
+        working-directory: apps/mobile
+        run: |
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          "$aapt" dump badging "$apk" | head -3
+          "$aapt" dump badging "$apk" | grep -q "package: name='com.shivaayetechnologies.rentmate'"
+          sha256sum "$apk" | sed 's#android/app/build/outputs/apk/debug/##' > apk-checksums.txt
+          cat apk-checksums.txt
+
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v6
         with:
-          name: rentmate-android-device-test
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: rentmate-android-internal-test-${{ github.run_number }}
+          path: |
+            apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            apps/mobile/apk-checksums.txt
           if-no-files-found: error
           retention-days: 7
