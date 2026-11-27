@@ -98,9 +98,7 @@ export default function ProfileHub() {
       >
         <Text style={{ color: "#FFFFFF", fontSize: 30, fontWeight: "700" }}>Wallet</Text>
         <Text style={{ color: "#D9D3CC", fontSize: 16 }}>
-          {balance === null
-            ? "Tokens for activities and extras"
-            : `${formatIndianNumber(balance)} tokens`}
+          {balance === null ? "Tokens for activities and extras" : `${formatIndianNumber(balance)} tokens`}
         </Text>
         <View
           style={{
