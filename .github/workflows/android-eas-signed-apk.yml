@@ -16,6 +16,7 @@ on:
     paths:
       - ".github/workflows/android-eas-signed-apk.yml"
       - "scripts/apk-signing-cert.mjs"
+      - "scripts/retry-expo-api.sh"
   workflow_dispatch:
     inputs:
       ref:
@@ -63,14 +64,14 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then echo "::error::The EXPO_TOKEN secret is not set."; exit 1; fi
-          npx --yes "$EAS_CLI" whoami
+          bash scripts/retry-expo-api.sh npx --yes "$EAS_CLI" whoami
 
       - name: List earlier EAS Android builds
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx --yes "$EAS_CLI" build:list --platform android --limit 30 --json --non-interactive > "$RUNNER_TEMP/builds.json"
+          bash ../../scripts/retry-expo-api.sh npx --yes "$EAS_CLI" build:list --platform android --limit 30 --json --non-interactive > "$RUNNER_TEMP/builds.json"
           jq -r '["id","profile","status","distribution","version","versionCode","commit","created"],
                  (.[] | [.id, .buildProfile, .status, .distribution, .appVersion, .appBuildVersion,
                          ((.gitCommitHash // "") | .[0:7]), .createdAt]) | @tsv' "$RUNNER_TEMP/builds.json" | column -t
@@ -166,7 +167,7 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
         run: |
-          npx --yes "$EAS_CLI" build --local --platform android --profile staging --non-interactive \
+          bash ../../scripts/retry-expo-api.sh npx --yes "$EAS_CLI" build --local --platform android --profile staging --non-interactive \
             --output "$RUNNER_TEMP/out/app-release.apk"
 
       - name: Verify signer, package, version, bundle, permissions and WebRTC classes
