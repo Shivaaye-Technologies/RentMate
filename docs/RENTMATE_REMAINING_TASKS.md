@@ -10,7 +10,7 @@ proceed in a session with GitHub write access.
 | A-1 | F     | Push this round's commits (bundle), or give the session write access to `Shivaaye-Technologies/RentMate`.                                                 |
 | A-2 | F/E   | Open a draft PR from `feature/rentmate-testing-apk` (check first that none exists). Get CI and CodeQL green. Do not merge without approval.               |
 | A-3 | F     | Set the Actions variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (publishable key only) and `EXPO_PUBLIC_API_URL` to staging values. |
-| A-4 | F/E   | Run `android-device-apk.yml`, download the artifact and check its package id and checksum.                                                                |
+| A-4 | done  | APK run 45975566796 on `d081489`; artifact 15189205015 (expires 2026-12-04); SHA-256 `73d7665e41853655…` (full value in the completion report).           |
 | A-5 | F     | Install on 2+ phones (one small screen, Android 8–9 and a current Android) and run the smoke test.                                                        |
 
 ## Staging setup (see `RENTMATE_DEPLOYMENT_RUNBOOK.md`)
@@ -35,8 +35,8 @@ proceed in a session with GitHub write access.
 
 ## Session blockers (2026-11-27)
 
-- The APK workflow fix ("fix(ci): build the release variant for the test APK") is local only: pushing a workflow file needs the `workflow` OAuth scope, which the
-  token does not have. Until then the APK run fails at the permission check and there is no artifact.
+- Resolved: the `workflow` scope was granted and the APK now builds (run 45975566796). The artifact expires on
+  2026-12-04; rerun the workflow for a fresh one.
 - No Android SDK, emulator or device on this machine, so no device testing.
 - No local PostgreSQL: the two new concurrency cases run only in CI.
 

@@ -5,11 +5,11 @@ it is done and checked. Nothing here is a production step; production needs a se
 
 ## 1. Code and CI
 
-- [ ] **F** Grant the `workflow` scope (`gh auth refresh -h github.com -s workflow`, then finish the device login in
-      the browser), or push the local commit "fix(ci): build the release variant for the test APK" yourself. This fixes the APK workflow.
-- [x] **E** CI green on PR #19 at `13aad35` (run 45909194104).
-- [ ] **E** APK workflow green on the release-variant build; record the artifact link, run ID and SHA-256.
-- [ ] **F** CodeQL: check the PR's code-scanning results in the GitHub UI (default setup).
+- [x] **F** Grant the `workflow` scope (done 2026-11-27).
+- [x] **E** CI green on PR #19 at `d081489` (run 45975566728).
+- [x] **E** APK workflow green on the release-variant build: run 45975566796, artifact 15189205015 (expires
+      2026-12-04), SHA-256 `73d7665e418536559b15a6dd781a19de150d1245769209d58cb7e12a58daadb6`.
+- [ ] **F** CodeQL: check the PR's code-scanning results in the GitHub UI (default setup). The API showed 0 open alerts.
 - [ ] **F** Review PR #19 and decide on the merge. Do not merge without founder approval.
 
 ## 2. Supabase staging (never production)

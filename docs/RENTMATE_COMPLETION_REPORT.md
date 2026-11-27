@@ -3,23 +3,23 @@
 ## Round 4 (2026-11-26/27)
 
 Branch `feature/rentmate-testing-apk`, draft PR #19 (base `feature/rentmate-conversion`, open, mergeable, **not
-merged**). Pushed to GitHub through `13aad35`. One commit is local only: the APK workflow fix (commit "fix(ci): build the release variant for the test APK", kept last on the local branch), because
-pushing a workflow file needs the `workflow` OAuth scope. The token still reports `gist`, `read:org` and `repo`
-after the refresh attempt.
+merged**). Everything is pushed, through `d081489`. The founder granted the `workflow` OAuth scope on 2026-11-27,
+so the APK workflow fix is pushed too.
 
 Recovery points: the tag `backup/2026-11-26-before-round4` (`ab3f42f`) and the verified bundle
 `/root/RentMate-backups/rentmate-2026-11-26-ab3f42f.bundle`.
 
 ### Commits this round
 
-| Commit    | What                                                                                                        |
-| --------- | ----------------------------------------------------------------------------------------------------------- |
-| `349e6b4` | SEC-2: `live_room_for` and `room_name` restricted to people who may join (`20261126150000`)                 |
-| `6c667eb` | SEC-1: admin decision on disputes raised after settlement (`20261126160000`, `20261126170000`)              |
-| `d75fab6` | Gifts sandbox migration and test, **held** for founder approval (`docs/held-migrations/`)                   |
-| `55d8f1f` | Billing tests: cancelled, paused, pending and lapsed-grace subscription states                              |
-| `13aad35` | Concurrency tests: concurrent settlement runs and concurrent settlement reversals                           |
-| (local)   | (not pushed) APK workflow builds the release variant with the bundle embedded and fails if it is debuggable |
+| Commit    | What                                                                                           |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `349e6b4` | SEC-2: `live_room_for` and `room_name` restricted to people who may join (`20261126150000`)    |
+| `6c667eb` | SEC-1: admin decision on disputes raised after settlement (`20261126160000`, `20261126170000`) |
+| `d75fab6` | Gifts sandbox migration and test, **held** for founder approval (`docs/held-migrations/`)      |
+| `55d8f1f` | Billing tests: cancelled, paused, pending and lapsed-grace subscription states                 |
+| `13aad35` | Concurrency tests: concurrent settlement runs and concurrent settlement reversals              |
+| `4a6db73` | APK workflow builds the release variant with the bundle embedded and fails if it is debuggable |
+| `d081489` | R8 keep rules for the WebRTC classes native code calls by name (fixes the release build)       |
 
 ### Already present before this round (verified, not rebuilt)
 
@@ -56,26 +56,44 @@ share, no payouts).
 | `npm run test:db`                    | 32 suites, all passing; settlement reversal 23/23; live room 9/9                                       |
 | `npm run test:rollback`              | exit 0 (21 stages)                                                                                     |
 | `npm run test:hooks` / `test:aihub`  | 21/21 / 32/32                                                                                          |
-| Mobile `vitest run` / `tsc --noEmit` | 88/88 / clean                                                                                          |
+| Mobile `vitest run` / `tsc --noEmit` | 89/89 / clean (new: R8 keep-rules test)                                                                |
 | `test:db:concurrency` (2 new cases)  | not run locally (no PostgreSQL); **passed in CI** `db-concurrency`, run 45933120742 (11 cases, all ok) |
 
 ### GitHub
 
-| Item                      | Status                                                                                                                    |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| CI                        | success on `13aad35` (run 45909194104) and on `0893d91` (run 45933120742): check, browser, rtc, db-concurrency, mobile    |
-| APK workflow on `13aad35` | failure (run 45909194094), as expected: `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed by the local workflow commit |
-| APK artifact              | **none yet**: there is no artifact link or build ID to report                                                             |
-| CodeQL                    | default setup; 0 open code-scanning alerts for the PR #19 ref (API query this session)                                    |
-| PR #19 description        | updated this round                                                                                                        |
+| Item                      | Status                                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI                        | success on `13aad35` (run 45909194104) and on `0893d91` (run 45933120742): check, browser, rtc, db-concurrency, mobile                                                     |
+| CI on `d081489`           | success (run 45975566728)                                                                                                                                                  |
+| APK workflow on `13aad35` | failure (run 45909194094): `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed in `4a6db73`                                                                               |
+| APK workflow on `4a6db73` | failure (run 45970802476): R8 missing class `livekit.org.jni_zero.JniZeroJni` (LiveKit WebRTC). Fixed in `d081489`                                                         |
+| APK workflow on `d081489` | **success** (run 45975566796)                                                                                                                                              |
+| APK artifact              | `rentmate-android-internal-test-13` (ID 15189205015), expires 2026-12-04: https://github.com/Shivaaye-Technologies/RentMate/actions/runs/45975566796/artifacts/15189205015 |
+| APK SHA-256               | `73d7665e418536559b15a6dd781a19de150d1245769209d58cb7e12a58daadb6` (`app-release.apk`, 145,416,535 bytes; matches the workflow's checksum file)                            |
+| CodeQL                    | default setup; 0 open code-scanning alerts for the PR #19 ref (API query this session)                                                                                     |
+| PR #19 description        | updated this round                                                                                                                                                         |
+
+### APK checks (artifact downloaded and inspected in this session)
+
+- Package `com.shivaayetechnologies.rentmate`, versionName 0.1.0, versionCode 1; minSdk 24, targetSdk 36, compileSdk 37.
+- Release variant, debug-signed (APK signature block present). Not debuggable: the workflow's `aapt` check passed.
+- Standalone: `assets/index.android.bundle` (4,564,524 bytes, Hermes bytecode) is embedded, so no Metro server is
+  needed. Native libraries for arm64-v8a, armeabi-v7a, x86 and x86_64.
+- Permissions: INTERNET, ACCESS_NETWORK_STATE, CAMERA, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS, BLUETOOTH,
+  BLUETOOTH_ADMIN, VIBRATE, WAKE_LOCK, FOREGROUND_SERVICE, BILLING, USE_BIOMETRIC, USE_FINGERPRINT. None of the
+  blocked ones (location, contacts, `SYSTEM_ALERT_WINDOW`, external storage).
+- After shrinking, `classes.dex` still holds `livekit.org.webrtc.PeerConnectionFactory`, `livekit.org.jni_zero.JniZero`
+  and `com.oney.WebRTCModule.WebRTCModule`. The only `-dontwarn` rule is for the one generated class.
+- Built with the staging Actions variables. The staging API `/health` returned 200 (`authConfigured: true`).
 
 ### Device evidence
 
-None. No device testing was performed (see `RENTMATE_ANDROID_DEVICE_TEST_REPORT.md`).
+None. No device testing was performed, because this machine has no Android device or emulator, so installing
+without Metro is shown by the APK's contents, not by an install (see `RENTMATE_ANDROID_DEVICE_TEST_REPORT.md`).
 
 ### Founder approvals still required
 
-Grant the `workflow` scope (or push the APK workflow fix commit); approve the gift rules, which unblocks the held migration; F-RT1
+Approve the gift rules, which unblocks the held migration; F-RT1
 (removing staff roles); creator shares; the legal, tax and Play policy items in
 `RENTMATE_STAGING_RELEASE_CHECKLIST.md`; and the merge of PR #19.
 

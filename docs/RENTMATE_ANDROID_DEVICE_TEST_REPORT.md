@@ -5,22 +5,33 @@
 ## Why
 
 - This session runs on a machine with no Android SDK, emulator or connected device.
-- No installable APK from this round exists yet. The latest `android-device-apk.yml` run (45909194094, commit
-  `13aad35`) failed on purpose at the permission check: the debug variant's manifest adds `SYSTEM_ALERT_WINDOW`
-  (for the React Native dev menu), and the workflow blocks that permission. The fix (the local commit "fix(ci): build the release variant for the test APK": build the release
-  variant with the JS bundle embedded, still debug-signed, and fail if it is debuggable) is committed locally, but
-  it can be pushed only with a GitHub token that has the `workflow` scope. The current token has `gist`,
-  `read:org` and `repo`.
+- An installable APK now exists, but no one has installed it on a phone yet.
+
+## APK under test
+
+| Field    | Value                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| Run      | 45975566796 (`android-device-apk.yml`, commit `d081489`)                                         |
+| Artifact | `rentmate-android-internal-test-13`, ID 15189205015, expires 2026-12-04                          |
+| Link     | https://github.com/Shivaaye-Technologies/RentMate/actions/runs/45975566796/artifacts/15189205015 |
+| SHA-256  | `73d7665e418536559b15a6dd781a19de150d1245769209d58cb7e12a58daadb6`                               |
+| Package  | `com.shivaayetechnologies.rentmate` 0.1.0 (1); minSdk 24, targetSdk 36                           |
+| Signing  | debug key (internal testing only; not for Play)                                                  |
+
+Check the SHA-256 after downloading (`sha256sum app-release.apk`) before installing it with `adb install` or by
+sideloading.
 
 ## What was verified without a device
 
-| Check                                        | Result (this session)                   |
-| -------------------------------------------- | --------------------------------------- |
-| Mobile typecheck (`tsc --noEmit`)            | clean                                   |
-| Mobile unit tests (`vitest run`)             | 88/88                                   |
-| Shared check-in rules (web and mobile)       | covered by web 226/226 and mobile 88/88 |
-| APK build in CI (debug variant, before fix)  | built; blocked by the permission check  |
-| APK build in CI (release variant, after fix) | **not run**: needs the `workflow` scope |
+| Check                                       | Result (this session)                   |
+| ------------------------------------------- | --------------------------------------- |
+| Mobile typecheck (`tsc --noEmit`)           | clean                                   |
+| Mobile unit tests (`vitest run`)            | 88/88                                   |
+| Shared check-in rules (web and mobile)      | covered by web 226/226 and mobile 88/88 |
+| APK build in CI (debug variant, before fix) | built; blocked by the permission check  |
+| APK build in CI (release variant)           | success, run 45975566796                |
+| JS bundle embedded (no Metro needed)        | yes: `assets/index.android.bundle`      |
+| Not debuggable; blocked permissions absent  | yes (workflow `aapt` checks)            |
 
 ## Device checklist (to be filled in by a tester)
 
