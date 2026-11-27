@@ -1,6 +1,6 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
+import { createApp, supabaseProjectRef } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { MemoryProfileStore } from "../src/store.js";
@@ -33,6 +33,24 @@ describe("API", () => {
     const res = await request(makeApp(new MemoryProfileStore(), verifier, async () => false)).get("/health");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "ok", authConfigured: true });
+  });
+
+  it("GET /health names the Supabase project used to verify sign-ins, without any key", async () => {
+    const withUrl = loadConfig({
+      NODE_ENV: "test",
+      SUPABASE_URL: "https://wgoscvlghavqepaojeao.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key-value-not-for-output",
+    });
+    const app = createApp({
+      config: withUrl,
+      verifyToken: verifier,
+      storeFor: () => new MemoryProfileStore(),
+    });
+    const res = await request(app).get("/health");
+    expect(res.body.authProject).toBe("wgoscvlghavqepaojeao");
+    expect(JSON.stringify(res.body)).not.toContain("anon-key-value-not-for-output");
+    expect(supabaseProjectRef(undefined)).toBeNull();
+    expect(supabaseProjectRef("https://auth.example.com")).toBe("auth.example.com");
   });
 
   it("GET /ready reports ready when Supabase is reachable", async () => {

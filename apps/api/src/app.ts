@@ -150,6 +150,17 @@ export interface AppDeps {
   readinessCheck?: () => Promise<boolean>;
 }
 
+/** "abc123" for https://abc123.supabase.co; the bare host for a custom domain; null when unset. */
+export function supabaseProjectRef(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname;
+    return host.endsWith(".supabase.co") ? host.slice(0, -".supabase.co".length) : host;
+  } catch {
+    return null;
+  }
+}
+
 export function createApp({
   config,
   verifyToken,
@@ -186,9 +197,14 @@ export function createApp({
 
   // Liveness for Render's health check: answers 200 whenever the process is up.
   // Deliberately does not call Supabase, so a database hiccup does not restart the server.
+  // authProject: which Supabase project this API checks sign-ins against (the public project host, never a key),
+  // so a mismatch with the app's project can be spotted without dashboard access.
+  const authProject = supabaseProjectRef(config.SUPABASE_URL);
   app.get("/health", (_req, res) => {
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null });
+    res
+      .status(200)
+      .json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null, authProject });
   });
 
   // Readiness is separate from liveness: do not restart a healthy process for a
