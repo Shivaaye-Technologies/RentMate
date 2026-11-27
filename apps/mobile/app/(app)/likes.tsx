@@ -5,6 +5,7 @@ import { Chip, ChipRow, TopBar } from "../../src/components/kit";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
 import { Body, Notice, Screen, usePalette } from "../../src/ui";
+import { dbFailure } from "../../src/lib/diagnostics";
 
 type PersonRow = {
   id: string;
@@ -75,8 +76,15 @@ export default function Likes() {
           .select("id,user_a,user_b,created_at")
           .order("created_at", { ascending: false }),
       ]);
+      dbFailure("likes (received)", r.error);
+      dbFailure("likes (sent)", s.error);
+      dbFailure("passes", p.error);
+      dbFailure("matches", m.error);
       const failure = r.error ?? s.error ?? p.error ?? m.error;
-      if (failure) throw new Error(failure.message);
+      if (failure)
+        throw new Error(
+          `We couldn't load your likes (${failure.code ?? "error"}). Pull to refresh or try again later.`,
+        );
       const receivedRows = (r.data ?? []) as LikeRow[];
       const sentRows = (s.data ?? []) as LikeRow[];
       const passRows = p.data ?? [];

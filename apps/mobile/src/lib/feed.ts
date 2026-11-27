@@ -1,23 +1,25 @@
 /** The Discover feed (GET /api/v1/matches), shared by Home, Vibes and Map. */
+import { API_ROUTES } from "./api";
+import { authedApiRequest, supabaseSessionAuth } from "./authedApi";
+import { dbFailure, record } from "./diagnostics";
 import { personFromApi, rememberPeople, type Person } from "./people";
 import { apiBaseUrl, supabase } from "./supabase";
 
+/**
+ * Throws on every failure (offline, signed out, server auth problem): an error is never shown as "no one nearby".
+ * An empty array means the server really found no eligible profiles.
+ */
 export async function loadFeed(): Promise<Person[]> {
-  if (!supabase) throw new Error("App configuration is missing.");
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error("Please sign in again.");
-  let response: Response;
-  try {
-    response = await fetch(`${apiBaseUrl}/api/v1/matches`, { headers: { Authorization: `Bearer ${token}` } });
-  } catch {
-    throw new Error("You're offline. Check your connection and try again.");
-  }
-  const body = (await response.json().catch(() => ({}))) as { matches?: unknown; error?: string };
-  if (!response.ok) throw new Error(body.error ?? "Could not load profiles.");
-  const people = (Array.isArray(body.matches) ? body.matches : []).map((m) =>
+  if (!supabase || !apiBaseUrl) throw new Error("App configuration is missing.");
+  const body = await authedApiRequest<{ matches?: unknown }>(supabaseSessionAuth(supabase.auth), {
+    base: apiBaseUrl,
+    method: "GET",
+    path: API_ROUTES.matches,
+  });
+  const people = (Array.isArray(body?.matches) ? body.matches : []).map((m) =>
     personFromApi(m as Record<string, unknown>),
   );
+  record("feed", "loaded", { count: people.length });
   rememberPeople(people);
   return people;
 }
@@ -35,6 +37,7 @@ export async function react(person: Person, kind: "like" | "super" | "pass"): Pr
           .from("likes")
           .insert({ liker_id: me, liked_id: person.id, is_super: kind === "super", message: null });
   if (result.error) {
+    dbFailure(kind === "pass" ? "passes" : "likes", result.error);
     if (/super/i.test(result.error.message))
       throw new Error("You've used today's special like. Try again tomorrow.");
     throw new Error("That action could not be saved. Please try again.");

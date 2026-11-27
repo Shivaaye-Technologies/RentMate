@@ -11,6 +11,7 @@ import {
 } from "../../../src/lib/bookings";
 import { supabase } from "../../../src/lib/supabase";
 import { Body, Button, Notice, Screen, usePalette } from "../../../src/ui";
+import { dbFailure } from "../../../src/lib/diagnostics";
 
 export default function MyBookings() {
   const c = usePalette();
@@ -22,20 +23,28 @@ export default function MyBookings() {
   const load = useCallback(async () => {
     if (!supabase) return setError("App configuration is missing.");
     setError(null);
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) return setError("Please sign in again.");
-    setMe(auth.user.id);
-    // Unanswered requests whose time has passed expire on the server and return their tokens.
-    await supabase.rpc("booking_expire_stale");
-    const { data, error: e } = await supabase
-      .from("bookings")
-      .select(
-        "id, reference, member_id, companion_id, service_title, starts_at, ends_at, meeting_point, status",
-      )
-      .order("starts_at", { ascending: false })
-      .limit(100);
-    if (e) return setError(bookingErrorMessage(e));
-    setRows((data ?? []) as Booking[]);
+    // Any failure (offline, timeout, permission) ends the spinner with a message; it never spins forever.
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return setError("Please sign in again.");
+      setMe(auth.user.id);
+      // Unanswered requests whose time has passed expire on the server and return their tokens.
+      await supabase.rpc("booking_expire_stale");
+      const { data, error: e } = await supabase
+        .from("bookings")
+        .select(
+          "id, reference, member_id, companion_id, service_title, starts_at, ends_at, meeting_point, status",
+        )
+        .order("starts_at", { ascending: false })
+        .limit(100);
+      if (e) {
+        dbFailure("bookings", e);
+        return setError(bookingErrorMessage(e));
+      }
+      setRows((data ?? []) as Booking[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load your bookings.");
+    }
   }, []);
 
   useFocusEffect(

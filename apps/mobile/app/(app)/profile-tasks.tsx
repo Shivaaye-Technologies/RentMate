@@ -6,6 +6,7 @@ import { profileStrength, type ProfileRow, type StrengthItem } from "../../src/l
 import { supabase } from "../../src/lib/supabase";
 import { useSession } from "../../src/session";
 import { Notice, Screen, usePalette } from "../../src/ui";
+import { loadMyProfile } from "../../src/lib/me";
 
 const GLYPH: Record<StrengthItem["key"], string> = {
   photo: "🖼️",
@@ -49,13 +50,11 @@ export default function ProfileTasks() {
     useCallback(() => {
       void (async () => {
         if (!supabase || !session?.user?.id) return;
-        const { data, error: e } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        if (e) setError("Could not load your profile.");
-        setRow((data as ProfileRow | null) ?? null);
+        try {
+          setRow(await loadMyProfile<ProfileRow>(supabase));
+        } catch {
+          setError("Could not load your profile.");
+        }
       })();
     }, [session?.user?.id]),
   );

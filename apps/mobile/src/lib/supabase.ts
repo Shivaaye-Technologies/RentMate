@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
 import { AppState } from "react-native";
 import { readConfig, type ConfigResult } from "./config";
+import { boundedFetch } from "./fetchWithTimeout";
 import { createChunkedStorage } from "./secureSession";
 
 export const configResult: ConfigResult = readConfig(
@@ -32,6 +33,7 @@ export const supabase: SupabaseClient | null = configResult.ok
         detectSessionInUrl: false,
         flowType: "pkce",
       },
+      global: { fetch: boundedFetch() },
     })
   : null;
 

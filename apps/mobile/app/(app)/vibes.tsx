@@ -5,10 +5,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BackBar, TopBar } from "../../src/components/kit";
 import { PeopleGrid } from "../../src/components/PeopleGrid";
 import { loadFeed } from "../../src/lib/feed";
-import { buildVibes, type Vibe, type VibeTone } from "../../src/lib/people";
+import { buildVibes, vibesEmptyReason, type Vibe, type VibeTone } from "../../src/lib/people";
 import { supabase } from "../../src/lib/supabase";
 import { useSession } from "../../src/session";
 import { Body, Button, Notice, usePalette } from "../../src/ui";
+import { loadMyProfile } from "../../src/lib/me";
 
 const TONES: Record<VibeTone, { bg: string; card: string; title: string }> = {
   sky: { bg: "#4E6274", card: "#B6D6F2", title: "#B6D6F2" },
@@ -29,20 +30,24 @@ export default function Vibes() {
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<Vibe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emptyReason, setEmptyReason] = useState<ReturnType<typeof vibesEmptyReason> | null>(null);
   const cardWidth = Math.min(width - 48, 480);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const me = session?.user?.id;
-      const [people, mine] = await Promise.all([
+      // Your own interests and city come from get_my_profile (city is a private column). A failure is shown as an
+      // error, not as "add your hobbies".
+      const [people, row] = await Promise.all([
         loadFeed(),
         me && supabase
-          ? supabase.from("profiles").select("interests, city").eq("id", me).maybeSingle()
-          : Promise.resolve({ data: null }),
+          ? loadMyProfile<{ interests?: string[] | null; city?: string | null }>(supabase)
+          : Promise.resolve(null),
       ]);
-      const row = (mine as { data: { interests?: string[]; city?: string | null } | null }).data;
-      setVibes(buildVibes(people, { interests: row?.interests ?? [], city: row?.city ?? null }));
+      const mine = { interests: row?.interests ?? [], city: row?.city ?? null };
+      setEmptyReason(vibesEmptyReason(people.length, mine));
+      setVibes(buildVibes(people, mine));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load Vibes.");
       setVibes((v) => v ?? []);
@@ -95,11 +100,15 @@ export default function Vibes() {
         {vibes === null ? (
           <ActivityIndicator accessibilityLabel="Loading Vibes" color="#FFFFFF" size="large" />
         ) : null}
-        {vibes && vibes.length === 0 ? (
+        {vibes && !error && vibes.length === 0 ? (
           <View style={{ backgroundColor: c.card, borderRadius: 28, padding: 24, gap: 12 }}>
             <Text style={{ color: c.text, fontSize: 22, fontWeight: "800" }}>No Vibes yet</Text>
-            <Body muted>Add hobbies and your city to your profile to unlock Vibes built around you.</Body>
-            <Button label="Add hobbies" onPress={() => router.push("/(app)/edit-profile" as Href)} />
+            <Body muted>{emptyReason?.text ?? "Nobody to show yet."}</Body>
+            {emptyReason?.kind === "no-feed" ? (
+              <Button label="Preferences" onPress={() => router.push("/(app)/preferences" as Href)} />
+            ) : emptyReason?.kind === "no-details" ? (
+              <Button label="Edit profile" onPress={() => router.push("/(app)/edit-profile" as Href)} />
+            ) : null}
           </View>
         ) : null}
         {current ? (

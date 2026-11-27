@@ -7,6 +7,7 @@ import { markFeedStale } from "../../src/lib/feed";
 import { supabase } from "../../src/lib/supabase";
 import { useSession } from "../../src/session";
 import { Body, Button, Notice, Screen, usePalette } from "../../src/ui";
+import { loadMyProfile } from "../../src/lib/me";
 
 type ShowMe = keyof typeof SHOW_ME_LABELS;
 
@@ -29,18 +30,9 @@ export default function Preferences() {
     useCallback(() => {
       void (async () => {
         if (!supabase || !session?.user?.id) return;
-        const { data, error: e } = await supabase
-          .from("profiles")
-          .select("show_me, age_min, age_max, looking_for")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        if (e || !data) return setError("Could not load your preferences.");
-        const r = data as {
-          show_me: ShowMe | null;
-          age_min: number;
-          age_max: number;
-          looking_for: LookingFor;
-        };
+        type Prefs = { show_me: ShowMe | null; age_min: number; age_max: number; looking_for: LookingFor };
+        const r = await loadMyProfile<Prefs>(supabase).catch(() => null);
+        if (!r) return setError("Could not load your preferences.");
         setShowMe(r.show_me);
         setMin(r.age_min);
         setMax(r.age_max);

@@ -31,6 +31,7 @@ import {
 import { apiBaseUrl, supabase } from "../../src/lib/supabase";
 import { useSession } from "../../src/session";
 import { Body, Button, Notice, Screen, usePalette } from "../../src/ui";
+import { loadMyProfile } from "../../src/lib/me";
 
 type Editor =
   | { kind: "gender" | "education" | "children" | "smoking" | "exercise" }
@@ -89,8 +90,12 @@ export default function EditProfile() {
   const load = useCallback(async () => {
     if (!supabase || !me) return setError("Please sign in again to edit your profile.");
     setError(null);
-    const { data, error: e } = await supabase.from("profiles").select("*").eq("id", me).maybeSingle();
-    if (e) return setError("We couldn't load your profile. Check your connection and try again.");
+    let data: ProfileRow | null;
+    try {
+      data = await loadMyProfile<ProfileRow>(supabase);
+    } catch {
+      return setError("We couldn't load your profile. Check your connection and try again.");
+    }
     if (!data) return setError("Finish creating your profile first.");
     const r = data as ProfileRow;
     setRow(r);

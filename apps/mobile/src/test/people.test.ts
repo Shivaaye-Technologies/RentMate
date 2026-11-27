@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVibes,
+  vibesEmptyReason,
   distanceText,
   factsFor,
   personFromApi,
@@ -107,5 +108,19 @@ describe("people", () => {
       city: "Delhi",
     });
     expect(better.items.filter((i) => i.done).map((i) => i.key)).toEqual(["photo", "photos3", "city"]);
+  });
+});
+
+describe("vibesEmptyReason", () => {
+  it("says the feed is empty rather than asking for hobbies the member already has", () => {
+    expect(vibesEmptyReason(0, { interests: ["Anime"], city: "Noida" }).kind).toBe("no-feed");
+  });
+  it("names exactly the missing profile details", () => {
+    expect(vibesEmptyReason(5, { interests: [], city: null }).text).toContain("hobbies and your city");
+    expect(vibesEmptyReason(5, { interests: [], city: "Noida" }).text).toContain("Add hobbies to");
+    expect(vibesEmptyReason(5, { interests: ["Anime"], city: " " }).text).toContain("Add your city");
+  });
+  it("otherwise reports no overlap", () => {
+    expect(vibesEmptyReason(5, { interests: ["Anime"], city: "Noida" }).kind).toBe("no-overlap");
   });
 });

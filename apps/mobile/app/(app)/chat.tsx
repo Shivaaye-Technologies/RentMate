@@ -16,6 +16,7 @@ import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
 import { SafetyActions } from "../../src/components/SafetyActions";
 import { Body, Button, Notice, Screen, usePalette } from "../../src/ui";
+import { dbFailure, record } from "../../src/lib/diagnostics";
 
 type MatchRow = { id: string; user_a: string; user_b: string; created_at: string };
 type PersonRow = {
@@ -83,7 +84,12 @@ export default function Chat() {
         .from("matches")
         .select("id,user_a,user_b,created_at")
         .order("created_at", { ascending: false });
-      if (matchError) throw new Error(matchError.message);
+      if (matchError) {
+        dbFailure("matches", matchError);
+        throw new Error(
+          `We couldn't load your conversations (${matchError.code ?? "error"}). Please try again.`,
+        );
+      }
       const matches = (rows ?? []) as MatchRow[];
       if (!matches.length) {
         setThreads([]);
@@ -102,8 +108,11 @@ export default function Chat() {
           .order("created_at", { ascending: false })
           .limit(1000),
       ]);
-      if (people.error) throw new Error(people.error.message);
-      if (msgs.error) throw new Error(msgs.error.message);
+      dbFailure("profiles_by_ids", people.error);
+      dbFailure("messages", msgs.error);
+      if (people.error || msgs.error)
+        throw new Error("We couldn't load your conversations. Please try again.");
+      record("chat", "conversations loaded", { count: matches.length });
       const byId = new Map(((people.data ?? []) as PersonRow[]).map((x) => [x.id, x]));
       const latest = new Map<string, Message>();
       for (const msg of (msgs.data ?? []) as Message[])

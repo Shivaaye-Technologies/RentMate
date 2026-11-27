@@ -193,6 +193,30 @@ export function buildVibes(
   return out.filter((v) => v.people.length > 0);
 }
 
+/** Why Vibes is empty, from real data only: an empty feed, missing profile details, or no overlap. */
+export function vibesEmptyReason(
+  feedCount: number,
+  me: { interests: string[]; city: string | null },
+): { kind: "no-feed" | "no-details" | "no-overlap"; text: string } {
+  if (feedCount === 0)
+    return {
+      kind: "no-feed",
+      text: "Nobody is in your Discover feed right now, so there is no one to group into Vibes. Try wider preferences or check back later.",
+    };
+  const missing = [me.interests.length === 0 ? "hobbies" : null, me.city?.trim() ? null : "your city"].filter(
+    Boolean,
+  );
+  if (missing.length)
+    return {
+      kind: "no-details",
+      text: `Add ${missing.join(" and ")} to your profile so Vibes can group people around what you share.`,
+    };
+  return {
+    kind: "no-overlap",
+    text: "Nobody in your feed shares these vibes yet. Check back as more people join.",
+  };
+}
+
 // ---------- Cache ----------
 
 const cache = new Map<string, Person>();

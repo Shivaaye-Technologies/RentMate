@@ -27,6 +27,7 @@ import { signedPhotoUrl } from "../../../src/lib/photos";
 import type { PersonRow } from "../../../src/lib/shared";
 import { supabase } from "../../../src/lib/supabase";
 import { Body, Button, Notice, usePalette } from "../../../src/ui";
+import { loadMyProfile } from "../../../src/lib/me";
 
 /**
  * Someone's profile, photo first: photos alternate with cards for what they're looking for, their facts, hobbies,
@@ -53,8 +54,8 @@ export default function UserProfile() {
     setError(null);
     try {
       if (self) {
-        const { data, error: e } = await supabase.from("profiles").select("*").eq("id", id).maybeSingle();
-        if (e || !data) throw new Error("Could not load your profile.");
+        const data = await loadMyProfile<PersonRow>(supabase).catch(() => null);
+        if (!data) throw new Error("Could not load your profile.");
         setPerson(personFromRow({ ...(data as PersonRow), distance_km: null, online: true } as PersonRow));
       } else if (!cachedPerson(id)) {
         const { data, error: e } = await supabase.rpc("profiles_by_ids", { p_ids: [id] });

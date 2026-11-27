@@ -6,6 +6,7 @@ import { formatIndianNumber, profileStrength, type ProfileRow } from "../../src/
 import { supabase } from "../../src/lib/supabase";
 import { useSession } from "../../src/session";
 import { Body, Button, Notice, Screen, usePalette } from "../../src/ui";
+import { loadMyProfile } from "../../src/lib/me";
 
 const level = (pct: number) =>
   pct >= 85
@@ -33,7 +34,10 @@ export default function ProfileHub() {
         const me = session?.user?.id;
         if (!supabase || !me) return setError("Please sign in again.");
         const [p, w, comp] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", me).maybeSingle(),
+          loadMyProfile(supabase).then(
+            (data) => ({ data, error: null }),
+            (error: unknown) => ({ data: null, error }),
+          ),
           supabase.from("token_wallets").select("balance").eq("user_id", me).maybeSingle(),
           supabase.from("companion_profiles").select("user_id").eq("user_id", me).maybeSingle(),
         ]);
@@ -135,6 +139,7 @@ export default function ProfileHub() {
         ) : null}
         <MenuRow glyph="🎙️" label="Live rooms" onPress={() => go("/(app)/live")} />
         <MenuRow glyph="⚙️" label="Settings, privacy & safety" onPress={() => go("/(app)/settings")} />
+        <MenuRow glyph="🩺" label="Diagnostics (testing)" onPress={() => go("/(app)/diagnostics")} />
       </View>
       <Body muted>18+ only. Report or block anyone, any time, free.</Body>
     </Screen>

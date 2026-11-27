@@ -122,6 +122,7 @@ export default function AppLayout() {
       <Tabs.Screen name="edit-profile" options={{ href: null, title: "Edit profile" }} />
       <Tabs.Screen name="profile-tasks" options={{ href: null, title: "Complete your profile" }} />
       <Tabs.Screen name="preferences" options={{ href: null, title: "Preferences" }} />
+      <Tabs.Screen name="diagnostics" options={{ href: null, title: "Diagnostics" }} />
       <Tabs.Screen
         name="user/[id]"
         options={{ href: null, title: "Profile", tabBarStyle: { display: "none" } }}

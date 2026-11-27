@@ -79,8 +79,12 @@ export default function Nearby() {
       {people === null ? (
         <ActivityIndicator accessibilityLabel="Finding people around you" color={c.text} size="large" />
       ) : null}
-      {people && shown.length === 0 ? (
-        <Body muted>Nobody in this range right now. Try a wider ring.</Body>
+      {people && !error && shown.length === 0 ? (
+        <Body muted>
+          {people.length === 0
+            ? "Nobody is in your Discover feed right now. Try wider preferences or check back later."
+            : "Nobody in this range right now. Try a wider ring."}
+        </Body>
       ) : null}
       <PeopleGrid people={shown} caption={(p) => distanceText(p.distanceKm) ?? p.details.city ?? undefined} />
       <View style={{ height: 8 }} />

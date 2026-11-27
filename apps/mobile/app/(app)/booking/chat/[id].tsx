@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { bookingErrorMessage } from "../../../../src/lib/bookings";
 import { supabase } from "../../../../src/lib/supabase";
 import { Button, Notice, usePalette } from "../../../../src/ui";
+import { dbFailure } from "../../../../src/lib/diagnostics";
 
 type Msg = {
   id: string;
@@ -35,16 +36,24 @@ export default function BookingChat() {
 
   const load = useCallback(async () => {
     if (!supabase || !id) return;
-    const { data: auth } = await supabase.auth.getUser();
-    setMe(auth.user?.id ?? null);
-    const { data, error: e } = await supabase
-      .from("booking_messages")
-      .select("id, sender_id, kind, body, created_at")
-      .eq("booking_id", id)
-      .order("created_at", { ascending: true })
-      .limit(500);
-    if (e) return setError(bookingErrorMessage(e));
-    setMsgs((data ?? []) as Msg[]);
+    // Any failure (offline, timeout, permission) ends the spinner with a message; it never spins forever.
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      setMe(auth.user?.id ?? null);
+      const { data, error: e } = await supabase
+        .from("booking_messages")
+        .select("id, sender_id, kind, body, created_at")
+        .eq("booking_id", id)
+        .order("created_at", { ascending: true })
+        .limit(500);
+      if (e) {
+        dbFailure("booking_messages", e);
+        return setError(bookingErrorMessage(e));
+      }
+      setMsgs((data ?? []) as Msg[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load this booking chat.");
+    }
   }, [id]);
 
   useEffect(() => {
