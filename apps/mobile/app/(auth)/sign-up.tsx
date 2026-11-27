@@ -1,3 +1,4 @@
+import { AuthHero } from "../../src/components/AuthHero";
 import { useState } from "react";
 import { signUp, type FieldErrors } from "../../src/lib/auth";
 import { authClient, callbackUrl } from "../../src/lib/authClient";
@@ -35,10 +36,7 @@ export default function SignUp() {
 
   return (
     <Screen>
-      <Title>Create your account</Title>
-      <Body muted>
-        RentMate is only for adults (18+). Meetings are non-sexual and happen in public, social places.
-      </Body>
+      <AuthHero line="Create your account" />
       <Field
         label="Email"
         value={email}

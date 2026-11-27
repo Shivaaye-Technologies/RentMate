@@ -6,8 +6,8 @@ import { profileDb } from "../../src/lib/data";
 import { declarationStatus, type DeclarationStatus } from "../../src/lib/shared";
 import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
 
-function TabIcon({ symbol, color }: { symbol: string; color: string }) {
-  return <Text style={{ color, fontSize: 19, fontWeight: "700" }}>{symbol}</Text>;
+function TabIcon({ symbol, color }: { symbol: string; color: unknown }) {
+  return <Text style={{ color: String(color), fontSize: 22, fontWeight: "800" }}>{symbol}</Text>;
 }
 
 export default function AppLayout() {
@@ -71,59 +71,66 @@ export default function AppLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: c.accent,
-        tabBarInactiveTintColor: c.muted,
+        tabBarActiveTintColor: "#FFFFFF",
+        tabBarInactiveTintColor: "#8D877F",
         tabBarStyle: {
-          backgroundColor: c.bg,
-          borderTopColor: c.border,
-          height: 66,
-          paddingTop: 7,
-          paddingBottom: 8,
+          backgroundColor: c.tabBar,
+          borderTopWidth: 0,
+          height: 76,
+          paddingTop: 8,
+          paddingBottom: 10,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 13, fontWeight: "700" },
       }}
     >
       <Tabs.Screen
         name="discover"
         options={{
-          title: "Discover",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="⌕" color={focused ? c.accent : c.muted} />,
+          title: "Home",
+          tabBarIcon: ({ color }) => <TabIcon symbol="◠" color={color} />,
         }}
       />
       <Tabs.Screen
         name="vibes"
         options={{
           title: "Vibes",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◉" color={focused ? c.accent : c.muted} />,
+          tabBarIcon: ({ color }) => <TabIcon symbol="❏" color={color} />,
         }}
       />
-      <Tabs.Screen name="wallet" options={{ href: null, title: "Wallet" }} />
+      <Tabs.Screen
+        name="nearby"
+        options={{
+          title: "Map",
+          tabBarIcon: ({ color }) => <TabIcon symbol="⌖" color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="likes"
         options={{
           title: "Likes",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="♡" color={focused ? c.accent : c.muted} />,
+          tabBarIcon: ({ color }) => <TabIcon symbol="♥" color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
           title: "Chat",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="▤" color={focused ? c.accent : c.muted} />,
+          tabBarIcon: ({ color }) => <TabIcon symbol="💬" color={color} />,
         }}
       />
+      <Tabs.Screen name="profile" options={{ href: null, title: "Profile" }} />
+      <Tabs.Screen name="edit-profile" options={{ href: null, title: "Edit profile" }} />
+      <Tabs.Screen name="profile-tasks" options={{ href: null, title: "Complete your profile" }} />
+      <Tabs.Screen name="preferences" options={{ href: null, title: "Preferences" }} />
       <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◎" color={focused ? c.accent : c.muted} />,
-        }}
+        name="user/[id]"
+        options={{ href: null, title: "Profile", tabBarStyle: { display: "none" } }}
       />
+      <Tabs.Screen name="wallet" options={{ href: null, title: "Wallet" }} />
       <Tabs.Screen name="home" options={{ href: null }} />
       <Tabs.Screen name="live" options={{ href: null, title: "Live social" }} />
       <Tabs.Screen name="companions" options={{ href: null, title: "Companionship" }} />
       <Tabs.Screen name="booking" options={{ href: null, title: "Bookings" }} />
-      <Tabs.Screen name="nearby" options={{ href: null, title: "Nearby" }} />
       <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
       <Tabs.Screen name="notifications" options={{ href: null, title: "Notifications" }} />
       <Tabs.Screen name="availability" options={{ href: null, title: "Availability" }} />

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Linking } from "react-native";
 import { signIn, signInWithGoogle, type FieldErrors } from "../../src/lib/auth";
 import { authClient, callbackUrl } from "../../src/lib/authClient";
-import { Body, Button, Field, Notice, Screen, Title } from "../../src/ui";
+import { AuthHero } from "../../src/components/AuthHero";
+import { Button, Field, Notice, Screen } from "../../src/ui";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -45,8 +46,13 @@ export default function SignIn() {
 
   return (
     <Screen>
-      <Title>Welcome to RentMate</Title>
-      <Body muted>RentMate is for adults (18+) meeting in non-sexual public and social settings.</Body>
+      <AuthHero line="Cross paths with people who share your vibe." />
+      <Button
+        label="G  Continue with Google"
+        kind="plain"
+        onPress={() => void continueWithGoogle()}
+        busy={busy === "google"}
+      />
       <Field
         label="Email"
         value={email}
@@ -73,14 +79,8 @@ export default function SignIn() {
         <Button label="Forgot your password?" kind="plain" onPress={() => undefined} />
       </Link>
       <Link href="/sign-up" asChild>
-        <Button label="Create an account" kind="plain" onPress={() => undefined} />
+        <Button label="New here? Create an account" kind="plain" onPress={() => undefined} />
       </Link>
-      <Button
-        label="Continue with Google"
-        kind="plain"
-        onPress={() => void continueWithGoogle()}
-        busy={busy === "google"}
-      />
     </Screen>
   );
 }

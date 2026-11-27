@@ -34,3 +34,35 @@ export {
   type ProfileDb,
 } from "../../../web/src/shared/profileData";
 export { formatIndianNumber } from "../../../web/src/market/marketText";
+export {
+  CHILDREN_LABELS,
+  detailsFromRow,
+  EDUCATION_LABELS,
+  EXERCISE_LABELS,
+  GENDER_LABELS,
+  heightLabel,
+  MAX_NEIGHBOURHOODS,
+  MAX_PLACES,
+  MAX_PROMPTS,
+  PLACE_CATEGORIES,
+  PROMPT_ANSWER_MAX,
+  PROMPT_CATEGORIES,
+  searchCities,
+  SHOW_ME_LABELS,
+  SMOKING_LABELS,
+  validateDetails,
+  type DetailFields,
+  type Prompt,
+} from "../../../web/src/details";
+export {
+  allPhotos,
+  isNew,
+  LOOKING_FOR_LABELS,
+  MAX_INTERESTS,
+  profileStrength,
+  type LookingFor,
+  type PersonRow,
+  type ProfileRow,
+  type StrengthItem,
+} from "../../../web/src/profile";
+export { INTEREST_CATEGORIES, interestKey, STANDARD_INTERESTS } from "../../../web/src/interests";

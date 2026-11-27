@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Image, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { Chip, ChipRow, TopBar } from "../../src/components/kit";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
-import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
+import { Body, Notice, Screen, usePalette } from "../../src/ui";
 
 type PersonRow = {
   id: string;
@@ -168,92 +169,100 @@ export default function Likes() {
         : "Your mutual matches will appear here.";
   return (
     <Screen>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Title>Likes & matches</Title>
-        <Button
-          label={busy ? "Refreshing…" : "Refresh"}
-          kind="plain"
-          busy={busy}
-          onPress={() => void load()}
-        />
-      </View>
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <TopBar title="Likes" />
+      <ChipRow>
         {(["received", "sent", "matches"] as const).map((key) => (
-          <Pressable
+          <Chip
             key={key}
+            label={
+              key === "received"
+                ? `Liked you${received.length ? ` · ${received.length}` : ""}`
+                : key === "sent"
+                  ? "You liked"
+                  : "Matches"
+            }
+            selected={tab === key}
             onPress={() => setTab(key)}
+          />
+        ))}
+      </ChipRow>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {busy && rows.length === 0 ? (
+        <ActivityIndicator accessibilityLabel="Loading likes" color={c.text} />
+      ) : null}
+      {!busy && !error && rows.length === 0 ? (
+        <View
+          style={{ backgroundColor: c.card, borderRadius: 28, padding: 24, gap: 10, alignItems: "center" }}
+        >
+          <Text style={{ fontSize: 40 }}>♥</Text>
+          <Body muted>{empty}</Body>
+        </View>
+      ) : null}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        {rows.map((person) => (
+          <Pressable
+            key={person.matchId ?? person.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${person.name}, ${person.age}`}
+            onPress={() => {
+              if (tab === "matches" && person.matchId) {
+                router.push({ pathname: "/chat", params: { matchId: person.matchId } });
+              } else {
+                router.push({
+                  pathname: "/(app)/user/[id]",
+                  params: { id: person.id, actions: tab === "received" ? "1" : "0" },
+                } as never);
+              }
+            }}
             style={{
-              flex: 1,
-              paddingVertical: 12,
-              borderRadius: 14,
-              backgroundColor: tab === key ? c.accent : c.card,
-              alignItems: "center",
+              width: "48%",
+              height: 250,
+              borderRadius: 26,
+              overflow: "hidden",
+              backgroundColor: c.chipActive,
             }}
           >
-            <Text style={{ color: tab === key ? c.onAccent : c.text, fontWeight: "700", fontSize: 12 }}>
-              {key === "received" ? "Liked you" : key === "sent" ? "You liked" : "Matches"}
-            </Text>
+            {person.photo ? (
+              <Image source={{ uri: person.photo }} style={{ width: "100%", height: "100%" }} />
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: c.onChipActive, fontSize: 56, fontWeight: "900" }}>
+                  {person.name.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: 12,
+                backgroundColor: "rgba(10,8,6,0.42)",
+                gap: 2,
+              }}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800" }} numberOfLines={1}>
+                {person.name}, {person.age} {person.verified ? "✓" : ""}
+              </Text>
+              <Text style={{ color: "#F1ECE6", fontSize: 13 }} numberOfLines={1}>
+                {person.super
+                  ? "★ Special like"
+                  : person.online
+                    ? "● Active now"
+                    : tab === "matches"
+                      ? "It's a match"
+                      : "Like"}
+              </Text>
+              {person.message ? (
+                <Text style={{ color: "#FFFFFF", fontSize: 13 }} numberOfLines={2}>
+                  “{person.message}”
+                </Text>
+              ) : null}
+            </View>
           </Pressable>
         ))}
       </View>
-      {error ? <Notice kind="error">{error}</Notice> : null}
-      {!busy && !error && rows.length === 0 ? <Body muted>{empty}</Body> : null}
-      {rows.map((person) => (
-        <Pressable
-          key={person.matchId ?? person.id}
-          onPress={() => {
-            if (tab === "matches" && person.matchId) {
-              router.push({ pathname: "/chat", params: { matchId: person.matchId } });
-            }
-          }}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 14,
-            padding: 12,
-            borderRadius: 18,
-            backgroundColor: c.card,
-            borderWidth: 1,
-            borderColor: c.border,
-          }}
-        >
-          {person.photo ? (
-            <Image source={{ uri: person.photo }} style={{ width: 72, height: 84, borderRadius: 12 }} />
-          ) : (
-            <View
-              style={{
-                width: 72,
-                height: 84,
-                borderRadius: 12,
-                backgroundColor: c.border,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: c.text, fontSize: 28 }}>{person.name.slice(0, 1).toUpperCase()}</Text>
-            </View>
-          )}
-          <View style={{ flex: 1, gap: 5 }}>
-            <Text style={{ color: c.text, fontSize: 17, fontWeight: "700" }}>
-              {person.name}, {person.age} {person.verified ? "✓" : ""}
-            </Text>
-            <Text style={{ color: c.muted }}>
-              {person.online
-                ? "Active now"
-                : person.super
-                  ? "Super Like"
-                  : tab === "matches"
-                    ? "It's a match"
-                    : "Like"}
-            </Text>
-            {person.message ? (
-              <Text style={{ color: c.text }} numberOfLines={2}>
-                “{person.message}”
-              </Text>
-            ) : null}
-          </View>
-        </Pressable>
-      ))}
     </Screen>
   );
 }

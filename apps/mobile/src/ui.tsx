@@ -19,30 +19,52 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * RentMate palette: warm paper background, ink-black controls, lavender highlights. Every screen reads colours from
+ * here, so the look stays consistent and dark mode keeps working.
+ */
 export function usePalette() {
   const dark = useColorScheme() === "dark";
   return dark
     ? {
-        bg: "#121212",
-        text: "#F4F4F5",
-        muted: "#A1A1AA",
-        card: "#1E1E22",
-        border: "#3F3F46",
-        accent: "#F472B6",
+        bg: "#121110",
+        text: "#F3EFEA",
+        muted: "#A8A29A",
+        card: "#1D1B19",
+        border: "#34302C",
+        accent: "#F3EFEA",
+        onAccent: "#141210",
         danger: "#F87171",
-        onAccent: "#1A1A1A",
+        chip: "#2A2724",
+        chipActive: "#B99AD6",
+        onChipActive: "#141210",
+        brand: "#E879B9",
+        like: "#F0435B",
+        star: "#8EC5F0",
+        tabBar: "#0B0A09",
+        surface: "#26231F",
       }
     : {
-        bg: "#FFFFFF",
-        text: "#18181B",
-        muted: "#52525B",
-        card: "#F4F4F5",
-        border: "#D4D4D8",
-        accent: "#BE185D",
-        danger: "#B91C1C",
+        bg: "#F1ECE6",
+        text: "#141210",
+        muted: "#6E6860",
+        card: "#FAF8F5",
+        border: "#E3DDD5",
+        accent: "#141210",
         onAccent: "#FFFFFF",
+        danger: "#B42318",
+        chip: "#E5DFD8",
+        chipActive: "#D7BDEB",
+        onChipActive: "#141210",
+        brand: "#B0237A",
+        like: "#E8364C",
+        star: "#8EC5F0",
+        tabBar: "#0E0D0C",
+        surface: "#E9E3DC",
       };
 }
+
+export type Palette = ReturnType<typeof usePalette>;
 
 export function Screen({ children }: { children: ReactNode }) {
   const c = usePalette();
@@ -116,8 +138,8 @@ export function Button(props: {
   const c = usePalette();
   const kind = props.kind ?? "primary";
   const disabled = props.disabled || props.busy;
-  const bg = kind === "primary" ? c.accent : kind === "danger" ? c.danger : "transparent";
-  const fg = kind === "plain" ? c.accent : c.onAccent;
+  const bg = kind === "primary" ? c.accent : kind === "danger" ? c.danger : c.chip;
+  const fg = kind === "plain" ? c.text : kind === "danger" ? "#FFFFFF" : c.onAccent;
   return (
     <Pressable
       accessibilityRole="button"
@@ -196,20 +218,20 @@ const styles = StyleSheet.create({
     gap: 16,
     flexGrow: 1,
   },
-  title: { fontSize: 26, fontWeight: "700" },
+  title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.3 },
   body: { fontSize: 16, lineHeight: 22 },
   field: { gap: 6 },
   label: { fontSize: 15, fontWeight: "600" },
   input: {
-    minHeight: 48,
+    minHeight: 52,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 12,
     fontSize: 16,
   },
   button: {
-    minHeight: 48,
-    borderRadius: 10,
+    minHeight: 52,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,

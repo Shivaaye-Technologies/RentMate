@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Avatar, Panel, SquareButton, TopBar } from "../../src/components/kit";
 import { supabase } from "../../src/lib/supabase";
 import { signedPhotoUrl } from "../../src/lib/photos";
 import { SafetyActions } from "../../src/components/SafetyActions";
-import { Body, Button, Notice, Screen, Title, usePalette } from "../../src/ui";
+import { Body, Button, Notice, Screen, usePalette } from "../../src/ui";
 
 type MatchRow = { id: string; user_a: string; user_b: string; created_at: string };
 type PersonRow = {
@@ -22,6 +33,7 @@ type Thread = {
   name: string;
   age: number;
   photo: string | null;
+  photoPath: string | null;
   last: Message | null;
 };
 export default function Chat() {
@@ -39,6 +51,22 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [answeringCall, setAnsweringCall] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [companionOf, setCompanionOf] = useState<string | null>(null);
+  // Offer "Book an activity" only when the other person is an approved companion (visible under RLS).
+  useEffect(() => {
+    if (!active || !supabase) return;
+    let alive = true;
+    void supabase
+      .from("companion_profiles")
+      .select("user_id")
+      .eq("user_id", active.personId)
+      .maybeSingle()
+      .then(({ data }) => alive && setCompanionOf(data ? active.personId : null));
+    return () => {
+      alive = false;
+    };
+  }, [active]);
   const load = useCallback(async () => {
     if (!supabase) {
       setError("App configuration is missing.");
@@ -238,178 +266,332 @@ export default function Chat() {
       setSending(false);
     }
   }
-  return (
-    <Screen>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Title>{active ? active.name : "Messages"}</Title>
-        {active ? (
-          <Button
-            label="Back"
-            kind="plain"
-            onPress={() => {
-              setActive(null);
-              setMessages([]);
-            }}
-          />
-        ) : (
-          <Button label="Refresh" kind="plain" busy={busy} onPress={() => void load()} />
-        )}
-      </View>
-      {error ? <Notice kind="error">{error}</Notice> : null}
-      {incomingCall ? (
-        <View
-          style={{
-            padding: 14,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: c.accent,
-            backgroundColor: c.card,
-            gap: 10,
-          }}
-        >
-          <Body>{incomingCall.mode === "voice" ? "Incoming voice call" : "Incoming video call"}</Body>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Button label="Accept" busy={answeringCall} onPress={() => void answerIncoming(true)} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label="Decline"
-                kind="danger"
-                disabled={answeringCall}
-                onPress={() => void answerIncoming(false)}
-              />
-            </View>
-          </View>
-        </View>
-      ) : null}
-      {active ? (
-        <SafetyActions
-          userId={active.personId}
-          matchId={active.matchId}
-          onBlocked={() => {
-            setActive(null);
-            setMessages([]);
-            void load();
-          }}
-          onUnmatched={() => {
-            setActive(null);
-            setMessages([]);
-            void load();
-          }}
+  const openProfile = (personId: string) =>
+    router.push({ pathname: "/(app)/user/[id]", params: { id: personId, actions: "0" } } as never);
+  const callButtons = active ? (
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      <View style={{ flex: 1 }}>
+        <Button
+          label="📞 Voice call"
+          kind="plain"
+          onPress={() =>
+            router.push({
+              pathname: "/call/[id]",
+              params: { id: "new", callee: active.personId, mode: "audio" },
+            } as never)
+          }
         />
-      ) : null}
-      {active ? (
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Voice call"
-              onPress={() =>
-                router.push({
-                  pathname: "/call/[id]",
-                  params: { id: "new", callee: active.personId, mode: "audio" },
-                } as never)
-              }
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Video call"
-              onPress={() =>
-                router.push({
-                  pathname: "/call/[id]",
-                  params: { id: "new", callee: active.personId, mode: "video" },
-                } as never)
-              }
-            />
-          </View>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Button
+          label="🎥 Video call"
+          kind="plain"
+          onPress={() =>
+            router.push({
+              pathname: "/call/[id]",
+              params: { id: "new", callee: active.personId, mode: "video" },
+            } as never)
+          }
+        />
+      </View>
+    </View>
+  ) : null;
+  const incoming = incomingCall ? (
+    <Panel style={{ borderWidth: 2, borderColor: c.chipActive }}>
+      <Body>{incomingCall.mode === "voice" ? "📞 Incoming voice call" : "🎥 Incoming video call"}</Body>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Button label="Accept" busy={answeringCall} onPress={() => void answerIncoming(true)} />
         </View>
-      ) : null}
-      {!active ? (
-        <>
-          <Body muted>Chats are available after a mutual match.</Body>
-          {!busy && threads.length === 0 ? (
-            <Body muted>
-              No matches yet. When you both like each other, your conversations will appear here.
-            </Body>
-          ) : null}
-          {threads.map((t) => (
+        <View style={{ flex: 1 }}>
+          <Button
+            label="Decline"
+            kind="danger"
+            disabled={answeringCall}
+            onPress={() => void answerIncoming(false)}
+          />
+        </View>
+      </View>
+    </Panel>
+  ) : null;
+
+  if (active) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={["top", "left", "right"]}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+            }}
+          >
             <Pressable
-              key={t.matchId}
+              accessibilityRole="button"
+              accessibilityLabel="Back to conversations"
+              hitSlop={12}
               onPress={() => {
-                setError(null);
-                setActive(t);
-              }}
-              style={{
-                padding: 14,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: c.border,
-                backgroundColor: c.card,
-                gap: 4,
+                setActive(null);
+                setMessages([]);
+                setMenuOpen(false);
               }}
             >
-              <Text style={{ color: c.text, fontWeight: "700", fontSize: 17 }}>
-                {t.name}, {t.age}
-              </Text>
-              <Text style={{ color: c.muted }} numberOfLines={1}>
-                {t.last?.body ?? "Say hello 👋"}
-              </Text>
+              <Text style={{ color: c.text, fontSize: 30, fontWeight: "600" }}>‹</Text>
             </Pressable>
-          ))}
-        </>
-      ) : (
-        <>
-          <View style={{ minHeight: 260, gap: 10 }}>
-            {messages.map((m) => (
-              <View
-                key={m.id}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`See ${active.name}'s profile`}
+              onPress={() => openProfile(active.personId)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}
+            >
+              <Avatar path={active.photoPath} name={active.name} size={56} radius={18} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: c.text, fontSize: 18, fontWeight: "800" }} numberOfLines={1}>
+                  {active.name}, {active.age}
+                </Text>
+                <Text style={{ color: c.muted }}>See profile</Text>
+              </View>
+            </Pressable>
+            <SquareButton label="More options" glyph="⋯" onPress={() => setMenuOpen((v) => !v)} />
+          </View>
+          <ScrollView
+            contentContainerStyle={{
+              padding: 16,
+              gap: 10,
+              flexGrow: 1,
+              width: "100%",
+              maxWidth: 640,
+              alignSelf: "center",
+            }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {error ? <Notice kind="error">{error}</Notice> : null}
+            {incoming}
+            {menuOpen ? (
+              <Panel>
+                {callButtons}
+                <SafetyActions
+                  userId={active.personId}
+                  matchId={active.matchId}
+                  onBlocked={() => {
+                    setActive(null);
+                    setMessages([]);
+                    void load();
+                  }}
+                  onUnmatched={() => {
+                    setActive(null);
+                    setMessages([]);
+                    void load();
+                  }}
+                />
+              </Panel>
+            ) : null}
+            {companionOf === active.personId ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/booking/new/[companion]",
+                    params: { companion: active.personId },
+                  } as never)
+                }
                 style={{
-                  alignSelf: m.sender_id === myId ? "flex-end" : "flex-start",
-                  maxWidth: "88%",
-                  padding: 12,
-                  borderRadius: 16,
-                  backgroundColor: m.sender_id === myId ? c.accent : c.card,
+                  backgroundColor: c.tabBar,
+                  borderRadius: 22,
+                  padding: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
                 }}
               >
-                <Text style={{ color: m.sender_id === myId ? c.onAccent : c.text }}>{m.body}</Text>
-                <Text
-                  style={{ color: m.sender_id === myId ? c.onAccent : c.muted, fontSize: 10, marginTop: 4 }}
-                >
-                  {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </Text>
-              </View>
-            ))}
-            {!messages.length ? (
-              <Body muted>Your conversation starts here. Keep it respectful and stay safe.</Body>
+                <Text style={{ fontSize: 24 }}>🗓️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+                    Book an activity with {active.name}
+                  </Text>
+                  <Text style={{ color: "#D9D3CC", fontSize: 13 }}>
+                    Public places only · tokens held until you both confirm
+                  </Text>
+                </View>
+                <Text style={{ color: "#FFFFFF", fontSize: 24 }}>›</Text>
+              </Pressable>
             ) : null}
+            {!messages.length ? (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 14,
+                  paddingVertical: 30,
+                }}
+              >
+                <Avatar path={active.photoPath} name={active.name} size={180} radius={36} />
+                <Text style={{ color: c.text, fontSize: 20, fontWeight: "800" }}>
+                  You matched with {active.name}
+                </Text>
+                <Body muted>Say hello. Keep it kind, and meet in public places.</Body>
+              </View>
+            ) : null}
+            {messages.map((m) => {
+              const mine = m.sender_id === myId;
+              return (
+                <View
+                  key={m.id}
+                  style={{
+                    alignSelf: mine ? "flex-end" : "flex-start",
+                    maxWidth: "82%",
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: 22,
+                    borderBottomRightRadius: mine ? 6 : 22,
+                    borderBottomLeftRadius: mine ? 22 : 6,
+                    backgroundColor: mine ? c.accent : c.card,
+                  }}
+                >
+                  <Text style={{ color: mine ? c.onAccent : c.text, fontSize: 16 }}>{m.body}</Text>
+                  <Text
+                    style={{ color: mine ? c.onAccent : c.muted, fontSize: 11, marginTop: 4, opacity: 0.7 }}
+                  >
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10, padding: 12 }}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Write a message…"
+              placeholderTextColor={c.muted}
+              accessibilityLabel="Message"
+              multiline
+              maxLength={2000}
+              style={{
+                flex: 1,
+                minHeight: 56,
+                maxHeight: 130,
+                borderRadius: 28,
+                paddingHorizontal: 20,
+                paddingTop: 16,
+                paddingBottom: 14,
+                color: c.text,
+                fontSize: 16,
+                backgroundColor: c.card,
+                borderWidth: 1,
+                borderColor: c.border,
+              }}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+              disabled={!draft.trim() || sending}
+              onPress={() => void send()}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: c.accent,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: !draft.trim() || sending ? 0.4 : 1,
+              }}
+            >
+              <Text style={{ color: c.onAccent, fontSize: 22 }}>➤</Text>
+            </Pressable>
           </View>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Write a message…"
-            placeholderTextColor={c.muted}
-            multiline
-            maxLength={2000}
-            style={{
-              minHeight: 50,
-              maxHeight: 120,
-              borderWidth: 1,
-              borderColor: c.border,
-              borderRadius: 14,
-              padding: 12,
-              color: c.text,
-              backgroundColor: c.card,
-            }}
-          />
-          <Button
-            label={sending ? "Sending…" : "Send message"}
-            busy={sending}
-            disabled={!draft.trim()}
-            onPress={() => void send()}
-          />
-        </>
-      )}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <Screen>
+      <TopBar title="Chat" />
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {incoming}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/(app)/booking" as never)}
+        style={{
+          backgroundColor: c.card,
+          borderRadius: 24,
+          padding: 16,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+        }}
+      >
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 18,
+            backgroundColor: c.tabBar,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ fontSize: 24 }}>🗓️</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: "800" }}>Booking chats</Text>
+          <Text style={{ color: c.muted }}>Messages for your activity bookings</Text>
+        </View>
+        <Text style={{ color: c.text, fontSize: 26 }}>›</Text>
+      </Pressable>
+      {busy && !threads.length ? (
+        <ActivityIndicator accessibilityLabel="Loading conversations" color={c.text} />
+      ) : null}
+      {!busy && threads.length === 0 ? (
+        <Panel style={{ alignItems: "center" }}>
+          <Text style={{ fontSize: 40 }}>💬</Text>
+          <Body muted>No conversations yet. When you both like each other, you can chat here.</Body>
+        </Panel>
+      ) : null}
+      {threads.map((t) => (
+        <Pressable
+          key={t.matchId}
+          accessibilityRole="button"
+          accessibilityLabel={`Chat with ${t.name}`}
+          onPress={() => {
+            setError(null);
+            setActive(t);
+          }}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            paddingVertical: 6,
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Avatar path={t.photoPath} name={t.name} size={64} radius={22} />
+          <View
+            style={{ flex: 1, gap: 3, borderBottomWidth: 1, borderBottomColor: c.border, paddingBottom: 12 }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+              <Text style={{ color: c.text, fontWeight: "800", fontSize: 17 }} numberOfLines={1}>
+                {t.name}, {t.age}
+              </Text>
+              {t.last ? (
+                <Text style={{ color: c.muted, fontSize: 12 }}>
+                  {new Date(t.last.created_at).toLocaleDateString([], { day: "numeric", month: "short" })}
+                </Text>
+              ) : null}
+            </View>
+            <Text
+              style={{ color: t.last ? c.muted : c.text, fontWeight: t.last ? "400" : "700" }}
+              numberOfLines={1}
+            >
+              {t.last?.body ?? "New match · say hello 👋"}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
     </Screen>
   );
 }
