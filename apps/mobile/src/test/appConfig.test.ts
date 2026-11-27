@@ -61,14 +61,34 @@ describe("EAS project link", () => {
 
 describe("Android build settings", () => {
   const buildProps = config.plugins?.find((p) => Array.isArray(p) && p[0] === "expo-build-properties") as
-    [string, { android: Record<string, number> }] | undefined;
+    [string, { android: Record<string, number | string> }] | undefined;
 
   it("compiles against API 37 (Expo SDK 58 libraries), targets API 36 (Google Play) and supports min 24", () => {
-    expect(buildProps?.[1].android).toEqual({
+    const android = buildProps?.[1].android ?? {};
+    const sdk = Object.fromEntries(Object.entries(android).filter(([k]) => k !== "extraProguardRules"));
+    expect(sdk).toEqual({
       compileSdkVersion: 37,
       targetSdkVersion: 36,
       minSdkVersion: 24,
     });
+  });
+
+  it("keeps the WebRTC classes native code calls by name when R8 shrinks the release build", () => {
+    const rules = String(buildProps?.[1].android.extraProguardRules ?? "").split("\n");
+    for (const pkg of [
+      "livekit.org.webrtc",
+      "livekit.org.jni_zero",
+      "io.livekit.android",
+      "org.webrtc",
+      "com.oney.WebRTCModule",
+    ]) {
+      expect(rules).toContain(`-keep class ${pkg}.** { *; }`);
+    }
+    // Only the one generated class may be ignored; no blanket -dontwarn and no disabling of shrinking.
+    expect(rules.filter((r) => r.startsWith("-dontwarn"))).toEqual([
+      "-dontwarn livekit.org.jni_zero.JniZeroJni",
+    ]);
+    expect(rules.some((r) => /-dontobfuscate|-dontshrink|-dontoptimize/.test(r))).toBe(false);
   });
 
   it("enables camera and microphone for LiveKit while keeping location blocked", () => {

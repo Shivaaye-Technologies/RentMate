@@ -66,7 +66,22 @@ const config: ExpoConfig = {
         // requires compileSdk 37; RN 0.88's version catalog uses compile 37 / target 36 / min 24).
         // Target stays at API 36, Google Play's requirement since 2026-08-31; moving the target to 37 needs a
         // separate compatibility and Play policy review.
-        android: { compileSdkVersion: 37, targetSdkVersion: 36, minSdkVersion: 24 },
+        android: {
+          compileSdkVersion: 37,
+          targetSdkVersion: 36,
+          minSdkVersion: 24,
+          // Release builds are shrunk by R8. WebRTC (LiveKit's fork and react-native-webrtc) calls these classes from
+          // native code by name, so they must be kept. `JniZeroJni` is generated at build time and is absent from
+          // LiveKit's published library, so R8 is told not to fail on it.
+          extraProguardRules: [
+            "-keep class livekit.org.webrtc.** { *; }",
+            "-keep class livekit.org.jni_zero.** { *; }",
+            "-dontwarn livekit.org.jni_zero.JniZeroJni",
+            "-keep class io.livekit.android.** { *; }",
+            "-keep class org.webrtc.** { *; }",
+            "-keep class com.oney.WebRTCModule.** { *; }",
+          ].join("\n"),
+        },
       },
     ],
   ],
