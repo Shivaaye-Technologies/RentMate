@@ -48,25 +48,25 @@ share, no payouts).
 
 ### Test results (run in this session; disposable databases only)
 
-| Command                              | Result                                                                      |
-| ------------------------------------ | --------------------------------------------------------------------------- |
-| `npm run check`                      | exit 0 (lint, format, typecheck, policy 612 files, build)                   |
-| API tests                            | 159/159                                                                     |
-| Web tests                            | 226/226                                                                     |
-| `npm run test:db`                    | 32 suites, all passing; settlement reversal 23/23; live room 9/9            |
-| `npm run test:rollback`              | exit 0 (21 stages)                                                          |
-| `npm run test:hooks` / `test:aihub`  | 21/21 / 32/32                                                               |
-| Mobile `vitest run` / `tsc --noEmit` | 88/88 / clean                                                               |
-| `test:db:concurrency` (2 new cases)  | **not run locally** (no PostgreSQL here); runs in CI's `db-concurrency` job |
+| Command                              | Result                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `npm run check`                      | exit 0 (lint, format, typecheck, policy 612 files, build)                                              |
+| API tests                            | 159/159                                                                                                |
+| Web tests                            | 226/226                                                                                                |
+| `npm run test:db`                    | 32 suites, all passing; settlement reversal 23/23; live room 9/9                                       |
+| `npm run test:rollback`              | exit 0 (21 stages)                                                                                     |
+| `npm run test:hooks` / `test:aihub`  | 21/21 / 32/32                                                                                          |
+| Mobile `vitest run` / `tsc --noEmit` | 88/88 / clean                                                                                          |
+| `test:db:concurrency` (2 new cases)  | not run locally (no PostgreSQL); **passed in CI** `db-concurrency`, run 45933120742 (11 cases, all ok) |
 
 ### GitHub
 
 | Item                      | Status                                                                                                                    |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| CI on `13aad35`           | success (run 45909194104)                                                                                                 |
+| CI                        | success on `13aad35` (run 45909194104) and on `0893d91` (run 45933120742): check, browser, rtc, db-concurrency, mobile    |
 | APK workflow on `13aad35` | failure (run 45909194094), as expected: `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed by the local workflow commit |
 | APK artifact              | **none yet**: there is no artifact link or build ID to report                                                             |
-| CodeQL                    | default setup; not re-read this round (the check-runs API call failed with a network EOF)                                 |
+| CodeQL                    | default setup; 0 open code-scanning alerts for the PR #19 ref (API query this session)                                    |
 | PR #19 description        | updated this round                                                                                                        |
 
 ### Device evidence
