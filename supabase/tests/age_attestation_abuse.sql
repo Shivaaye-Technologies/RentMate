@@ -66,9 +66,13 @@ begin
   exception when insufficient_privilege or raise_exception then
     r := r || 'ok an existing row in the same upsert does not carry a new row through; ';
   end;
-  delete from public.profiles where id = e;
-  get diagnostics cnt = row_count;
-  r := r || case when cnt = 0 then 'ok members cannot delete their own profile row (no delete policy); '
+  -- Refused either way: no DELETE privilege (current Supabase defaults) or no delete policy (0 rows).
+  begin
+    delete from public.profiles where id = e;
+    get diagnostics cnt = row_count;
+  exception when insufficient_privilege then cnt := 0;
+  end;
+  r := r || case when cnt = 0 then 'ok members cannot delete their own profile row; '
               else 'FAIL a member deleted their profile row; ' end;
   reset role;
   delete from public.profiles where id = e; -- a profile removed by the platform (owner)

@@ -63,6 +63,7 @@ for (const test of [
   "booking_checkin_and_settlement.sql",
   "live_room_for_restricted.sql",
   "booking_settlement_reversal.sql",
+  "api_role_grants.sql",
   "schema_security_audit.sql",
 ]) {
   try {

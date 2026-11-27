@@ -16,6 +16,14 @@ const migrations = readdirSync(join(root, "supabase/migrations")).sort();
 /** Newest first. Each step undoes `migrations` with `rollback`; `suites` test those migrations once re-applied. */
 const STEPS = [
   {
+    // Standalone: rehearsed on its own and kept applied while older steps are rehearsed. Without these grants the
+    // app's tables are unreadable on current Supabase defaults, so no earlier state can pass the suites without them.
+    standalone: true,
+    migrations: ["20261127100000_explicit_api_role_grants.sql"],
+    rollback: "docs/rollback/20261127_explicit_api_role_grants.rollback.sql",
+    suites: ["api_role_grants.sql", "rls_flow.sql", "audit_hardening.sql"],
+  },
+  {
     migrations: [
       "20261126160000_booking_settlement_reversal.sql",
       "20261126170000_reconciliation_keeps_release_rules.sql",
@@ -173,10 +181,28 @@ async function suite(db, test) {
   }
 }
 
+async function regrant(db, file) {
+  const statements = read(`supabase/migrations/${file}`)
+    .replace(/--.*$/gm, "")
+    .split(";")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  for (const sql of statements) {
+    try {
+      await db.exec(sql);
+    } catch (e) {
+      if (!/does not exist/.test(String(e.message))) throw e;
+    }
+  }
+}
+
 let failed = false;
+const standaloneMigrations = STEPS.filter((s) => s.standalone).flatMap((s) => s.migrations);
 for (let i = 0; i < STEPS.length; i++) {
-  const undone = STEPS.slice(0, i + 1);
-  const skip = undone.flatMap((s) => s.migrations);
+  const step = STEPS[i];
+  const undone = step.standalone ? [step] : STEPS.slice(0, i + 1).filter((s) => !s.standalone);
+  // Grants are not part of SHAPE, so a standalone grants step can be left out of the "never had it" database.
+  const skip = [...undone.flatMap((s) => s.migrations), ...(step.standalone ? [] : standaloneMigrations)];
   const label = undone.map((s) => s.rollback.replace("docs/rollback/", "")).join(" + ");
   const before = await shape(await fresh(skip));
   const db = await fresh([]);
@@ -193,14 +219,24 @@ for (let i = 0; i < STEPS.length; i++) {
   } else {
     console.log(`Rollback ${label} restores the previous schema (${before.length} objects compared).`);
   }
-  for (const test of EARLIER_SUITES) {
-    const r = await suite(db, test);
-    console.log(`  after rollback, ${r.line}`);
-    if (!r.ok) failed = true;
+  if (step.standalone) {
+    // The regression suite must notice the missing grants, or it would not have caught the staging bug.
+    const r = await suite(db, step.suites[0]);
+    console.log(`  after rollback (must fail), ${r.line}`);
+    if (r.ok) failed = true;
+  } else {
+    for (const test of EARLIER_SUITES) {
+      const r = await suite(db, test);
+      console.log(`  after rollback, ${r.line}`);
+      if (!r.ok) failed = true;
+    }
   }
   // Forward again, oldest undone step first.
   for (const s of [...undone].reverse()) {
     for (const f of s.migrations) await db.exec(read(`supabase/migrations/${f}`));
+    // Tables re-created by an older migration lose their grants; the (idempotent) grants migration restores them.
+    // Mid-way, newer tables may not exist yet: skip only those statements.
+    if (!s.standalone) for (const f of standaloneMigrations) await regrant(db, f);
     for (const test of s.suites) {
       const r = await suite(db, test);
       console.log(`  after re-applying, ${r.line}`);

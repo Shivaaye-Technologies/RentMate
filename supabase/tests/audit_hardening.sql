@@ -41,13 +41,27 @@ begin
   insert into public.passes (passer_id, passed_id, created_at) values (a, cm, '1999-01-01');
   select created_at into t from public.passes where passer_id = a and passed_id = cm;
   r := r || case when t = now() then 'ok passes get the server time; ' else 'FAIL pass time; ' end;
-  insert into public.reports (reporter_id, reported_id, reason, created_at) values (a, cm, 'other', '1999-01-01');
+  -- A forged report time is either refused (created_at is not granted to members) or overwritten by the server.
+  begin
+    insert into public.reports (reporter_id, reported_id, reason, created_at) values (a, cm, 'other', '1999-01-01');
+    select created_at into t from public.reports where reporter_id = a and reported_id = cm;
+    r := r || case when t = now() then 'ok a forged report time is overwritten; ' else 'FAIL report time; ' end;
+  exception when insufficient_privilege then
+    r := r || 'ok a forged report time is refused; ';
+  end;
+  if not exists (select 1 from public.reports where reporter_id = a and reported_id = cm) then
+    insert into public.reports (reporter_id, reported_id, reason) values (a, cm, 'other');
+  end if;
   select created_at into t from public.reports where reporter_id = a and reported_id = cm;
   r := r || case when t = now() then 'ok reports get the server time; ' else 'FAIL report time; ' end;
   insert into public.blocks (blocker_id, blocked_id, created_at) values (a, cm, '1999-01-01');
   select created_at into t from public.blocks where blocker_id = a and blocked_id = cm;
   r := r || case when t = now() then 'ok blocks get the server time; ' else 'FAIL block time; ' end;
-  update public.blocks set created_at = '1999-01-01' where blocker_id = a and blocked_id = cm;
+  -- Rewriting a block's time is either refused (members have no UPDATE on blocks) or has no effect.
+  begin
+    update public.blocks set created_at = '1999-01-01' where blocker_id = a and blocked_id = cm;
+  exception when insufficient_privilege then null;
+  end;
   select created_at into t from public.blocks where blocker_id = a and blocked_id = cm;
   r := r || case when t = now() then 'ok block timestamps cannot be rewritten; ' else 'FAIL block rewrite; ' end;
   delete from public.blocks where blocker_id = a and blocked_id = cm;
