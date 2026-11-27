@@ -1,0 +1,204 @@
+name: Android EAS-signed update APK
+
+# Builds an internal-testing APK signed with the project's EXISTING EAS Android keystore, so it installs as an update
+# over an earlier EAS-built RentMate APK without uninstalling it or losing app data.
+#
+# Safety:
+# - The keystore stays in EAS. `eas build --local` downloads it to a temporary directory for this one build; it is
+#   never printed, uploaded as an artifact or committed.
+# - The build job runs only if the inspect job found an existing keystore, so EAS can never generate a new one here
+#   (no credential reset). Only public certificate fingerprints are printed.
+# - Internal distribution only: no store submission, no production profile.
+
+on:
+  push:
+    branches: [feature/rentmate-testing-apk]
+    paths:
+      - ".github/workflows/android-eas-signed-apk.yml"
+      - "scripts/apk-signing-cert.mjs"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to build
+        required: true
+        default: feature/rentmate-testing-apk
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-eas-signed-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EAS_CLI: eas-cli@27.11.0
+  EXPO_PROJECT_ID: 8b134aa5-6f2c-4741-90d9-05d03dae3662
+  ANDROID_PACKAGE: com.shivaayetechnologies.rentmate
+
+jobs:
+  inspect:
+    name: Inspect EAS builds and the Android keystore (read-only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      keystore_sha256: ${{ steps.keystore.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Check the Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then echo "::error::The EXPO_TOKEN secret is not set."; exit 1; fi
+          npx --yes "$EAS_CLI" whoami
+
+      - name: List earlier EAS Android builds
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx --yes "$EAS_CLI" build:list --platform android --limit 30 --json --non-interactive > "$RUNNER_TEMP/builds.json"
+          jq -r '["id","profile","status","distribution","version","versionCode","commit","created"],
+                 (.[] | [.id, .buildProfile, .status, .distribution, .appVersion, .appBuildVersion,
+                         ((.gitCommitHash // "") | .[0:7]), .createdAt]) | @tsv' "$RUNNER_TEMP/builds.json" | column -t
+          jq -r '[.[] | select(.status=="FINISHED" and ((.artifacts.buildUrl // "") | endswith(".apk")))][0].artifacts.buildUrl // empty' \
+            "$RUNNER_TEMP/builds.json" > "$RUNNER_TEMP/latest-apk-url.txt"
+
+      - name: Read the Android keystore's public fingerprints
+        id: keystore
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          # Asks only for public fields. The keystore file and passwords are never requested.
+          query='query($appId: String!, $pkg: String!) { app { byId(appId: $appId) { fullName
+            androidAppCredentials(filter: { applicationIdentifier: $pkg }) { applicationIdentifier
+              androidAppBuildCredentialsList { name isDefault isLegacy
+                androidKeystore { type keyAlias sha1CertificateFingerprint sha256CertificateFingerprint createdAt } } } } } }'
+          body="$(jq -n --arg q "$query" --arg appId "$EXPO_PROJECT_ID" --arg pkg "$ANDROID_PACKAGE" \
+            '{query: $q, variables: {appId: $appId, pkg: $pkg}}')"
+          curl -sS https://api.expo.dev/graphql -H "Authorization: Bearer $EXPO_TOKEN" \
+            -H 'content-type: application/json' -d "$body" > "$RUNNER_TEMP/creds.json"
+          if jq -e '.errors' "$RUNNER_TEMP/creds.json" >/dev/null; then
+            jq -r '.errors[].message' "$RUNNER_TEMP/creds.json"
+            echo "::error::Could not read the EAS Android credentials."
+            exit 1
+          fi
+          jq -r '.data.app.byId.androidAppCredentials[]?.androidAppBuildCredentialsList[]? |
+                 "credentials=\(.name) default=\(.isDefault) legacy=\(.isLegacy) alias=\(.androidKeystore.keyAlias // "-") created=\(.androidKeystore.createdAt // "-")\n  SHA-256 \(.androidKeystore.sha256CertificateFingerprint // "-")\n  SHA-1   \(.androidKeystore.sha1CertificateFingerprint // "-")"' \
+            "$RUNNER_TEMP/creds.json"
+          sha256="$(jq -r '[.data.app.byId.androidAppCredentials[]?.androidAppBuildCredentialsList[]? |
+                     select(.isDefault) | .androidKeystore.sha256CertificateFingerprint // empty][0] // empty' "$RUNNER_TEMP/creds.json")"
+          if [ -z "$sha256" ]; then
+            echo "::error::No default Android keystore exists in EAS for $ANDROID_PACKAGE. Not building: a new keystore could not update the installed app."
+            exit 1
+          fi
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Signing certificate of the latest EAS-built APK
+        env:
+          KEYSTORE_SHA256: ${{ steps.keystore.outputs.sha256 }}
+        run: |
+          url="$(cat "$RUNNER_TEMP/latest-apk-url.txt")"
+          if [ -z "$url" ]; then echo "No finished EAS APK build to inspect."; exit 0; fi
+          mkdir -p "$RUNNER_TEMP/eas-apk"
+          curl -sSL -o "$RUNNER_TEMP/eas-apk/latest.apk" "$url"
+          sha256sum "$RUNNER_TEMP/eas-apk/latest.apk" | sed "s#$RUNNER_TEMP/eas-apk/##"
+          node scripts/apk-signing-cert.mjs "$RUNNER_TEMP/eas-apk/latest.apk" --expect "$KEYSTORE_SHA256" || true
+
+  build:
+    name: Build the EAS-signed update APK (staging profile, internal)
+    needs: inspect
+    if: needs.inspect.outputs.keystore_sha256 != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK components (compileSdk 37 is required; never downgraded)
+        run: |
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null
+          "$sdkmanager" --list 2>/dev/null > "$RUNNER_TEMP/sdk-list.txt"
+          platform="$(grep -oE 'platforms;android-37(\.[0-9]+)?' "$RUNNER_TEMP/sdk-list.txt" | sort -uV | tail -n 1)"
+          build_tools="$(grep -vE -- '-rc[0-9]' "$RUNNER_TEMP/sdk-list.txt" | grep -oE 'build-tools;3[67]\.[0-9]+\.[0-9]+' | sort -uV | tail -n 1)"
+          if [ -z "$platform" ] || [ -z "$build_tools" ]; then
+            echo "::error::Android API 37 platform or build-tools 36/37 is not available on this runner."
+            exit 1
+          fi
+          "$sdkmanager" "platform-tools" "$platform" "$build_tools"
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Build with EAS (local build on this runner, existing remote keystore)
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+        run: |
+          npx --yes "$EAS_CLI" build --local --platform android --profile staging --non-interactive \
+            --output "$RUNNER_TEMP/out/app-release.apk"
+
+      - name: Verify signer, package, version, bundle, permissions and WebRTC classes
+        env:
+          KEYSTORE_SHA256: ${{ needs.inspect.outputs.keystore_sha256 }}
+        run: |
+          apk="$RUNNER_TEMP/out/app-release.apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          # Must be signed with the existing EAS keystore, or it cannot update the installed app.
+          node scripts/apk-signing-cert.mjs "$apk" --expect "$KEYSTORE_SHA256"
+          "$aapt" dump badging "$apk" | grep -E "^package:|sdkVersion|targetSdkVersion"
+          "$aapt" dump badging "$apk" | grep -q "package: name='$ANDROID_PACKAGE'"
+          if "$aapt" dump badging "$apk" | grep -q 'application-debuggable'; then echo "::error::The APK is debuggable."; exit 1; fi
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle' || { echo "::error::No embedded JS bundle."; exit 1; }
+          permissions="$("$aapt" dump permissions "$apk")"
+          printf '%s\n' "$permissions"
+          if printf '%s\n' "$permissions" | grep -Eq 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|READ_CONTACTS|SYSTEM_ALERT_WINDOW'; then
+            echo "::error::A blocked permission is present in the packaged APK."; exit 1
+          fi
+          printf '%s\n' "$permissions" | grep -q 'com.android.vending.BILLING' || { echo "::error::Play Billing is not linked."; exit 1; }
+          mkdir -p "$RUNNER_TEMP/dex" && unzip -q -o "$apk" 'classes*.dex' -d "$RUNNER_TEMP/dex"
+          for cls in Llivekit/org/webrtc/PeerConnectionFactory\; Llivekit/org/jni_zero/JniZero\; Lcom/oney/WebRTCModule/WebRTCModule\;; do
+            cat "$RUNNER_TEMP"/dex/classes*.dex | grep -aqF "$cls" || { echo "::error::$cls was removed by R8."; exit 1; }
+          done
+          (cd "$RUNNER_TEMP/out" && sha256sum app-release.apk > apk-checksums.txt && cat apk-checksums.txt)
+
+      - name: Upload the update APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: rentmate-android-eas-signed-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/out/app-release.apk
+            ${{ runner.temp }}/out/apk-checksums.txt
+          if-no-files-found: error
+          retention-days: 7
