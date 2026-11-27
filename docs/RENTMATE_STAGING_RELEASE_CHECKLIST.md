@@ -6,7 +6,7 @@ it is done and checked. Nothing here is a production step; production needs a se
 ## 1. Code and CI
 
 - [ ] **F** Grant the `workflow` scope (`gh auth refresh -h github.com -s workflow`, then finish the device login in
-      the browser), or push `4790fad` yourself. This fixes the APK workflow.
+      the browser), or push the local commit "fix(ci): build the release variant for the test APK" yourself. This fixes the APK workflow.
 - [x] **E** CI green on PR #19 at `13aad35` (run 45909194104).
 - [ ] **E** APK workflow green on the release-variant build; record the artifact link, run ID and SHA-256.
 - [ ] **F** CodeQL: check the PR's code-scanning results in the GitHub UI (default setup).

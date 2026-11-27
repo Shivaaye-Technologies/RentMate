@@ -3,7 +3,7 @@
 ## Round 4 (2026-11-26/27)
 
 Branch `feature/rentmate-testing-apk`, draft PR #19 (base `feature/rentmate-conversion`, open, mergeable, **not
-merged**). Pushed to GitHub through `13aad35`. One commit is local only: `4790fad` (the APK workflow fix), because
+merged**). Pushed to GitHub through `13aad35`. One commit is local only: the APK workflow fix (commit "fix(ci): build the release variant for the test APK", kept last on the local branch), because
 pushing a workflow file needs the `workflow` OAuth scope. The token still reports `gist`, `read:org` and `repo`
 after the refresh attempt.
 
@@ -19,7 +19,7 @@ Recovery points: the tag `backup/2026-11-26-before-round4` (`ab3f42f`) and the v
 | `d75fab6` | Gifts sandbox migration and test, **held** for founder approval (`docs/held-migrations/`)                   |
 | `55d8f1f` | Billing tests: cancelled, paused, pending and lapsed-grace subscription states                              |
 | `13aad35` | Concurrency tests: concurrent settlement runs and concurrent settlement reversals                           |
-| `4790fad` | (local only) APK workflow builds the release variant with the bundle embedded and fails if it is debuggable |
+| (local)   | (not pushed) APK workflow builds the release variant with the bundle embedded and fails if it is debuggable |
 
 ### Already present before this round (verified, not rebuilt)
 
@@ -61,13 +61,13 @@ share, no payouts).
 
 ### GitHub
 
-| Item                      | Status                                                                                                    |
-| ------------------------- | --------------------------------------------------------------------------------------------------------- |
-| CI on `13aad35`           | success (run 45909194104)                                                                                 |
-| APK workflow on `13aad35` | failure (run 45909194094), as expected: `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed by `4790fad` |
-| APK artifact              | **none yet**: there is no artifact link or build ID to report                                             |
-| CodeQL                    | default setup; not re-read this round (the check-runs API call failed with a network EOF)                 |
-| PR #19 description        | updated this round                                                                                        |
+| Item                      | Status                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| CI on `13aad35`           | success (run 45909194104)                                                                                                 |
+| APK workflow on `13aad35` | failure (run 45909194094), as expected: `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed by the local workflow commit |
+| APK artifact              | **none yet**: there is no artifact link or build ID to report                                                             |
+| CodeQL                    | default setup; not re-read this round (the check-runs API call failed with a network EOF)                                 |
+| PR #19 description        | updated this round                                                                                                        |
 
 ### Device evidence
 
@@ -75,7 +75,7 @@ None. No device testing was performed (see `RENTMATE_ANDROID_DEVICE_TEST_REPORT.
 
 ### Founder approvals still required
 
-Grant the `workflow` scope (or push `4790fad`); approve the gift rules, which unblocks the held migration; F-RT1
+Grant the `workflow` scope (or push the APK workflow fix commit); approve the gift rules, which unblocks the held migration; F-RT1
 (removing staff roles); creator shares; the legal, tax and Play policy items in
 `RENTMATE_STAGING_RELEASE_CHECKLIST.md`; and the merge of PR #19.
 

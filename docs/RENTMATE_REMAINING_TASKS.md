@@ -35,7 +35,7 @@ proceed in a session with GitHub write access.
 
 ## Session blockers (2026-11-27)
 
-- `4790fad` (APK workflow fix) is local only: pushing a workflow file needs the `workflow` OAuth scope, which the
+- The APK workflow fix ("fix(ci): build the release variant for the test APK") is local only: pushing a workflow file needs the `workflow` OAuth scope, which the
   token does not have. Until then the APK run fails at the permission check and there is no artifact.
 - No Android SDK, emulator or device on this machine, so no device testing.
 - No local PostgreSQL: the two new concurrency cases run only in CI.

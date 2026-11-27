@@ -7,7 +7,7 @@
 - This session runs on a machine with no Android SDK, emulator or connected device.
 - No installable APK from this round exists yet. The latest `android-device-apk.yml` run (45909194094, commit
   `13aad35`) failed on purpose at the permission check: the debug variant's manifest adds `SYSTEM_ALERT_WINDOW`
-  (for the React Native dev menu), and the workflow blocks that permission. The fix (`4790fad`: build the release
+  (for the React Native dev menu), and the workflow blocks that permission. The fix (the local commit "fix(ci): build the release variant for the test APK": build the release
   variant with the JS bundle embedded, still debug-signed, and fail if it is debuggable) is committed locally, but
   it can be pushed only with a GitHub token that has the `workflow` scope. The current token has `gist`,
   `read:org` and `repo`.
