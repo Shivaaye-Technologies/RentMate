@@ -1,5 +1,84 @@
 # RentMate — completion report
 
+## Round 4 (2026-11-26/27)
+
+Branch `feature/rentmate-testing-apk`, draft PR #19 (base `feature/rentmate-conversion`, open, mergeable, **not
+merged**). Pushed to GitHub through `13aad35`. One commit is local only: `4790fad` (the APK workflow fix), because
+pushing a workflow file needs the `workflow` OAuth scope. The token still reports `gist`, `read:org` and `repo`
+after the refresh attempt.
+
+Recovery points: the tag `backup/2026-11-26-before-round4` (`ab3f42f`) and the verified bundle
+`/root/RentMate-backups/rentmate-2026-11-26-ab3f42f.bundle`.
+
+### Commits this round
+
+| Commit    | What                                                                                                        |
+| --------- | ----------------------------------------------------------------------------------------------------------- |
+| `349e6b4` | SEC-2: `live_room_for` and `room_name` restricted to people who may join (`20261126150000`)                 |
+| `6c667eb` | SEC-1: admin decision on disputes raised after settlement (`20261126160000`, `20261126170000`)              |
+| `d75fab6` | Gifts sandbox migration and test, **held** for founder approval (`docs/held-migrations/`)                   |
+| `55d8f1f` | Billing tests: cancelled, paused, pending and lapsed-grace subscription states                              |
+| `13aad35` | Concurrency tests: concurrent settlement runs and concurrent settlement reversals                           |
+| `4790fad` | (local only) APK workflow builds the release variant with the bundle embedded and fails if it is debuggable |
+
+### Already present before this round (verified, not rebuilt)
+
+Auth and the 18+ attestation, profiles, discovery, likes and matches, chat, live and creators (LiveKit), the token
+wallet and ledger, the Play Billing sandbox, bookings with token holds, the check-in code and settlement job, staff
+role tiers with admin MFA on the web, notifications, and the schema security audit.
+
+### Migrations added
+
+- `20261126150000_live_room_for_restricted.sql`
+- `20261126160000_booking_settlement_reversal.sql`
+- `20261126170000_reconciliation_keeps_release_rules.sql`. This is a follow-up: the file guard rightly blocked
+  editing `160000`, so the reconciliation correction ships as a new migration.
+
+Each has a rollback in `docs/rollback/` that refuses to run once the feature has been used, and each is rehearsed
+in `npm run test:rollback`.
+
+### Gifts (held, not applied)
+
+`supabase/tests/token_wallet.sql` deliberately fails while any public function is named like `gift`. Gifts are
+therefore written, tested on a throwaway database (gift test 23/23, schema audit 8/8), and **held** in
+`docs/held-migrations/`. The guard was not weakened. The design has an empty, admin-priced catalogue with price
+history; a sandbox switch for testers only, with live gifts locked off; idempotent sending with price snapshots;
+an append-only gift ledger; and reconciliation. The creator share is constrained to `NULL` (no invented revenue
+share, no payouts).
+
+### Test results (run in this session; disposable databases only)
+
+| Command                              | Result                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| `npm run check`                      | exit 0 (lint, format, typecheck, policy 612 files, build)                   |
+| API tests                            | 159/159                                                                     |
+| Web tests                            | 226/226                                                                     |
+| `npm run test:db`                    | 32 suites, all passing; settlement reversal 23/23; live room 9/9            |
+| `npm run test:rollback`              | exit 0 (21 stages)                                                          |
+| `npm run test:hooks` / `test:aihub`  | 21/21 / 32/32                                                               |
+| Mobile `vitest run` / `tsc --noEmit` | 88/88 / clean                                                               |
+| `test:db:concurrency` (2 new cases)  | **not run locally** (no PostgreSQL here); runs in CI's `db-concurrency` job |
+
+### GitHub
+
+| Item                      | Status                                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| CI on `13aad35`           | success (run 45909194104)                                                                                 |
+| APK workflow on `13aad35` | failure (run 45909194094), as expected: `SYSTEM_ALERT_WINDOW` from the debug manifest. Fixed by `4790fad` |
+| APK artifact              | **none yet**: there is no artifact link or build ID to report                                             |
+| CodeQL                    | default setup; not re-read this round (the check-runs API call failed with a network EOF)                 |
+| PR #19 description        | updated this round                                                                                        |
+
+### Device evidence
+
+None. No device testing was performed (see `RENTMATE_ANDROID_DEVICE_TEST_REPORT.md`).
+
+### Founder approvals still required
+
+Grant the `workflow` scope (or push `4790fad`); approve the gift rules, which unblocks the held migration; F-RT1
+(removing staff roles); creator shares; the legal, tax and Play policy items in
+`RENTMATE_STAGING_RELEASE_CHECKLIST.md`; and the merge of PR #19.
+
 ## Round 3 (2026-11-26)
 
 On top of `d963b06`, which is now on GitHub. The commits from this round are **local only**: this session has no
