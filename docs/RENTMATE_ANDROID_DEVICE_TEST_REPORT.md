@@ -7,7 +7,14 @@
 - This session runs on a machine with no Android SDK, emulator or connected device.
 - An installable APK now exists, but no one has installed it on a phone yet.
 
-## APK under test
+## APK to use on a phone that already has RentMate
+
+Use the **EAS-signed** APK: run 45988842760, artifact 15193937202 (https://github.com/Shivaaye-Technologies/RentMate/actions/runs/45988842760/artifacts/15193937202),
+SHA-256 `72fdcf4b9fa2d68edb8405dd7c10cc0b387a8ba094ba45b42e87af0e438278a4`. It is signed with the EAS keystore (`60:A1:2F:…:DC:44`), like every earlier EAS build, so it
+installs as an update and keeps the app's data. The CI APK below uses a different (public debug) key and gives
+"package conflicts with an existing package" over an EAS install. See `ANDROID_APK_SIGNING.md`.
+
+## CI APK (fresh installs only)
 
 | Field    | Value                                                                                            |
 | -------- | ------------------------------------------------------------------------------------------------ |

@@ -9,6 +9,10 @@ it is done and checked. Nothing here is a production step; production needs a se
 - [x] **E** CI green on PR #19 at `d081489` (run 45975566728).
 - [x] **E** APK workflow green on the release-variant build: run 45975566796, artifact 15189205015 (expires
       2026-12-04), SHA-256 `73d7665e418536559b15a6dd781a19de150d1245769209d58cb7e12a58daadb6`.
+- [x] **E** EAS-signed update APK (installs over EAS-built RentMate, keeps data): run 45988842760, artifact
+      15193937202, SHA-256 `72fdcf4b9fa2d68edb8405dd7c10cc0b387a8ba094ba45b42e87af0e438278a4`.
+- [ ] **F** On the phone, check RentMate's signing certificate in App Manager (`ANDROID_APK_SIGNING.md`), then
+      install the EAS-signed APK as an update. Do not uninstall first.
 - [ ] **F** CodeQL: check the PR's code-scanning results in the GitHub UI (default setup). The API showed 0 open alerts.
 - [ ] **F** Review PR #19 and decide on the merge. Do not merge without founder approval.
 

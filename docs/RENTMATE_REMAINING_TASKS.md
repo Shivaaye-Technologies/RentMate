@@ -11,6 +11,7 @@ proceed in a session with GitHub write access.
 | A-2 | F/E   | Open a draft PR from `feature/rentmate-testing-apk` (check first that none exists). Get CI and CodeQL green. Do not merge without approval.               |
 | A-3 | F     | Set the Actions variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (publishable key only) and `EXPO_PUBLIC_API_URL` to staging values. |
 | A-4 | done  | APK run 45975566796 on `d081489`; artifact 15189205015 (expires 2026-12-04); SHA-256 `73d7665e41853655…` (full value in the completion report).           |
+| A-6 | done  | Update APK signed with the existing EAS keystore (`android-eas-signed-apk.yml`, run 45988842760). See `ANDROID_APK_SIGNING.md`.                           |
 | A-5 | F     | Install on 2+ phones (one small screen, Android 8–9 and a current Android) and run the smoke test.                                                        |
 
 ## Staging setup (see `RENTMATE_DEPLOYMENT_RUNBOOK.md`)

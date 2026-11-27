@@ -73,6 +73,24 @@ share, no payouts).
 | CodeQL                    | default setup; 0 open code-scanning alerts for the PR #19 ref (API query this session)                                                                                     |
 | PR #19 description        | updated this round                                                                                                                                                         |
 
+### Update APK for phones that already have RentMate (EAS-signed)
+
+The CI APK cannot update an EAS-installed RentMate ("package conflicts with an existing package"). The CI APK is
+signed with React Native's public template debug key, SHA-256 `FA:C6:17:45:…:3B:9C`. All 15 earlier EAS builds are
+signed with the project's EAS keystore, SHA-256 `60:A1:2F:D8:…:DC:44`. The new workflow `android-eas-signed-apk.yml`
+builds with that keystore, which never leaves EAS. See `ANDROID_APK_SIGNING.md`.
+
+| Item     | Value                                                                                                                                                                 |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run      | 45988842760 on `f2a25bc` (success; run 45987290125 failed on Expo API 503s, now retried)                                                                              |
+| Artifact | `rentmate-android-eas-signed-2`, ID 15193937202, expires 2026-12-04: https://github.com/Shivaaye-Technologies/RentMate/actions/runs/45988842760/artifacts/15193937202 |
+| SHA-256  | `72fdcf4b9fa2d68edb8405dd7c10cc0b387a8ba094ba45b42e87af0e438278a4`                                                                                                    |
+| Signer   | `60:A1:2F:D8:CE:E7:60:C3:C4:FA:61:AC:CF:3F:F0:AF:44:A2:F8:C9:CE:B4:91:39:1D:F9:71:11:EA:AB:DC:44` (MATCH)                                                             |
+| Checks   | 0.1.0 (1), targetSdk 36; not debuggable; Hermes bundle embedded; WebRTC classes kept; same permissions as the CI APK; staging API and Supabase embedded               |
+
+The installed app's certificate was not read: there is no device access in this session. If it is the EAS key, this
+APK installs as an update; if not, Android refuses the install and leaves the app and its data as they are.
+
 ### APK checks (artifact downloaded and inspected in this session)
 
 - Package `com.shivaayetechnologies.rentmate`, versionName 0.1.0, versionCode 1; minSdk 24, targetSdk 36, compileSdk 37.
