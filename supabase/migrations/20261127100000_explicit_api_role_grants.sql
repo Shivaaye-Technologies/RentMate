@@ -1,28 +1,43 @@
--- Explicit privileges for the signed-in role on the core social tables.
---
--- Why: these tables were created by early migrations that relied on Supabase's old default privileges ("grant all
--- on new tables to anon, authenticated"). Current Supabase projects no longer apply that default to objects created
--- by migrations: RentMate-staging (created 2026-11-20) gives anon and authenticated no table privileges, so the app
--- got "permission denied for table likes" (and matches, messages, passes, blocks, reports) before RLS was evaluated.
---
--- What: grant ONLY the commands for which an RLS policy already exists for `authenticated`. RLS still decides which
--- rows each person can see or write; nothing here widens row access, and anon gets nothing.
---   likes     select (own or received), insert (own; hidden-demo and suspension restrictions still apply)
---   passes    select, insert, delete (own)
---   matches   select, delete (participants); update stays limited to (ready_a, ready_b); inserts come from the
---             mutual-like trigger, not from clients
---   messages  select, insert (participants; suspension restriction still applies)
---   blocks    select, insert, delete (own)
---   reports   select (own); insert of the reporter's own columns only
---   booking_completion_confirmations, creator_booking_earnings: select (participants / own), as their policies say
--- Idempotent: on projects that still grant by default these statements change nothing.
+-- Explicit least-privilege grants for authenticated mobile clients.
+-- Existing RLS policies remain enabled and continue to restrict row access.
+-- No privileges are granted to anon.
 
-grant select, insert on public.likes to authenticated;
-grant select, insert, delete on public.passes to authenticated;
-grant select, delete on public.matches to authenticated;
-grant select, insert on public.messages to authenticated;
-grant select, insert, delete on public.blocks to authenticated;
-grant select on public.reports to authenticated;
-grant insert (reporter_id, reported_id, reason, details, booking_id, review_id) on public.reports to authenticated;
-grant select on public.booking_completion_confirmations to authenticated;
-grant select on public.creator_booking_earnings to authenticated;
+-- Likes: clients create likes and read the columns used by the app.
+grant select (liker_id, liked_id, is_super, message, created_at)
+  on public.likes to authenticated;
+grant insert (liker_id, liked_id, is_super, message)
+  on public.likes to authenticated;
+
+-- Passes: clients read their own pass records, create passes, and rewind them.
+grant select (passer_id, passed_id, created_at)
+  on public.passes to authenticated;
+grant insert (passer_id, passed_id)
+  on public.passes to authenticated;
+grant delete on public.passes to authenticated;
+
+-- Matches: created by the mutual-like trigger, never directly by clients.
+-- Keep the existing column-restricted UPDATE grant for ready_a / ready_b.
+grant select (id, user_a, user_b, created_at, ready_a, ready_b)
+  on public.matches to authenticated;
+grant delete on public.matches to authenticated;
+
+-- Messages: clients read messages and send messages in permitted matches.
+grant select (id, match_id, sender_id, body, created_at)
+  on public.messages to authenticated;
+grant insert (match_id, sender_id, body)
+  on public.messages to authenticated;
+
+-- Blocks: users manage their own block rows under the existing RLS policy.
+grant select (blocker_id, blocked_id, created_at)
+  on public.blocks to authenticated;
+grant insert (blocker_id, blocked_id)
+  on public.blocks to authenticated;
+grant delete on public.blocks to authenticated;
+
+-- Reports: users can submit reports and read only their own rows under RLS.
+-- SELECT(id) also supports INSERT ... RETURNING id.
+-- created_at is intentionally not client-writable.
+grant select (id, reporter_id, created_at)
+  on public.reports to authenticated;
+grant insert (reporter_id, reported_id, reason, details, booking_id, review_id)
+  on public.reports to authenticated;

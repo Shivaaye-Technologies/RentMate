@@ -76,18 +76,18 @@ Staging API:
 
 Database (new, append-only; **not applied anywhere**):
 
-- `supabase/migrations/20261127100000_explicit_api_role_grants.sql` grants `authenticated` only the commands that
-  already have an RLS policy:
-  - likes: select, insert
-  - passes: select, insert, delete
-  - matches: select, delete
-  - messages: select, insert
-  - blocks: select, insert, delete
-  - reports: select, plus insert on the reporter's columns
-  - booking confirmations and earnings: select
+- `supabase/migrations/20261127100000_explicit_api_role_grants.sql`: column-level grants to `authenticated`, only for
+  commands that already have an RLS policy and only for the columns the Android and web clients use:
+  - likes: select (liker_id, liked_id, is_super, message, created_at); insert (liker_id, liked_id, is_super, message)
+  - passes: select (passer_id, passed_id, created_at); insert (passer_id, passed_id); delete
+  - matches: select (id, user_a, user_b, created_at, ready_a, ready_b); delete. No insert: the mutual-like trigger
+    creates matches. Update stays limited to (ready_a, ready_b).
+  - messages: select (id, match_id, sender_id, body, created_at); insert (match_id, sender_id, body)
+  - blocks: select (blocker_id, blocked_id, created_at); insert (blocker_id, blocked_id); delete
+  - reports: select (id, reporter_id, created_at); insert of the reporter's columns
 
-  `anon` gets nothing. No UPDATE or DELETE on likes or messages, and no INSERT on matches (the mutual-like trigger
-  creates matches). Hidden profile columns stay hidden.
+  `anon` gets nothing. `created_at` is never client-writable. No update or delete on likes or messages.
+  RLS is unchanged.
 
 - `docs/rollback/20261127_explicit_api_role_grants.rollback.sql` is its rollback, rehearsed by `npm run test:rollback`.
 - `supabase/tests/supabase_stubs.sql` now matches current Supabase defaults (no automatic grants), so a missing

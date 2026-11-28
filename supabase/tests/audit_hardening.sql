@@ -24,37 +24,58 @@ begin
   -- ===== SEC-01: server-owned timestamps =====
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'from the past', '1999-01-01');
-  select created_at into t from public.messages where sender_id = a and body = 'from the past';
-  r := r || case when t = now() then 'ok back-dated message gets the server time; ' else 'FAIL message time ' || t || '; ' end;
-  insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'from the future', '2099-01-01');
-  select created_at into t from public.messages where sender_id = a and body = 'from the future';
-  r := r || case when t = now() then 'ok future-dated message gets the server time; ' else 'FAIL future ' || t || '; ' end;
-  -- 20 messages a minute: back-dating no longer escapes the count.
+  -- A forged time is either refused (created_at is not granted to members) or overwritten by the server trigger.
+  begin
+    insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'from the past', '1999-01-01');
+    select created_at into t from public.messages where sender_id = a and body = 'from the past';
+    r := r || case when t = now() then 'ok back-dated message gets the server time; ' else 'FAIL message time ' || t || '; ' end;
+  exception when insufficient_privilege then r := r || 'ok back-dated message is refused; ';
+  end;
+  begin
+    insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'from the future', '2099-01-01');
+    select created_at into t from public.messages where sender_id = a and body = 'from the future';
+    r := r || case when t = now() then 'ok future-dated message gets the server time; ' else 'FAIL future ' || t || '; ' end;
+  exception when insufficient_privilege then r := r || 'ok future-dated message is refused; ';
+  end;
+  -- 20 messages a minute: back-dating cannot escape the count (refused, or stamped now and counted).
   begin
     for i in 1..25 loop
-      insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'spam ' || i, '1999-01-01');
+      begin
+        insert into public.messages (match_id, sender_id, body, created_at) values (m, a, 'spam ' || i, '1999-01-01');
+      exception when insufficient_privilege then
+        insert into public.messages (match_id, sender_id, body) values (m, a, 'spam ' || i);
+      end;
     end loop;
     r := r || 'FAIL message limit bypassed with back-dated rows; ';
   exception when raise_exception then r := r || 'ok back-dated messages still hit the per-minute limit; ';
   end;
-  insert into public.passes (passer_id, passed_id, created_at) values (a, cm, '1999-01-01');
+  begin
+    insert into public.passes (passer_id, passed_id, created_at) values (a, cm, '1999-01-01');
+  exception when insufficient_privilege then
+    r := r || 'ok a forged pass time is refused; ';
+    insert into public.passes (passer_id, passed_id) values (a, cm);
+  end;
   select created_at into t from public.passes where passer_id = a and passed_id = cm;
   r := r || case when t = now() then 'ok passes get the server time; ' else 'FAIL pass time; ' end;
   -- A forged report time is either refused (created_at is not granted to members) or overwritten by the server.
   begin
     insert into public.reports (reporter_id, reported_id, reason, created_at) values (a, cm, 'other', '1999-01-01');
-    select created_at into t from public.reports where reporter_id = a and reported_id = cm;
+    select created_at into t from public.reports where reporter_id = a;
     r := r || case when t = now() then 'ok a forged report time is overwritten; ' else 'FAIL report time; ' end;
   exception when insufficient_privilege then
     r := r || 'ok a forged report time is refused; ';
   end;
-  if not exists (select 1 from public.reports where reporter_id = a and reported_id = cm) then
+  if not exists (select 1 from public.reports where reporter_id = a) then
     insert into public.reports (reporter_id, reported_id, reason) values (a, cm, 'other');
   end if;
-  select created_at into t from public.reports where reporter_id = a and reported_id = cm;
+  select created_at into t from public.reports where reporter_id = a;
   r := r || case when t = now() then 'ok reports get the server time; ' else 'FAIL report time; ' end;
-  insert into public.blocks (blocker_id, blocked_id, created_at) values (a, cm, '1999-01-01');
+  begin
+    insert into public.blocks (blocker_id, blocked_id, created_at) values (a, cm, '1999-01-01');
+  exception when insufficient_privilege then
+    r := r || 'ok a forged block time is refused; ';
+    insert into public.blocks (blocker_id, blocked_id) values (a, cm);
+  end;
   select created_at into t from public.blocks where blocker_id = a and blocked_id = cm;
   r := r || case when t = now() then 'ok blocks get the server time; ' else 'FAIL block time; ' end;
   -- Rewriting a block's time is either refused (members have no UPDATE on blocks) or has no effect.

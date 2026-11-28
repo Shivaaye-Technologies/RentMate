@@ -61,6 +61,12 @@ create publication supabase_realtime;
 -- granted everything by default; testing against that hid missing grants ("permission denied for table likes").
 grant usage on schema public to anon, authenticated, service_role;
 -- Exactly staging's pg_default_acl for postgres-owned tables: anon=m, authenticated=m, service_role=Dxtm.
-alter default privileges in schema public grant maintain on tables to anon, authenticated;
-alter default privileges in schema public grant truncate, references, trigger, maintain on tables to service_role;
+alter default privileges in schema public grant truncate, references, trigger on tables to service_role;
+-- MAINTAIN (VACUUM/ANALYZE only) exists from PostgreSQL 17; the CI concurrency job runs an older server.
+do $$
+begin
+  if current_setting('server_version_num')::int >= 170000 then
+    execute 'alter default privileges in schema public grant maintain on tables to anon, authenticated, service_role';
+  end if;
+end $$;
 alter default privileges in schema public revoke execute on functions from public;
