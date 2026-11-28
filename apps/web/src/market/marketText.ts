@@ -31,10 +31,23 @@ export const WEEKDAYS = [
 export const MARKET_RULES =
   "RentMate companionship is non-sexual: public places and approved activities only. Escorting, sexual services and sexual solicitation are prohibited and lead to removal.";
 
+/**
+ * 1,50,000 — Indian digit grouping (last three digits, then pairs). Done by hand because runtimes built without
+ * full ICU data (small-icu Node builds, some Android JS engines) ignore "en-IN" and print 150,000.
+ */
+export function formatIndianNumber(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const rounded = Math.round(n);
+  const digits = String(Math.abs(rounded));
+  const last3 = digits.slice(-3);
+  const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+  return (rounded < 0 ? "-" : "") + (rest ? `${rest},${last3}` : last3);
+}
+
 /** ₹1,600 */
 export function formatINR(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+  return `₹${formatIndianNumber(n)}`;
 }
 
 /** Mirrors private.booking_price; the server always computes the real price. */
@@ -175,6 +188,44 @@ export function bookingActions(
     complete: b.status === "accepted" && ended,
     dispute: b.status === "accepted" && started,
   };
+}
+
+/** Check-in opens 30 minutes before the start and closes at the end (mirrors private.checkin_window_open). */
+export const CHECKIN_OPENS_MINUTES = 30;
+
+export type CheckInStep = "show_code" | "enter_code" | "checked_in" | "not_yet" | null;
+
+/**
+ * What the check-in card shows. The member shows a one-time code; the companion types it in. Outside the window,
+ * or for anything but an accepted booking, there is nothing to do (null), except a reminder shortly before.
+ */
+export function checkInStep(
+  b: {
+    status: string;
+    starts_at: string;
+    ends_at: string;
+    member_id: string | null;
+    companion_id: string | null;
+    checked_in_at?: string | null;
+  },
+  me: string,
+  now: Date = new Date(),
+): CheckInStep {
+  const role = b.member_id === me ? "member" : b.companion_id === me ? "companion" : null;
+  if (!role) return null;
+  if (b.checked_in_at) return "checked_in";
+  if (b.status !== "accepted") return null;
+  const opens = Date.parse(b.starts_at) - CHECKIN_OPENS_MINUTES * 60_000;
+  const t = now.getTime();
+  if (t > Date.parse(b.ends_at)) return null;
+  if (t < opens) return "not_yet";
+  return role === "member" ? "show_code" : "enter_code";
+}
+
+/** Six digits, spaces and dashes ignored. Returns null if it cannot be a code. */
+export function normaliseCheckInCode(input: string): string | null {
+  const digits = input.replace(/[\s-]/g, "");
+  return /^[0-9]{6}$/.test(digits) ? digits : null;
 }
 
 /** Friendly wording for database refusals (keeps the server's own explanation where it wrote one). */

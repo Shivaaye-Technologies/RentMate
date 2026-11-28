@@ -123,6 +123,8 @@ begin
   r := r || case when n = 0 then 'ok paused profile not in Discover; ' else 'FAIL paused profile shown; ' end;
 
   reset role;
+  -- The next fixture writes are trusted test setup, not member-authenticated actions.
+  perform set_config('request.jwt.claims', '', true);
   insert into public.likes (liker_id, liked_id) values (a, b), (b, a);
   select id into mid from public.matches where user_a = least(a, b) and user_b = greatest(a, b);
   insert into public.likes (liker_id, liked_id) values (b, c), (c, b);

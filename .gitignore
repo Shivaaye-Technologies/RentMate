@@ -8,3 +8,6 @@ coverage/
 .DS_Store
 .claude/logs/
 .claude/settings.local.json
+
+# Supabase local CLI state
+supabase/.temp/

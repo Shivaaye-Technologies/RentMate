@@ -1,6 +1,6 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
+import { createApp, supabaseProjectRef } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { MemoryProfileStore } from "../src/store.js";
@@ -13,8 +13,11 @@ const tokens: Record<string, string> = {
 };
 const verifier: TokenVerifier = async (t) => (tokens[t] ? { id: tokens[t] } : null);
 
-const makeApp = (store = new MemoryProfileStore(), verifyToken: TokenVerifier | null = verifier) =>
-  createApp({ config, verifyToken, storeFor: () => store });
+const makeApp = (
+  store = new MemoryProfileStore(),
+  verifyToken: TokenVerifier | null = verifier,
+  readinessCheck: () => Promise<boolean> = async () => true,
+) => createApp({ config, verifyToken, storeFor: () => store, readinessCheck });
 
 const profile = {
   displayName: "Alice",
@@ -26,10 +29,56 @@ const profile = {
 };
 
 describe("API", () => {
-  it("GET /health reports ok", async () => {
-    const res = await request(makeApp()).get("/health");
+  it("GET /health reports process liveness without probing dependencies", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), verifier, async () => false)).get("/health");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "ok", authConfigured: true });
+  });
+
+  it("GET /health names the Supabase project used to verify sign-ins, without any key", async () => {
+    const withUrl = loadConfig({
+      NODE_ENV: "test",
+      SUPABASE_URL: "https://wgoscvlghavqepaojeao.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key-value-not-for-output",
+    });
+    const app = createApp({
+      config: withUrl,
+      verifyToken: verifier,
+      storeFor: () => new MemoryProfileStore(),
+    });
+    const res = await request(app).get("/health");
+    expect(res.body.authProject).toBe("wgoscvlghavqepaojeao");
+    expect(JSON.stringify(res.body)).not.toContain("anon-key-value-not-for-output");
+    expect(supabaseProjectRef(undefined)).toBeNull();
+    expect(supabaseProjectRef("https://auth.example.com")).toBe("auth.example.com");
+  });
+
+  it("GET /ready reports ready when Supabase is reachable", async () => {
+    const res = await request(makeApp()).get("/ready");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: "ready", service: "rentmate-api" });
+    expect(res.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("GET /ready fails closed when Supabase is unavailable", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), verifier, async () => false)).get("/ready");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ status: "not_ready", service: "rentmate-api" });
+  });
+
+  it("GET /ready fails closed when the dependency probe throws", async () => {
+    const res = await request(
+      makeApp(new MemoryProfileStore(), verifier, async () => {
+        throw new Error("private connection detail");
+      }),
+    ).get("/ready");
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(res.body)).not.toContain("private connection detail");
+  });
+
+  it("GET /ready fails closed when authentication is not configured", async () => {
+    const res = await request(makeApp(new MemoryProfileStore(), null)).get("/ready");
+    expect(res.status).toBe(503);
   });
 
   it("rejects requests without a token", async () => {

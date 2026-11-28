@@ -78,6 +78,7 @@ export interface Booking {
   late_cancellation: boolean;
   payment_status: string;
   created_at: string;
+  checked_in_at?: string | null;
 }
 
 export interface Review {
@@ -272,7 +273,7 @@ export const marketApi = {
       (await supabase
         .from("bookings")
         .select(
-          "id, reference, member_id, companion_id, service_title, category, pricing, starts_at, ends_at, duration_minutes, timezone, price_inr, commission_pct, meeting_point, note, status, cancellation_policy, late_cancellation, payment_status, created_at",
+          "id, reference, member_id, companion_id, service_title, category, pricing, starts_at, ends_at, duration_minutes, timezone, price_inr, commission_pct, meeting_point, note, status, cancellation_policy, late_cancellation, payment_status, created_at, checked_in_at",
         )
         .order("starts_at", { ascending: false })
         .limit(300)) as Result<Booking[]>,
@@ -282,6 +283,11 @@ export const marketApi = {
   cancel: (id: string, reason: string) =>
     rpc<void>("booking_cancel", { p_booking: id, p_reason: reason || null }),
   complete: (id: string) => rpc<void>("booking_complete", { p_booking: id }),
+  checkInCode: (id: string) => rpc<string>("booking_checkin_code", { p_booking: id }),
+  checkIn: async (id: string, code: string) => {
+    const ok = await rpc<boolean>("booking_check_in", { p_booking: id, p_code: code });
+    if (ok !== true) throw new Error("That code is not right. Check it with the member and try again.");
+  },
   dispute: (id: string, reason: string) => rpc<void>("booking_dispute", { p_booking: id, p_reason: reason }),
   review: (booking: string, rating: number, comment: string) =>
     rpc<string>("review_create", { p_booking: booking, p_rating: rating, p_comment: comment }),

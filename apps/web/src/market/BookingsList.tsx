@@ -1,10 +1,87 @@
 import { useState } from "react";
 import { useAction } from "../live/useAction";
 import { marketApi, type Booking, type Review } from "./marketData";
-import { BOOKING_STATUS, bookingActions, formatINR, minutesLabel } from "./marketText";
+import {
+  BOOKING_STATUS,
+  bookingActions,
+  checkInStep,
+  formatINR,
+  minutesLabel,
+  normaliseCheckInCode,
+} from "./marketText";
 
 const when = (iso: string, tz: string) =>
   new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: tz });
+
+/** Meetup check-in: the member shows a one-time code, the companion enters it (the server checks everything). */
+export function CheckInPanel({ b, me, reload }: { b: Booking; me: string; reload: () => Promise<void> }) {
+  const { busy, run, messages } = useAction(reload);
+  const [code, setCode] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const step = checkInStep(b, me);
+  if (!step) return null;
+  return (
+    <div className="checkin">
+      <strong className="small">Meetup check-in</strong>
+      {step === "not_yet" && (
+        <p className="muted small">Check-in opens 30 minutes before the start, at the meeting place.</p>
+      )}
+      {step === "checked_in" && <p className="muted small">Checked in at the meetup.</p>}
+      {step === "show_code" && (
+        <>
+          <p className="muted small">
+            When you meet, show this code to your companion. Never share it before you are together.
+          </p>
+          {code && (
+            <p className="checkin-code" aria-label={`Check-in code ${code.split("").join(" ")}`}>
+              {code.slice(0, 3)} {code.slice(3)}
+            </p>
+          )}
+          <button
+            className={code ? "btn small" : "btn dark small"}
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                setCode(await marketApi.checkInCode(b.id));
+              })
+            }
+          >
+            {code ? "Get a new code" : "Show my check-in code"}
+          </button>
+        </>
+      )}
+      {step === "enter_code" && (
+        <form
+          className="row-wrap"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const digits = normaliseCheckInCode(input);
+            void run(async () => {
+              if (!digits) throw new Error("Enter the 6-digit code shown in the member's app.");
+              await marketApi.checkIn(b.id, digits);
+              setInput("");
+            }, "Checked in. Enjoy the meetup.");
+          }}
+        >
+          <label className="small">
+            Check-in code{" "}
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={7}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+          </label>
+          <button className="btn dark small" disabled={busy} type="submit">
+            Check in
+          </button>
+        </form>
+      )}
+      {messages}
+    </div>
+  );
+}
 
 /** One booking with the actions this person may take now (the server enforces the same rules). */
 export function BookingCard({
@@ -55,6 +132,8 @@ export function BookingCard({
         <summary className="small">Cancellation policy</summary>
         <p className="small muted">{b.cancellation_policy}</p>
       </details>
+
+      <CheckInPanel b={b} me={me} reload={reload} />
 
       {messages}
 

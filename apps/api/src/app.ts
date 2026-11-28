@@ -6,15 +6,18 @@ import { createRequire } from "node:module";
 import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import { displayDistanceKm, isOnline, rankMatches, summarize, type MatchProfile } from "./matching.js";
-import { ProfileInput } from "./validation.js";
+import { DeleteAccountInput, ProfileInput } from "./validation.js";
+import { AccountDeletionError, type AccountDeleter } from "./account.js";
+import { AgeAttestationRequiredError } from "./profileErrors.js";
 import { liveRouter, type LiveDeps } from "./live/routes.js";
 import { callsRouter } from "./live/calls.js";
 import { webhookRouter, type WebhookDeps } from "./live/webhook.js";
+import { billingRouter, rtdnRouter, type BillingDeps } from "./billing/routes.js";
 
 // apps/api/package.json sits one level above both src/ (tests) and dist/ (production).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
-export const SERVICE_NAME = "soulmate-api";
+export const SERVICE_NAME = "rentmate-api";
 
 /** Public route documentation served at GET /. Keep in sync with the routes below. */
 export const ROUTES = [
@@ -24,6 +27,12 @@ export const ROUTES = [
     path: "/health",
     auth: false,
     description: "Liveness check: 200 while the server is running",
+  },
+  {
+    method: "GET",
+    path: "/ready",
+    auth: false,
+    description: "Readiness check: 200 only when Supabase is reachable",
   },
   { method: "PUT", path: "/api/v1/profile", auth: true, description: "Create or update your profile" },
   { method: "GET", path: "/api/v1/matches", auth: true, description: "Ranked people for you to discover" },
@@ -98,6 +107,18 @@ export const ROUTES = [
   },
   {
     method: "POST",
+    path: "/api/v1/billing/google/purchases",
+    auth: true,
+    description: "Verify a Google Play purchase on the server (sandbox only)",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/billing/google/rtdn",
+    auth: false,
+    description: "Google Play real-time notifications (push token checked)",
+  },
+  {
+    method: "POST",
     path: "/api/v1/live/webhook",
     auth: false,
     description: "LiveKit signed webhooks (signature checked)",
@@ -121,9 +142,35 @@ export interface AppDeps {
   live?: LiveDeps;
   /** LiveKit webhooks (optional: without them the webhook route returns 503). */
   webhook?: WebhookDeps;
+  /** Server-side account deletion (optional: without it DELETE /api/v1/account returns 503). */
+  accountFor?: (req: Request) => AccountDeleter;
+  /** Google Play Billing (optional: without it the billing routes return 503). */
+  billing?: BillingDeps | null;
+  /** Checks the external dependency required to serve authenticated requests. */
+  readinessCheck?: () => Promise<boolean>;
 }
 
-export function createApp({ config, verifyToken, storeFor, live, webhook }: AppDeps) {
+/** "abc123" for https://abc123.supabase.co; the bare host for a custom domain; null when unset. */
+export function supabaseProjectRef(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname;
+    return host.endsWith(".supabase.co") ? host.slice(0, -".supabase.co".length) : host;
+  } catch {
+    return null;
+  }
+}
+
+export function createApp({
+  config,
+  verifyToken,
+  storeFor,
+  live,
+  webhook,
+  accountFor,
+  billing,
+  readinessCheck,
+}: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.TRUST_PROXY ?? (config.NODE_ENV === "production" ? 1 : 0));
@@ -150,10 +197,37 @@ export function createApp({ config, verifyToken, storeFor, live, webhook }: AppD
 
   // Liveness for Render's health check: answers 200 whenever the process is up.
   // Deliberately does not call Supabase, so a database hiccup does not restart the server.
+  // authProject: which Supabase project this API checks sign-ins against (the public project host, never a key),
+  // so a mismatch with the app's project can be spotted without dashboard access.
+  const authProject = supabaseProjectRef(config.SUPABASE_URL);
   app.get("/health", (_req, res) => {
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null });
+    res
+      .status(200)
+      .json({ status: "ok", service: SERVICE_NAME, authConfigured: verifyToken !== null, authProject });
   });
+
+  // Readiness is separate from liveness: do not restart a healthy process for a
+  // temporary dependency outage, but let the platform stop routing traffic to it.
+  app.get("/ready", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!verifyToken || !readinessCheck) {
+      res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+      return;
+    }
+    try {
+      if (!(await readinessCheck())) {
+        res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+        return;
+      }
+      res.status(200).json({ status: "ready", service: SERVICE_NAME });
+    } catch {
+      res.status(503).json({ status: "not_ready", service: SERVICE_NAME });
+    }
+  });
+
+  // Pub/Sub push from Google: authenticated by its push token, not a member session.
+  app.use("/api/v1/billing/google/rtdn", rtdnRouter(billing ?? null));
 
   const api = express.Router();
   api.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: "draft-7", legacyHeaders: false }));
@@ -169,6 +243,38 @@ export function createApp({ config, verifyToken, storeFor, live, webhook }: AppD
       await storeFor(req).upsertProfile(req.user!.id, parsed.data);
       res.status(204).end();
     } catch (err) {
+      if (err instanceof AgeAttestationRequiredError) {
+        // Database-level age attestation (P2-03): record the date of birth and 18+ confirmation first.
+        res.status(422).json({ error: err.message, code: "age_attestation_required" });
+        return;
+      }
+      next(err);
+    }
+  });
+
+  // Deletes the caller's photos and then their account, entirely on the server (P2-05). Safe to repeat: a retry
+  // removes whatever is left. The database refuses the account step while any photo remains.
+  api.delete("/account", async (req, res, next) => {
+    if (!accountFor) {
+      res.status(503).json({ error: "Account deletion is not configured" });
+      return;
+    }
+    const parsed = DeleteAccountInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Type "DELETE" to confirm' });
+      return;
+    }
+    try {
+      const { photosRemoved } = await accountFor(req).deleteAccount(req.user!.id);
+      res.status(200).json({ deleted: true, photosRemoved });
+    } catch (err) {
+      if (err instanceof AccountDeletionError) {
+        res.status(502).json({
+          error: `${err.message} Your account was not deleted; please try again.`,
+          stage: err.stage,
+        });
+        return;
+      }
       next(err);
     }
   });
@@ -207,6 +313,8 @@ export function createApp({ config, verifyToken, storeFor, live, webhook }: AppD
       next(err);
     }
   });
+
+  api.use("/billing", billingRouter(billing ?? null));
 
   if (live) {
     api.use("/live", liveRouter(live));

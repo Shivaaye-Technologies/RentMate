@@ -12,6 +12,41 @@ Render, GitHub settings).
 
 No P0 issue was found. Nothing was tested against production; no production system was touched.
 
+## Phase 2 audit (2026-11-20): new findings
+
+Full detail, evidence, reproduction, fixes and required tests: `RENTMATE_FULL_AUDIT_REPORT.md`. Audited at `c5aa208`,
+read-only.
+
+**Phase 3 update (2026-11-20, local commits, not pushed or deployed):** P2-04 **fixed** (`6fbd3d9`); P2-05 **fixed**
+(`923d939` + `ac396b7`); P2-03 **prepared only** (`0369f63`: self-declared date of birth and 18+ confirmation — not
+verification; requirement switch off). P2-01, P2-02, P2-06, P2-07, P2-08: proposals in
+`RENTMATE_PHASE3_PROPOSALS.md`, awaiting approval. Everything else below is still open.
+
+**P2-03 database enforcement (2026-11-20, local commit, not pushed or applied):** migration
+`20261123140000_age_attestation_enforcement.sql` lets the database refuse new non-demo profiles without a valid
+self-declared attestation when `require_age_attestation` is on, so direct Supabase or API requests cannot skip the
+app's date-of-birth step. Default stays `false`; enabled only in disposable staging. Existing members unaffected; demo
+exemption limited to reserved demo accounts; no admin or service-role exception. Still a self-declaration, not
+verification. Details, activation and rollback: `RENTMATE_AGE_ATTESTATION.md`.
+
+| ID    | Severity | Finding                                                                                                                       | Where                                                                             |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| P2-01 | High     | Prohibited-content filter bypassed by common wording and obfuscation ("happy ending massage", "nude photos", "s3x", "e$c0rt") | `20261118100000_policy_hardening.sql:12-24`                                       |
+| P2-02 | High     | "Public place" check accepts hotel rooms, homes and Airbnbs                                                                   | `20261119090000_marketplace.sql:114-121`, `:317`                                  |
+| P2-03 | High     | 18+ is a self-entered age; no date of birth, confirmation or verification (F-04/F-05)                                         | `apps/api/src/validation.ts:6`, `20261022210236_init.sql:8`, `AuthScreen.tsx:413` |
+| P2-04 | Medium   | Any signed-in member can read (and likely list) every member's photos                                                         | `20261023101225_safety_profile_functions_delete_account.sql:138-142`              |
+| P2-05 | Medium   | Account deletion removes photos only from the browser; nothing server-side                                                    | `AccountPanel.tsx:33-45`, `…delete_account.sql:80-92`                             |
+| P2-06 | Medium   | Production `Permissions-Policy` blocks geolocation, so location sharing fails                                                 | `render.yaml:78`, `Settings.tsx:160`                                              |
+| P2-07 | Medium   | API on Render free plan; sleeping delays room removals                                                                        | `render.yaml:7`, `apps/api/src/server.ts:52-56`                                   |
+| P2-08 | Medium   | Supabase Auth settings unversioned; password minimum enforced only in the browser                                             | no `supabase/config.toml`; `apps/web/src/auth.ts:93`                              |
+| P2-09 | Low      | `anon` still holds `SELECT` on six tables (no rows exposed today)                                                             | Supabase default privileges                                                       |
+| P2-10 | Low      | `transactions.kind` allows `payout`, `subscription` (table unused, closed to clients)                                         | `20261119090000_marketplace.sql:494`                                              |
+| P2-11 | Low      | 33 foreign keys without an index                                                                                              | several migrations                                                                |
+| P2-12 | Low      | Colour contrast on sign-in status pills                                                                                       | `apps/web/src/styles.css:3458`                                                    |
+| P2-13 | Low      | No runtime ledger reconciliation                                                                                              | `20261120100000_token_wallet.sql`                                                 |
+| P2-14 | Low      | Backups and restore not rehearsed                                                                                             | `docs/RENTMATE_ROLLBACK_PLAN.md:21`                                               |
+| P2-15 | Info     | CodeQL alert #3: false positive, open pending approval                                                                        | `apps/api/src/live/providers.ts:70`                                               |
+
 ## Summary
 
 | ID      | Sev | Title                                                                              | Evidence  | Status                       |

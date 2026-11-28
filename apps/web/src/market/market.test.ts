@@ -1,13 +1,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BookingCard } from "./BookingsList";
+import { BookingCard, CheckInPanel } from "./BookingsList";
 import { BookingForm, CompanionCards } from "./Marketplace";
 import type { Booking, Service, Settings } from "./marketData";
 import {
   bookingActions,
   bookingProblem,
+  checkInStep,
   formatINR,
+  formatIndianNumber,
+  normaliseCheckInCode,
   looksLikeAddress,
   marketError,
   priceEstimate,
@@ -29,6 +32,16 @@ describe("pricing (mirrors the server)", () => {
     expect(formatINR(1600)).toBe("₹1,600");
     expect(formatINR(150000)).toBe("₹1,50,000");
     expect(formatINR(null)).toBe("—");
+  });
+
+  it("groups digits the Indian way without relying on the runtime's locale data", () => {
+    expect(formatIndianNumber(0)).toBe("0");
+    expect(formatIndianNumber(999)).toBe("999");
+    expect(formatIndianNumber(1000)).toBe("1,000");
+    expect(formatIndianNumber(12345678)).toBe("1,23,45,678");
+    expect(formatIndianNumber(-150000)).toBe("-1,50,000");
+    expect(formatIndianNumber(1499.6)).toBe("1,500");
+    expect(formatIndianNumber(Number.NaN)).toBe("—");
   });
 });
 
@@ -284,5 +297,37 @@ describe("screens", () => {
       createElement(BookingCard, { b: done, me: "c", names: {}, reviewed: false, reload: noop }),
     );
     expect(companion).not.toContain(">Write a review<");
+  });
+});
+
+describe("meetup check-in (shared with Android)", () => {
+  const b = {
+    status: "accepted",
+    starts_at: "2026-12-02T10:00:00Z",
+    ends_at: "2026-12-02T11:00:00Z",
+    member_id: "m",
+    companion_id: "c",
+  };
+  it("gives the member a code and the companion a code box only inside the window", () => {
+    expect(checkInStep(b, "m", new Date("2026-12-02T09:00:00Z"))).toBe("not_yet");
+    expect(checkInStep(b, "m", new Date("2026-12-02T09:45:00Z"))).toBe("show_code");
+    expect(checkInStep(b, "c", new Date("2026-12-02T10:30:00Z"))).toBe("enter_code");
+    expect(checkInStep(b, "c", new Date("2026-12-02T11:30:00Z"))).toBeNull();
+    expect(checkInStep(b, "x", new Date("2026-12-02T10:30:00Z"))).toBeNull();
+  });
+  it("renders the panel in the booking card for the member", () => {
+    const html = renderToStaticMarkup(
+      createElement(CheckInPanel, {
+        b: {
+          ...b,
+          starts_at: new Date(Date.now() - 600_000).toISOString(),
+          ends_at: new Date(Date.now() + 3_000_000).toISOString(),
+        } as never,
+        me: "m",
+        reload: async () => {},
+      }),
+    );
+    expect(html).toContain("Show my check-in code");
+    expect(normaliseCheckInCode("12 34 56")).toBe("123456");
   });
 });

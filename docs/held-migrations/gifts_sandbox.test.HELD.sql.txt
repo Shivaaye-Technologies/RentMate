@@ -1,0 +1,156 @@
+-- HELD FOR REVIEW: test for docs/held-migrations/20261126180000_gifts_sandbox.HELD.sql.txt. Not run by npm test.
+-- Gifts sandbox (migration 20261126180000). Always rolls back. Every result must start with "ok".
+do $$
+declare
+  adm uuid := gen_random_uuid();
+  modr uuid := gen_random_uuid();
+  snd uuid := gen_random_uuid();   -- tester, sender
+  cr uuid := gen_random_uuid();    -- tester, approved creator
+  plain uuid := gen_random_uuid(); -- tester, not a creator
+  outsider uuid := gen_random_uuid(); -- not a tester
+  r text := ''; n bigint; t text; bal bigint; bal0 bigint; g1 bigint; g2 bigint; cat text; live uuid;
+begin
+  insert into auth.users (id, email, aud, role, instance_id)
+  select u, u::text || '@gift.test', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000'
+  from unnest(array[adm, modr, snd, cr, plain, outsider]) u;
+  insert into public.profiles (id, display_name, age, looking_for, age_min, age_max)
+  select u, 'Member', 30, 'friendship', 18, 60 from unnest(array[adm, modr, snd, cr, plain, outsider]) u;
+  insert into private.user_roles (user_id, role) values (adm, 'admin'), (modr, 'moderator');
+  update public.profiles set is_tester = true where id in (snd, cr, plain);
+  select key into cat from public.content_categories where available and not private.is_explicit(key) limit 1;
+  insert into public.creators (user_id, stage_name, country_code, categories, status)
+  values (cr, 'Host Name', 'GB', array[cat], 'approved');
+  insert into public.live_providers (key, name, api_endpoint, credential_env, integration_status, permitted_categories,
+                                     contract_status, terms_reviewed_at)
+  select 'livekit', 'LiveKit', 'wss://example.livekit.cloud', 'LIVEKIT', 'testing', array_agg(key), 'negotiating', now()
+  from public.content_categories where available
+  on conflict (key) do update set integration_status = 'testing';
+  insert into public.live_streams (creator_id, provider_key, title, category, status, started_at)
+  values (cr, 'livekit', 'Evening music', cat, 'live', now()) returning id into live;
+
+  -- Locked switches and the pending creator share.
+  begin
+    update public.gift_settings set live_enabled = true where id = 1;
+    r := r || 'FAIL live gifts switched on; ';
+  exception when check_violation then r := r || 'ok live gifts are locked off; ';
+  end;
+  begin
+    update public.gift_settings set creator_share_pct = 70 where id = 1;
+    r := r || 'FAIL a creator share was set; ';
+  exception when check_violation then r := r || 'ok no creator share until approved; ';
+  end;
+  select count(*) into n from public.gift_catalog;
+  r := r || case when n = 0 then 'ok the catalogue starts empty (no invented prices); ' else 'FAIL catalogue ' || n || '; ' end;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+  begin
+    perform public.admin_set_gift('rose', 'Rose', 10, true);
+    r := r || 'FAIL a member priced a gift; ';
+  exception when insufficient_privilege then r := r || 'ok only admins set gifts and prices; ';
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
+  perform public.admin_set_gift('rose', 'Rose', 10, true);
+  perform public.admin_set_gift('hidden_gift', 'Hidden', 5, false);
+  -- Sandbox test tokens come from the booking sandbox grant.
+  perform public.admin_set_booking_token_sandbox(true);
+  perform public.admin_grant_sandbox_tokens(snd, 100, 'gift-grant-0001');
+
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+  select balance into bal0 from public.token_wallets where user_id = snd;
+  begin
+    perform public.gift_send('rose', cr, null, 'gift-key-0001');
+    r := r || 'FAIL sent while the gift sandbox is off; ';
+  exception when raise_exception then r := r || 'ok nothing is sent while the sandbox is off; ';
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
+  perform public.admin_set_gift_sandbox(true);
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+
+  select count(*) into n from public.gift_catalog;
+  r := r || case when n = 1 then 'ok members see active gifts only; ' else 'FAIL visible gifts ' || n || '; ' end;
+  begin
+    perform public.gift_send('rose', plain, null, 'gift-key-0002');
+    r := r || 'FAIL gift to a non-creator; ';
+  exception when raise_exception then r := r || 'ok gifts go to approved creators only; ';
+  end;
+  begin
+    perform public.gift_send('rose', snd, null, 'gift-key-0003');
+    r := r || 'FAIL gift to self; ';
+  exception when invalid_parameter_value then r := r || 'ok no gifts to yourself; ';
+  end;
+  begin
+    perform public.gift_send('hidden_gift', cr, null, 'gift-key-0004');
+    r := r || 'FAIL inactive gift sent; ';
+  exception when raise_exception then r := r || 'ok inactive gifts cannot be sent; ';
+  end;
+
+  g1 := public.gift_send('rose', cr, live, 'gift-key-0005');
+  g2 := public.gift_send('rose', cr, live, 'gift-key-0005');
+  r := r || case when g1 = g2 then 'ok the same key never charges twice; ' else 'FAIL duplicate gift; ' end;
+  begin
+    perform public.gift_send('rose', cr, null, 'gift-key-0005');
+    r := r || 'FAIL key reused for a different gift; ';
+  exception when unique_violation then r := r || 'ok a reused key with other details is refused; ';
+  end;
+  select balance into bal from public.token_wallets where user_id = snd;
+  r := r || case when bal = bal0 - 10 then 'ok the sender paid the catalogue price once; ' else 'FAIL balance ' || bal || ' vs ' || bal0 || '; ' end;
+
+  -- A price change applies to later gifts only.
+  perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
+  perform public.admin_set_gift('rose', 'Rose', 25, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+  perform public.gift_send('rose', cr, null, 'gift-key-0006');
+  select string_agg(tokens::text, ',' order by id) into t from public.gift_transactions;
+  r := r || case when t = '10,25' then 'ok each gift keeps the price it was sent at; ' else 'FAIL prices ' || coalesce(t, 'none') || '; ' end;
+  perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
+  perform public.admin_set_gift('diamond', 'Diamond', 10000, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+  begin
+    perform public.gift_send('diamond', cr, null, 'gift-key-0007');
+    r := r || 'FAIL sent more than the balance; ';
+  exception when raise_exception then r := r || 'ok no gift without enough tokens; ';
+  end;
+
+  select count(*) into n from public.my_gift_history() where direction = 'sent';
+  r := r || case when n = 2 then 'ok the sender sees their gifts; ' else 'FAIL sender history ' || n || '; ' end;
+  perform set_config('request.jwt.claims', json_build_object('sub', cr, 'role', 'authenticated')::text, true);
+  select count(*), min(allocation_status) into n, t from public.my_gift_history() where direction = 'received';
+  r := r || case when n = 2 and t = 'pending_policy' then 'ok the creator sees received gifts, pending policy; '
+                 else 'FAIL creator history ' || n || ' ' || coalesce(t, '') || '; ' end;
+  perform set_config('request.jwt.claims', json_build_object('sub', outsider, 'role', 'authenticated')::text, true);
+  select count(*) into n from public.gift_transactions;
+  r := r || case when n = 0 then 'ok others cannot read gifts; ' else 'FAIL outsider reads ' || n || '; ' end;
+  begin
+    perform public.gift_send('rose', cr, null, 'gift-key-0010');
+    r := r || 'FAIL non-tester sent a gift; ';
+  exception when raise_exception then r := r || 'ok testers only; ';
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', modr, 'role', 'authenticated')::text, true);
+  select gifts, tokens, balanced::text into n, bal, t from public.admin_gift_reconciliation();
+  r := r || case when n = 2 and bal = 35 and t = 'true' then 'ok gift reconciliation balances; '
+                 else 'FAIL reconciliation ' || n || '/' || bal || '/' || t || '; ' end;
+  reset role;
+
+  -- Blocking stops gifts; records cannot be edited; nobody was credited.
+  insert into public.blocks (blocker_id, blocked_id) values (cr, snd);
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', snd, 'role', 'authenticated')::text, true);
+  begin
+    perform public.gift_send('rose', cr, null, 'gift-key-0011');
+    r := r || 'FAIL gift across a block; ';
+  exception when raise_exception then r := r || 'ok no gifts between blocked people; ';
+  end;
+  reset role;
+  begin
+    update public.gift_transactions set tokens = 1;
+    r := r || 'FAIL gift edited; ';
+  exception when insufficient_privilege then r := r || 'ok gift records are append-only; ';
+  end;
+  select count(*) into n from public.token_ledger where user_id = cr and reason <> 'registration_bonus';
+  r := r || case when n = 0 then 'ok the creator was credited nothing (share pending approval); ' else 'FAIL creator ledger ' || n || '; ' end;
+  select count(*) into n from public.gift_price_history where gift_key = 'rose';
+  r := r || case when n = 2 then 'ok every price change is kept; ' else 'FAIL price history ' || n || '; ' end;
+
+  raise exception 'ROLLED BACK. RESULTS: %', r;
+end $$;

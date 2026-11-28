@@ -36,6 +36,18 @@ services:
         sync: false
       - key: LIVE_COUNTRY_HEADER
         sync: false
+      # Google Play Billing (sandbox); see docs/PLAY_BILLING_SANDBOX_RUNBOOK.md.
+      - key: GOOGLE_PLAY_PACKAGE_NAME
+        sync: false
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: BILLING_DB_SECRET
+        sync: false
+      - key: GOOGLE_PLAY_RTDN_TOKEN
+        sync: false
+      # Booking expiry job; same value stored once with private.set_integration_secret('booking_jobs', ...).
+      - key: BOOKING_JOBS_DB_SECRET
+        sync: false
 
   - type: web
     name: soulmate-web

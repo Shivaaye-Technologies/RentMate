@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, staging/rentmate-android]
 
 permissions:
   contents: read
@@ -47,6 +47,8 @@ jobs:
         run: npm run test:aihub
       - name: Build
         run: npm run build
+      - name: Server secrets stay out of the browser bundle
+        run: npm run test:bundle-secrets
       - name: Secret scan (committed .env files)
         run: |
           if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
@@ -76,6 +78,8 @@ jobs:
         run: npm run test:e2e
       - name: Admin MFA screens (enrolment, challenge, recovery)
         run: npm run test:e2e:mfa
+      - name: Onboarding age declaration fails closed (attest_adult errors)
+        run: npm run test:e2e:onboarding
 
   db-concurrency:
     # Real PostgreSQL with two simultaneous sessions: double-booking, idempotent retries, cancel-vs-accept.
@@ -104,6 +108,13 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: ci-throwaway
         run: scripts/test-db-concurrency.sh
+      - name: Age attestation staging rehearsal (requirement on, disable, rollback)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: ci-throwaway
+        run: scripts/test-age-attestation-staging.sh
 
   rtc:
     # Real voice, video and broadcast through a real LiveKit server, in real Chromium with fake camera/microphone.
@@ -133,3 +144,31 @@ jobs:
       - name: LiveKit log (on failure)
         if: failure()
         run: tail -200 /tmp/livekit.log
+
+  mobile:
+    # Android app (apps/mobile, Expo SDK 58): its own npm project because it needs React 19 while the web uses
+    # React 18. No native build here (that runs on EAS); this checks types, unit tests, the Android JavaScript bundle
+    # and that no server secret reaches it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: App config resolves (package id, SDK 36, permissions)
+        run: npm run -s config > /dev/null
+      - name: Native Android project (expo prebuild) has the approved package id, SDK 36, deep links, no extra permissions
+        run: npm run check:native
+      - name: Android bundle has no server secrets (also proves the Android JavaScript bundle builds)
+        run: npm run check:bundle-secrets

@@ -67,7 +67,14 @@ begin
   select count(*) into n from public.discover_profiles() where id = any (demo_ids) and distance_km is not null and distance_km <= 30;
   r := r || case when n = array_length(demo_ids, 1) then 'ok demo distances within 30 km; ' else 'FAIL distances ' || n || '; ' end;
   select count(*) into n from public.discover_profiles() where id = any (demo_ids) and online;
-  r := r || case when n between 5 and 50 then 'ok some demo online (' || n || '); ' else 'FAIL online ' || n || '; ' end;
+  -- Online status is a deterministic hash-based 25% sample, not a fixed-size pool.
+  -- Use a proportion so the assertion remains valid as the released demo cohort grows.
+  r := r || case
+    when n >= ceil(array_length(demo_ids, 1) * 0.10)
+     and n <= ceil(array_length(demo_ids, 1) * 0.40)
+    then 'ok some demo online (' || n || ' of ' || array_length(demo_ids, 1) || '); '
+    else 'FAIL online ' || n || ' of ' || array_length(demo_ids, 1) || '; '
+  end;
   select count(*) into n from public.demo_profile_ids();
   r := r || case when n = total then 'ok tester gets demo ids; ' else 'FAIL tester demo ids ' || n || '; ' end;
 
@@ -76,11 +83,12 @@ begin
   select id into mid from public.matches where (user_a, user_b) = (least(t, d), greatest(t, d));
   r := r || case when mid is not null then 'ok super like to demo creates match; ' else 'FAIL no match after super like; ' end;
 
-  for i in 2..21 loop
+  -- The tester is still subject to the new 15-like free allowance.
+  for i in 2..15 loop
     insert into public.likes (liker_id, liked_id) values (t, demo_ids[i]);
   end loop;
   select count(*) into n from public.matches where t in (user_a, user_b);
-  r := r || case when n between 10 and 21 then 'ok most likes matched (' || n || ' of 21); ' else 'FAIL matches ' || n || '; ' end;
+  r := r || case when n between 8 and 15 then 'ok most likes matched (' || n || ' of 15); ' else 'FAIL matches ' || n || '; ' end;
   select count(*) into n from public.likes where liked_id = t;
   r := r || case when n = (select count(*) from public.matches where t in (user_a, user_b)) then 'ok tester sees demo likes; ' else 'FAIL likes received ' || n || '; ' end;
 

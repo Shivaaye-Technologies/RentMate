@@ -1,75 +1,123 @@
 # RentMate — Deployment Guide
 
-Nothing in this guide is executed without explicit founder approval (F-02, F-03, F-16).
+Nothing in this guide is executed without explicit founder approval. A green CI run or an open pull request is not deployment authorization.
+
+## Canonical source
+
+- Repository: `Shivaaye-Technologies/RentMate`
+- Canonical integration/release-candidate branch: `feature/android-companionship-social`
+- Earnings implementation branch: `feature/earnings-platform-foundation` (merged through [PR #5](https://github.com/Shivaaye-Technologies/RentMate/pull/5), merge commit `d6aea6051356b624238f0ff708a6468f679c9596`).
+- Staging documentation update: [PR #6](https://github.com/Shivaaye-Technologies/RentMate/pull/6) (merged; documentation only).
+- Do not use the historical `rentmate970-hue/RentMate` repository or `feature/rentmate-conversion` branch as the current source of truth.
+
+Confirm the actual Render service, deploy branch, Supabase project and environment variables in their respective dashboards before any release. This guide does not assert that existing production services have been repointed.
 
 ## Environments
 
-| Environment | Web                                                                                | API                                             | Database                                 |
-| ----------- | ---------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------- |
-| Local       | `npm run dev:web`                                                                  | `npm run dev:api`                               | PGlite tests (`npm run test:db`)         |
-| Preview     | Vercel preview per PR (`apps/web`)                                                 | —                                               | —                                        |
-| Staging     | Recommended: Render preview env or a second Render service on `rentmate-migration` | same                                            | Supabase branch or separate free project |
-| Production  | Render `soulmate-web`                                                              | Render `soulmate-api` (auto-deploy from `main`) | Supabase `soulmate-ai`                   |
+- **Local:** Development and automated tests. No shared environment changes.
+- **Preview:** Per-PR web/API validation where configured. Verify preview secrets and data isolation.
+- **Staging:** Isolated Supabase project and non-production services. Confirm project identity, full migration baseline and backup first.
+- **Production:** Approved public service. Deployment and database changes require separate founder approval.
 
-## Repository
-
-The RentMate code now lives in `rentmate970-hue/RentMate` on branch `feature/rentmate-conversion` (full Soulmate-AI
-history kept). The existing Render services still build from the old repository. Pointing them — or new RentMate
-services — at the new repository is a founder decision (F-23); nothing has been changed on Render.
+Staging verification on 2026-11-23: `RentMate-Staging-Mumbai` (`mmopqsqvoenqaedlakyc`, `ap-south-1`) is `ACTIVE_HEALTHY`. Its migration history matched the canonical chain through `20261123160000_financial_config_versions`; migration `20261123170000_retry_rejected_livekit_joins.sql` was then applied to staging and verified in migration history. The `live_webhook_ingest(text,jsonb)` function was verified as `SECURITY DEFINER` with an empty `search_path`. This does not constitute a full application acceptance test or production authorization.
 
 ## Build, start and health
 
-| Service | Build command                                       | Start / publish                                                 | Health              |
-| ------- | --------------------------------------------------- | --------------------------------------------------------------- | ------------------- |
-| API     | `npm ci --include=dev && npm run build -w apps/api` | `npm start -w apps/api`                                         | `GET /health` → 200 |
-| Web     | `npm ci --include=dev && npm run build -w apps/web` | static, publish `apps/web/dist`, SPA rewrite `/* → /index.html` | landing page loads  |
+- **API build:** `npm ci --include=dev && npm run build -w apps/api`
+- **API start:** `npm start -w apps/api`
+- **API liveness:** `GET /health` returns HTTP 200 while the process is running; it deliberately does not probe Supabase.
+- **API readiness:** `GET /ready` returns HTTP 200 only when authentication is configured and Supabase Auth health responds successfully; it returns HTTP 503 when the dependency is unavailable. Configure the host's readiness probe to use this endpoint where supported.
+- **Web build:** `npm ci --include=dev && npm run build -w apps/web`
+- **Web publish:** Static publish from `apps/web/dist`; configure SPA fallback.
+- **Web health:** Confirm the landing page loads.
 
-## Environment variables (production)
+Run the repository's current CI workflow rather than relying only on these abbreviated commands. Confirm the workflow scripts against the checked-out `package.json`.
 
-No new variables are needed for the marketplace: it uses Supabase only (RLS + database functions).
+## Environment variables
 
-| Where | Variable                                                      | Notes                                                    |
-| ----- | ------------------------------------------------------------- | -------------------------------------------------------- |
-| API   | `SUPABASE_URL`, `SUPABASE_ANON_KEY`                           | Publishable key; the API never uses the service-role key |
-| API   | `CORS_ORIGINS`                                                | The web origin(s)                                        |
-| API   | `LIVEKIT_*`, `LIVE_COUNTRY_HEADER`                            | Only after the provider's terms are approved (F-06)      |
-| Web   | `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Browser-safe values only; never a secret key             |
+Use only the values required by the selected environment. Enter secrets through the hosting provider's secret manager; never commit them or place them in browser/mobile bundles.
 
-## Database migrations (in order, after a backup and approval)
+- **API:** `SUPABASE_URL`, `SUPABASE_ANON_KEY` — publishable/anon key only; do not expose service-role credentials.
+- **API:** `CORS_ORIGINS` — explicit allowed web origins.
+- **API:** `LIVEKIT_*`, `LIVE_COUNTRY_HEADER` — only after provider terms and feature authorization.
+- **Web:** `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — browser-safe values only.
 
-1. `20261024090000_profile_details`
-2. `20261101090000_live_foundation`
-3. `20261118090000_no_adult_content`
-4. `20261118100000_policy_hardening`
-5. `20261119090000_marketplace` — installs `btree_gist` in the `extensions` schema (available on Supabase)
+## Canonical migration inventory
 
-All are additive; none deletes data. After applying: run Supabase `get_advisors` (security and performance), then
-make yourself admin once in SQL (`insert into private.user_roles (user_id, role) values ('<your user id>', 'admin');`).
+The following is the migration-file order currently present on `feature/android-companionship-social` after PR #5 was merged. It is an inventory, not permission to apply migrations. Before staging or production use, compare the target database's `supabase_migrations.schema_migrations` history with this exact chain, inspect every migration and dependency, take a restorable backup, and rehearse the full chain on a disposable database.
 
-## Deployment checklist
+1. `20261022210236_init.sql`
+2. `20261022210317_revoke_trigger_function_execute.sql`
+3. `20261022210959_discovery_and_realtime.sql`
+4. `20261022211449_photos_location_superlikes_meet.sql`
+5. `20261022211514_ready_to_meet_invoker.sql`
+6. `20261023095502_safety_private_helpers.sql`
+7. `20261023101049_safety_policies_reports_limits.sql`
+8. `20261023101225_safety_profile_functions_delete_account.sql`
+9. `20261023101930_safety_hide_location_private_photos.sql`
+10. `20261023103442_fix_write_limits_per_table.sql`
+11. `20261023121400_demo_profiles_testers.sql`
+12. `20261023165729_demo_mode_public.sql`
+13. `20261024090000_profile_details.sql`
+14. `20261101090000_live_foundation.sql`
+15. `20261118090000_no_adult_content.sql`
+16. `20261118100000_policy_hardening.sql`
+17. `20261119090000_marketplace.sql`
+18. `20261120090000_audit_hardening.sql`
+19. `20261120100000_token_wallet.sql`
+20. `20261121090000_calls_and_live_rooms.sql`
+21. `20261121100000_admin_mfa.sql`
+22. `20261122090000_recovery_codes_and_retention.sql`
+23. `20261123090000_guest_host_mutes.sql`
+24. `20261123100000_integration_secret_strength.sql`
+25. `20261123110000_photo_privacy.sql`
+26. `20261123120000_account_deletion_photos.sql`
+27. `20261123130000_age_attestation.sql`
+28. `20261123140000_age_attestation_enforcement.sql`
+29. `20261123150000_payment_account_registry.sql`
+30. `20261123160000_financial_config_versions.sql`
+31. `20261123170000_retry_rejected_livekit_joins.sql`
 
-- [ ] GitHub access to `rentmate970-hue/RentMate` for Claude (or push from your own machine).
-- [ ] PR reviewed; CI green (policy guard, format, lint, typecheck, unit + DB tests, build, e2e).
-- [ ] Supabase backup taken; migrations 1–5 applied; advisors checked.
-- [ ] Supabase Auth: Site URL and redirect URLs set to the production web address; custom SMTP (F-17).
-- [ ] Render services pointed at the approved repository/branch (F-23); environment variables entered by you.
-- [ ] Smoke test: `/health`, landing, sign-in, `#companions` search, a test booking between two test accounts.
-- [ ] Payments stay off (they cannot be switched on without a new reviewed migration).
+Do not mark migrations as applied manually to bypass execution. Do not run only items 29–31 against an empty staging database. Resolve missing, divergent or already-applied versions before proceeding. Run Supabase security/performance advisors and the full database test suite after a staging rehearsal.
 
-## Release steps
+Run database regression SQL only through `npm run test:db` against its disposable PGlite database. Do not paste the suite's test files into a real Supabase SQL editor; see `supabase/tests/README.md` for the platform-specific reason.
 
-1. GitHub access restored (F-01). Push `rentmate-migration`; open PRs per phase into it, then one release PR into `main`.
-2. CI green: `npm run check && npm run test:hooks && npm run test:aihub && npm run test:e2e`.
-3. Back up production (Supabase dashboard → Database → Backups, or `pg_dump` of `public` and `private`).
-4. Apply approved migrations in order with the Supabase migration tool; run `get_advisors` (security + performance).
-5. Set new environment variables in Render (names only are in `.env.example`; values are entered by the founder):
-   `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVE_COUNTRY_HEADER`.
-6. Founder merges the release PR to `main` → Render deploys.
-7. Verify: `GET /health` 200, `GET /` shows `"name": "RentMate API"`, landing shows RentMate, sign-in works,
-   `/privacy.html` loads.
-8. If any check fails → `RENTMATE_ROLLBACK_PLAN.md`.
+## Pre-release checklist
 
-## HostyCare/cPanel
+- [x] Confirm this canonical repository and integration branch (`Shivaaye-Technologies/RentMate`, `feature/android-companionship-social`).
+- [x] Review and merge PR #5, including its migration changes and CI checks; retain a separate release-base review before production.
+- [ ] Confirm CI is green on the exact final release-candidate commit (the PR checks passed, but rerun/verify against the final merged candidate SHA before release).
+- [x] Confirm staging project identity and migration history; latest pending LiveKit retry migration applied and recorded.
+- [x] Merge PR #6 documentation-only staging readiness update.
+- [ ] Rehearse the complete migration chain from a fresh disposable baseline and run full staging acceptance tests.
+- [ ] Take a backup and demonstrate that it can be restored.
+- [ ] Verify Supabase Auth site/redirect URLs, SMTP, CORS and provider configuration.
+- [ ] Verify hosting service repository, branch, build command, runtime and environment variables.
+- [ ] Run smoke tests for health, landing, sign-in, discovery, booking and relevant live features.
+- [ ] Confirm payment capture, token purchases, withdrawals and payouts remain disabled unless separately reviewed and approved.
 
-Not audited (no access). Suitable for static marketing/legal pages if it serves HTTPS. Not recommended for the API
-unless it provides Node 20+, persistent processes and environment variables; Render already does this.
+## Release and rollback
+
+1. Complete code review and CI for the exact candidate commit on `feature/android-companionship-social`; a green PR check on a different SHA is not sufficient.
+2. Obtain explicit approval for the target environment, deployment and database migration separately.
+3. Back up the target database and verify the restore procedure.
+4. Reconcile migration history, then apply the reviewed chain using the approved Supabase migration workflow.
+5. Run security/performance advisors, database tests and application smoke tests.
+6. Deploy the approved commit to the explicitly selected hosting environment.
+7. Verify health, authentication, key user journeys, logs and alerts.
+8. If validation fails, follow `RENTMATE_ROLLBACK_PLAN.md`; prefer forward fixes for applied schema changes unless a rehearsed rollback is known to be safe.
+
+A founder-approved code merge does not, by itself, authorize a production deployment or production database mutation.
+
+## Payment, tax and payout restrictions
+
+- The payment-account registry is metadata-only. It does not implement hosted card checkout, dynamic UPI QR issuance, provider credential management, webhook settlement verification or payment reconciliation.
+- Payment account records are read through an admin-only RPC; browser roles must not receive direct table access.
+- Token pricing and tax records are versioned configuration only. They do not activate purchases, deposits, withdrawals, cash redemption or payouts.
+- Tax settings require jurisdiction-specific professional review; do not assume a tax rate or copy test-fixture values into a real configuration.
+- Provider secrets belong in an approved server-side secret manager, never in repository files, database plaintext fields or client bundles.
+- No live payment or payout activation until legal, provider, security and founder approvals are separately recorded.
+
+## HostyCare / cPanel
+
+Not audited as part of this guide. Consider it only for static HTTPS content unless its Node runtime, persistent process model, environment-secret handling, observability and operational controls are independently verified.

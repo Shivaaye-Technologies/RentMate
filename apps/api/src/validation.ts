@@ -16,3 +16,6 @@ export const ProfileInput = z
   });
 
 export type ProfileInput = z.infer<typeof ProfileInput>;
+
+/** Body of DELETE /api/v1/account: the member typed the confirmation word (same word the app asks for). */
+export const DeleteAccountInput = z.object({ confirm: z.literal("DELETE") });

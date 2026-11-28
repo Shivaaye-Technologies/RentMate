@@ -138,6 +138,12 @@ begin
           'createdAt', extract(epoch from t)::bigint::text, 'room', jsonb_build_object('name', room),
           'participant', jsonb_build_object('identity', x::text)));
   r := r || case when (js ->> 'kick')::boolean then 'ok an outsider who reaches a call room is removed at once; ' else 'FAIL outsider stays; ' end;
+  js := public.live_webhook_ingest(secret, jsonb_build_object('event', 'participant_joined', 'id', 'EV_X',
+          'createdAt', extract(epoch from t)::bigint::text, 'room', jsonb_build_object('name', room),
+          'participant', jsonb_build_object('identity', x::text)));
+  r := r || case when (js ->> 'duplicate')::boolean and (js ->> 'kick')::boolean
+                 then 'ok a rejected duplicate join is kicked again after a failed removal retry; '
+                 else 'FAIL rejected duplicate join was not kicked again; ' end;
   js := public.live_webhook_ingest(secret, jsonb_build_object('event', 'participant_joined', 'id', 'EV_2',
           'createdAt', extract(epoch from t + interval '5 seconds')::bigint::text, 'room', jsonb_build_object('name', room),
           'participant', jsonb_build_object('identity', b::text)));
@@ -153,13 +159,15 @@ begin
   select * into rec from public.call_sessions where id = c1;
   r := r || case when rec.billable_seconds = 60 then 'ok billing counts only time both people were connected (60 s); '
                  else 'FAIL billable ' || coalesce(rec.billable_seconds, -1) || '; ' end;
-  r := r || case when rec.tokens_due = 10 and rec.billing_status = 'not_charged' and coalesce(rec.tokens_charged, 0) = 0
-                 then 'ok voice is priced at 10 tokens a minute and not charged while metering is off; '
+  r := r || case when rec.tokens_due = 60 and rec.billing_status = 'not_charged' and coalesce(rec.tokens_charged, 0) = 0
+                 then 'ok voice is priced at 60 tokens a minute and not charged while metering is off; '
                  else 'FAIL due ' || rec.tokens_due || ' ' || rec.billing_status || '; ' end;
   select balance into n from public.token_wallets where user_id = a;
   r := r || case when n = 100 then 'ok no tokens move while metering is off; ' else 'FAIL balance ' || n || '; ' end;
 
   -- Charging path (switched on only inside this rolled-back test).
+  -- The new video rate is 5 tokens/second; fund enough for the 30-second sample.
+  update public.token_wallets set balance = 500 where user_id = a;
   update public.metering_rates set call_metering_enabled = true;
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -183,7 +191,7 @@ begin
   reset role;
   select * into rec from public.call_sessions where id = c2;
   select balance into n from public.token_wallets where user_id = a;
-  r := r || case when rec.billing_status = 'charged' and rec.tokens_charged = 30 and n = 70
+  r := r || case when rec.billing_status = 'charged' and rec.tokens_charged = 150 and n = 350
                  then 'ok video is charged 1 token a second from server events, once; '
                  else 'FAIL video charge ' || rec.billing_status || ' ' || rec.tokens_charged || ' bal ' || n || '; ' end;
   select count(*) into n from public.token_ledger where idempotency_key = 'call:' || c2;

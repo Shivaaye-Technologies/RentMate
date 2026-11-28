@@ -792,12 +792,15 @@ function TicketsAndAppeals() {
   );
 }
 
+type StaffRole = "agent" | "sub_admin" | "master_admin" | "moderator" | "admin";
+const isLegacy = (r: StaffRole): r is "moderator" | "admin" => r === "moderator" || r === "admin";
+
 function AgreementAndRoles({ isAdmin }: { isAdmin: boolean }) {
   const [version, setVersion] = useState("");
   const [title, setTitle] = useState("Creator agreement");
   const [url, setUrl] = useState("");
   const [user, setUser] = useState("");
-  const [role, setRole] = useState<"admin" | "moderator">("moderator");
+  const [role, setRole] = useState<StaffRole>("agent");
   const { busy, run, messages, setError } = useAction(async () => undefined);
   if (!isAdmin) return null;
   return (
@@ -835,6 +838,10 @@ function AgreementAndRoles({ isAdmin }: { isAdmin: boolean }) {
         Publish as current version
       </button>
       <h3>Team roles</h3>
+      <p className="muted">
+        You can grant only roles below your own, to people below you. Super admins are added by the database
+        owner.
+      </p>
       <div className="row-wrap">
         <input
           aria-label="User id"
@@ -842,27 +849,35 @@ function AgreementAndRoles({ isAdmin }: { isAdmin: boolean }) {
           value={user}
           onChange={(e) => setUser(e.target.value.trim())}
         />
-        <select
-          aria-label="Role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as "admin" | "moderator")}
-        >
-          <option value="moderator">Moderator</option>
-          <option value="admin">Admin</option>
+        <select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
+          <option value="agent">Agent (support queue)</option>
+          <option value="sub_admin">Sub admin (moderation)</option>
+          <option value="master_admin">Master admin (settings, finance config)</option>
+          <option value="moderator">Moderator (legacy)</option>
+          <option value="admin">Admin (legacy)</option>
         </select>
       </div>
       <div className="row-wrap">
         <button
           className="btn small"
           disabled={busy || !user}
-          onClick={() => void run(() => adminApi.setRole(user, role, true), "Role granted.")}
+          onClick={() =>
+            void run(
+              () =>
+                isLegacy(role) ? adminApi.setRole(user, role, true) : adminApi.grantStaffRole(user, role),
+              "Role granted.",
+            )
+          }
         >
           Grant
         </button>
         <button
           className="btn small"
-          disabled={busy || !user}
-          onClick={() => void run(() => adminApi.setRole(user, role, false), "Role removed.")}
+          disabled={busy || !user || !isLegacy(role)}
+          title={isLegacy(role) ? undefined : "Staff tiers are removed by the database owner for now."}
+          onClick={() => {
+            if (isLegacy(role)) void run(() => adminApi.setRole(user, role, false), "Role removed.");
+          }}
         >
           Remove
         </button>

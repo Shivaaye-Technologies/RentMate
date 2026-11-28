@@ -7,6 +7,28 @@ database or Render service was read or changed. Labels: **Verified** (executed h
 **Verdict: deployment-preparable, not deployment-ready.** The code, migrations, rollback and checks are in place and
 tested locally and in CI. Approvals and production settings below must be completed first.
 
+## Phase 2 audit (2026-11-20)
+
+**Not deployment-ready.** All repository checks pass on `c5aa208` (see `RENTMATE_FULL_AUDIT_REPORT.md` §4), but the
+Phase 2 audit adds these to the blockers below:
+
+1. **P2-01, P2-02:** prohibited-content and public-place filters are easy to bypass (High; needs founder and legal input
+   on wording and venue rules).
+2. **P2-03:** date of birth and 18+ confirmation are now prepared (`0369f63`, self-declared, switch off), but this is
+   **not verification**; a verification provider is still a founder decision (F-04/F-05). Still a blocker for
+   public launch.
+   Database enforcement is ready (`20261123140000`, rehearsed in disposable staging). For the controlled beta: apply
+   the migration, then run `docs/ops/require_age_attestation.enable.sql`, each only with explicit approval; undo with
+   `require_age_attestation.disable.sql`. See `RENTMATE_AGE_ATTESTATION.md`.
+3. **P2-04, P2-05:** fixed in local commits (`6fbd3d9`; `923d939` + `ac396b7`). Their three migrations must be
+   applied to production only with approval, after merge. Not a blocker once applied.
+4. **P2-06:** `render.yaml` `Permissions-Policy` must allow `geolocation=(self)`, or location sharing fails in
+   production.
+5. **P2-07:** move the API off Render's free plan (always-on instance) before launch.
+6. **P2-08:** record and verify the Supabase Auth settings (password minimum, email confirmation, redirect allowlist,
+   leaked-password protection).
+7. **P2-14:** confirm Supabase backups for the production plan and rehearse a restore.
+
 ## 1. Blockers (must be resolved before any production deploy)
 
 | #   | Blocker                                                                                                          | Owner   | Ref        |

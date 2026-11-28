@@ -20,7 +20,8 @@ create table auth.users (
   is_anonymous boolean not null default false
 );
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid;
+  -- Like Supabase's own auth.uid(): an empty claims setting (left behind after a transaction-local set) means no user.
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'sub', '')::uuid;
 $$;
 -- Supabase Auth: the JWT claims (aal = assurance level), MFA factors and sessions.
 create function auth.jwt() returns jsonb language sql stable as $$
@@ -54,8 +55,18 @@ grant all on storage.objects, storage.buckets to anon, authenticated, service_ro
 
 create publication supabase_realtime;
 
--- Supabase grants the API roles access to new objects in public by default.
+-- Default privileges as on a current Supabase project (checked on RentMate-staging, created 2026-11-20): objects
+-- that migrations create in public get NO table, sequence or function privileges for anon or authenticated, and
+-- PUBLIC loses EXECUTE on new functions. Every migration must grant exactly what the app needs. Older projects
+-- granted everything by default; testing against that hid missing grants ("permission denied for table likes").
 grant usage on schema public to anon, authenticated, service_role;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+-- Exactly staging's pg_default_acl for postgres-owned tables: anon=m, authenticated=m, service_role=Dxtm.
+alter default privileges in schema public grant truncate, references, trigger on tables to service_role;
+-- MAINTAIN (VACUUM/ANALYZE only) exists from PostgreSQL 17; the CI concurrency job runs an older server.
+do $$
+begin
+  if current_setting('server_version_num')::int >= 170000 then
+    execute 'alter default privileges in schema public grant maintain on tables to anon, authenticated, service_role';
+  end if;
+end $$;
+alter default privileges in schema public revoke execute on functions from public;
